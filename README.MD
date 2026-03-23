@@ -1,4 +1,4 @@
-# EduApp (in progress)
+# Courser
 
 ## O projekcie
 EduApp to darmowa platforma e-learningowa łącząca kursy, interaktywne quizy i elementy rywalizacji (rankingi), aby zwiększać motywację do nauki.
