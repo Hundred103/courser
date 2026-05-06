@@ -1,0 +1,215 @@
+### =========================================
+### GET ALL QUIZZES
+### Pobranie wszystkich quizów
+### =========================================
+GET http://localhost:8080/quizzes
+
+
+### =========================================
+### CREATE QUIZ 1
+### Tworzenie pełnego quizu
+### =========================================
+POST http://localhost:8080/quizzes
+Content-Type: application/json
+
+{
+  "title": "Java Basics Quiz",
+  "questions": [
+    {
+      "content": "What is JVM?",
+      "answers": [
+        {
+          "content": "Java Virtual Machine",
+          "correct": true
+        },
+        {
+          "content": "JavaScript Version Manager",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Which keyword creates object?",
+      "answers": [
+        {
+          "content": "new",
+          "correct": true
+        },
+        {
+          "content": "class",
+          "correct": false
+        }
+      ]
+    }
+  ]
+}
+
+
+### =========================================
+### CREATE QUIZ 2
+### Drugi quiz do testów
+### =========================================
+POST http://localhost:8080/quizzes
+Content-Type: application/json
+
+{
+  "title": "Spring Quiz",
+  "questions": [
+    {
+      "content": "What is Spring Boot?",
+      "answers": [
+        {
+          "content": "Java Framework",
+          "correct": true
+        },
+        {
+          "content": "Database",
+          "correct": false
+        }
+      ]
+    }
+  ]
+}
+
+
+### =========================================
+### GET RAW QUIZ
+### Pobranie quizu bez pytań i odpowiedzi
+### =========================================
+GET http://localhost:8080/quizzes/1/raw
+
+
+### =========================================
+### GET WHOLE QUIZ
+### Pobranie pełnego quizu z pytaniami i odpowiedziami
+### =========================================
+GET http://localhost:8080/quizzes/1
+
+
+### =========================================
+### UPDATE WHOLE QUIZ
+### Edycja całego quizu
+### =========================================
+PUT http://localhost:8080/quizzes/1
+Content-Type: application/json
+
+{
+  "title": "Updated Java Quiz",
+  "questions": [
+    {
+      "content": "What does JDK mean?",
+      "answers": [
+        {
+          "content": "Java Development Kit",
+          "correct": true
+        },
+        {
+          "content": "Java Deployment Kernel",
+          "correct": false
+        }
+      ]
+    }
+  ]
+}
+
+
+### =========================================
+### UPDATE ONLY TITLE
+### Test zmiany samego tytułu
+### UWAGA:
+### Obecnie Twój PUT usuwa wszystkie pytania
+### jeśli wyślesz pustą listę questions
+### =========================================
+PUT http://localhost:8080/quizzes/1
+Content-Type: application/json
+
+{
+  "title": "Only Title Changed",
+  "questions": []
+}
+
+
+### =========================================
+### PATCH QUIZ TITLE
+### Zmiana tylko tytułu quizu
+### =========================================
+
+PATCH http://localhost:8080/quizzes/1
+Content-Type: application/json
+
+{
+  "title": "Patched Title"
+}
+
+
+### =========================================
+### DELETE QUIZ
+### Usunięcie quizu
+### =========================================
+DELETE http://localhost:8080/quizzes/2
+
+
+### =========================================
+### GET DELETED QUIZ
+### Powinno zwrócić 404
+### Test ExceptionHandlera
+### =========================================
+GET http://localhost:8080/quizzes/2
+
+
+### =========================================
+### GET NON EXISTING QUIZ
+### Test 404
+### =========================================
+GET http://localhost:8080/quizzes/999
+
+
+### =========================================
+### DELETE NON EXISTING QUIZ
+### Test 404 przy delete
+### =========================================
+DELETE http://localhost:8080/quizzes/999
+
+
+### =========================================
+### UPDATE NON EXISTING QUIZ
+### Test 404 przy update
+### =========================================
+PUT http://localhost:8080/quizzes/999
+Content-Type: application/json
+
+{
+  "title": "Does Not Exist",
+  "questions": []
+}
+
+
+### =========================================
+### CREATE EMPTY QUIZ
+### Test pustego quizu
+### =========================================
+POST http://localhost:8080/quizzes
+Content-Type: application/json
+
+{
+  "title": "Empty Quiz",
+  "questions": []
+}
+
+
+### =========================================
+### CREATE QUIZ WITH EMPTY ANSWERS
+### Test pytania bez odpowiedzi
+### =========================================
+POST http://localhost:8080/quizzes
+Content-Type: application/json
+
+{
+  "title": "Broken Quiz",
+  "questions": [
+    {
+      "content": "Question without answers",
+      "answers": []
+    }
+  ]
+}
