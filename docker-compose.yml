@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: courser-postgres
+    environment:
+      POSTGRES_DB: courserdb
+      POSTGRES_USER: courseruser
+      POSTGRES_PASSWORD: courserpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - courser-postgres-data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend/quiz-service
+      dockerfile: Dockerfile
+    container_name: courser-backend
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
+      SPRING_DATASOURCE_USERNAME: courseruser
+      SPRING_DATASOURCE_PASSWORD: courserpassword
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+
+volumes:
+  courser-postgres-data:
+    name: courser-postgres-data

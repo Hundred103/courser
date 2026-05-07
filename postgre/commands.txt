@@ -1,0 +1,13 @@
+!!!KONTENERY MUSZA CHODZIC!!!
+---najlepiej w folderze postgre---
+
+
+IMPORT
+docker exec -it courser-postgres psql -U courseruser -d courserdb
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+\q
+Get-Content dump.sql | docker exec -i courser-postgres psql -U courseruser -d courserdb
+
+EXPORT
+docker exec -t courser-postgres pg_dump -U courseruser -d courserdb > dump.sql
