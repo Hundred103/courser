@@ -36,7 +36,8 @@ public class QuizController {
         return mapperDTO.toQuizPlayDTO(quiz);
     }
 
-    //GET /quizzes/id/raw -> pojedynczy quiz bez pytan i odpowiedzi
+    //GET /quizzes/id/raw -> pojedynczy quiz bez zaciagania pytan i odpowiedzi
+    //                    -> (np. zeby wyswietic tylko tytul albo w przyszlosci inne dane - moze sie przydac)
     @GetMapping("/{id}/raw")
     public QuizRawDTO getRawQuiz(@PathVariable Long id) {
         Quiz quiz = quizService.findById(id);
@@ -61,7 +62,8 @@ public class QuizController {
                 .body(mapperDTO.toQuizRawDTO(saved));
     }
 
-    //PUT /quizzes/id
+    //PUT /quizzes/id -> zmienia caly quiz wraz z pytaniami i odpowiedziami
+    //                -> (mozliwosc edycji pytan i odpowiedzi quizu)
     @PutMapping("/{id}")
     public ResponseEntity<QuizRawDTO> updateQuiz(@PathVariable Long id, @RequestBody QuizCreateDTO dto) {
         Quiz updated = quizService.update(id, dto);
@@ -70,7 +72,9 @@ public class QuizController {
         );
     }
 
-    //PATCH /quizzes/id
+    //PATCH /quizzes/id -> zmienia tylko quiz bez zmieniania pytan i odpowiedzi
+    //                  -> np. guzik przy liscie quizow by zmienic tytul
+    //                  -> (obecnie jest tylko tytul w przyszlosc mozna dodac inne pola)
     @PatchMapping("/{id}")
     public ResponseEntity<QuizRawDTO> updateQuizTitle(@PathVariable Long id, @RequestBody QuizEditTitleDTO dto) {
         Quiz updated = quizService.updateTitle(id, dto);

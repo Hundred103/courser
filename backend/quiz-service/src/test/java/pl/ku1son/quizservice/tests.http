@@ -13,30 +13,214 @@ POST http://localhost:8080/quizzes
 Content-Type: application/json
 
 {
-  "title": "Java Basics Quiz",
+  "title": "Geografia",
   "questions": [
     {
-      "content": "What is JVM?",
+      "content": "Jaka jest stolica Polski?",
       "answers": [
         {
-          "content": "Java Virtual Machine",
+          "content": "Kraków",
+          "correct": false
+        },
+        {
+          "content": "Warszawa",
           "correct": true
         },
         {
-          "content": "JavaScript Version Manager",
+          "content": "Gdańsk",
+          "correct": false
+        },
+        {
+          "content": "Wrocław",
           "correct": false
         }
       ]
     },
     {
-      "content": "Which keyword creates object?",
+      "content": "Który kontynent jest największy?",
       "answers": [
         {
-          "content": "new",
+          "content": "Afryka",
+          "correct": false
+        },
+        {
+          "content": "Europa",
+          "correct": false
+        },
+        {
+          "content": "Azja",
           "correct": true
         },
         {
-          "content": "class",
+          "content": "Australia",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Jak nazywa się najdłuższa rzeka świata?",
+      "answers": [
+        {
+          "content": "Amazonka",
+          "correct": true
+        },
+        {
+          "content": "Wisła",
+          "correct": false
+        },
+        {
+          "content": "Nil",
+          "correct": false
+        },
+        {
+          "content": "Odra",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Które państwo ma kształt buta?",
+      "answers": [
+        {
+          "content": "Hiszpania",
+          "correct": false
+        },
+        {
+          "content": "Włochy",
+          "correct": true
+        },
+        {
+          "content": "Francja",
+          "correct": false
+        },
+        {
+          "content": "Norwegia",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Jakie morze leży nad Polską?",
+      "answers": [
+        {
+          "content": "Morze Czarne",
+          "correct": false
+        },
+        {
+          "content": "Morze Śródziemne",
+          "correct": false
+        },
+        {
+          "content": "Morze Bałtyckie",
+          "correct": true
+        },
+        {
+          "content": "Morze Północne",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Która planeta jest nazywana Czerwoną Planetą?",
+      "answers": [
+        {
+          "content": "Mars",
+          "correct": true
+        },
+        {
+          "content": "Wenus",
+          "correct": false
+        },
+        {
+          "content": "Jowisz",
+          "correct": false
+        },
+        {
+          "content": "Saturn",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Który ocean jest największy?",
+      "answers": [
+        {
+          "content": "Ocean Atlantycki",
+          "correct": false
+        },
+        {
+          "content": "Ocean Indyjski",
+          "correct": false
+        },
+        {
+          "content": "Ocean Arktyczny",
+          "correct": false
+        },
+        {
+          "content": "Ocean Spokojny",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "content": "Jak nazywa się najwyższy szczyt świata?",
+      "answers": [
+        {
+          "content": "K2",
+          "correct": false
+        },
+        {
+          "content": "Mount Everest",
+          "correct": true
+        },
+        {
+          "content": "Rysy",
+          "correct": false
+        },
+        {
+          "content": "Mont Blanc",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "W jakim kraju znajdują się piramidy w Gizie?",
+      "answers": [
+        {
+          "content": "Grecja",
+          "correct": false
+        },
+        {
+          "content": "Turcja",
+          "correct": false
+        },
+        {
+          "content": "Egipt",
+          "correct": true
+        },
+        {
+          "content": "Indie",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Które państwo słynie z miasta Tokio?",
+      "answers": [
+        {
+          "content": "Chiny",
+          "correct": false
+        },
+        {
+          "content": "Korea Południowa",
+          "correct": false
+        },
+        {
+          "content": "Japonia",
+          "correct": true
+        },
+        {
+          "content": "Tajlandia",
           "correct": false
         }
       ]
@@ -53,17 +237,214 @@ POST http://localhost:8080/quizzes
 Content-Type: application/json
 
 {
-  "title": "Spring Quiz",
+  "title": "Informatyka",
   "questions": [
     {
-      "content": "What is Spring Boot?",
+      "content": "Które urządzenie służy do wyświetlania obrazu?",
       "answers": [
         {
-          "content": "Java Framework",
+          "content": "Klawiatura",
+          "correct": false
+        },
+        {
+          "content": "Monitor",
           "correct": true
         },
         {
-          "content": "Database",
+          "content": "Myszka",
+          "correct": false
+        },
+        {
+          "content": "Drukarka",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Który system operacyjny stworzyła firma Microsoft?",
+      "answers": [
+        {
+          "content": "Linux",
+          "correct": false
+        },
+        {
+          "content": "Windows",
+          "correct": true
+        },
+        {
+          "content": "macOS",
+          "correct": false
+        },
+        {
+          "content": "Android",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Jak nazywa się podstawowa część komputera odpowiedzialna za obliczenia?",
+      "answers": [
+        {
+          "content": "Procesor",
+          "correct": true
+        },
+        {
+          "content": "Monitor",
+          "correct": false
+        },
+        {
+          "content": "Głośnik",
+          "correct": false
+        },
+        {
+          "content": "Pendrive",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Który program służy do przeglądania internetu?",
+      "answers": [
+        {
+          "content": "Excel",
+          "correct": false
+        },
+        {
+          "content": "Word",
+          "correct": false
+        },
+        {
+          "content": "Chrome",
+          "correct": true
+        },
+        {
+          "content": "Paint",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Jak nazywa się urządzenie używane do wpisywania tekstu?",
+      "answers": [
+        {
+          "content": "Myszka",
+          "correct": false
+        },
+        {
+          "content": "Klawiatura",
+          "correct": true
+        },
+        {
+          "content": "Skaner",
+          "correct": false
+        },
+        {
+          "content": "Router",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Który język programowania jest często używany do stron internetowych?",
+      "answers": [
+        {
+          "content": "HTML",
+          "correct": false
+        },
+        {
+          "content": "Java",
+          "correct": false
+        },
+        {
+          "content": "Python",
+          "correct": false
+        },
+        {
+          "content": "JavaScript",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "content": "Jak nazywa się pamięć używana do przechowywania plików?",
+      "answers": [
+        {
+          "content": "Dysk twardy",
+          "correct": true
+        },
+        {
+          "content": "Procesor",
+          "correct": false
+        },
+        {
+          "content": "Karta graficzna",
+          "correct": false
+        },
+        {
+          "content": "Wentylator",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Które urządzenie pozwala połączyć się z internetem bezprzewodowo?",
+      "answers": [
+        {
+          "content": "Router",
+          "correct": true
+        },
+        {
+          "content": "Drukarka",
+          "correct": false
+        },
+        {
+          "content": "Monitor",
+          "correct": false
+        },
+        {
+          "content": "Projektor",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Jak nazywa się małe przenośne urządzenie do przechowywania danych USB?",
+      "answers": [
+        {
+          "content": "Tablet",
+          "correct": false
+        },
+        {
+          "content": "Pendrive",
+          "correct": true
+        },
+        {
+          "content": "Laptop",
+          "correct": false
+        },
+        {
+          "content": "Mikrofon",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "content": "Która firma stworzyła iPhone’a?",
+      "answers": [
+        {
+          "content": "Samsung",
+          "correct": false
+        },
+        {
+          "content": "Google",
+          "correct": false
+        },
+        {
+          "content": "Apple",
+          "correct": true
+        },
+        {
+          "content": "Intel",
           "correct": false
         }
       ]
@@ -110,22 +491,6 @@ Content-Type: application/json
       ]
     }
   ]
-}
-
-
-### =========================================
-### UPDATE ONLY TITLE
-### Test zmiany samego tytułu
-### UWAGA:
-### Obecnie Twój PUT usuwa wszystkie pytania
-### jeśli wyślesz pustą listę questions
-### =========================================
-PUT http://localhost:8080/quizzes/1
-Content-Type: application/json
-
-{
-  "title": "Only Title Changed",
-  "questions": []
 }
 
 
@@ -181,35 +546,4 @@ Content-Type: application/json
 {
   "title": "Does Not Exist",
   "questions": []
-}
-
-
-### =========================================
-### CREATE EMPTY QUIZ
-### Test pustego quizu
-### =========================================
-POST http://localhost:8080/quizzes
-Content-Type: application/json
-
-{
-  "title": "Empty Quiz",
-  "questions": []
-}
-
-
-### =========================================
-### CREATE QUIZ WITH EMPTY ANSWERS
-### Test pytania bez odpowiedzi
-### =========================================
-POST http://localhost:8080/quizzes
-Content-Type: application/json
-
-{
-  "title": "Broken Quiz",
-  "questions": [
-    {
-      "content": "Question without answers",
-      "answers": []
-    }
-  ]
 }
