@@ -1,17 +1,17 @@
 <section class="view-shell">
-  <h2 class="neon-title">Dostepne quizy</h2>
+  <h2 class="neon-title">Dostępne quizy</h2>
 
-  <p *ngIf="isLoading" class="status-text">Ladowanie quizow...</p>
+  <p *ngIf="isLoading" class="status-text">Ładowanie quizów...</p>
   <p *ngIf="errorMessage" class="status-text error">{{ errorMessage }}</p>
 
   <div class="quiz-grid" *ngIf="!isLoading && !errorMessage">
     <article class="quiz-card squircle" *ngFor="let quiz of quizzes">
       <h3>{{ quiz.title }}</h3>
-      <a class="quiz-button squircle" [routerLink]="['/quiz', quiz.id]">Rozwiaz quiz</a>
+      <a class="quiz-button squircle" [routerLink]="['/quiz', quiz.id]">Rozwiąż quiz</a>
     </article>
   </div>
 
   <p *ngIf="!isLoading && !errorMessage && quizzes.length === 0" class="status-text">
-    Brak quizow. Dodaj pierwszy quiz po stronie backendu.
+    Brak quizów. Dodaj pierwszy quiz po stronie backendu.
   </p>
 </section>

@@ -1,7 +1,7 @@
 <section class="view-shell">
-  <button class="back-button squircle" (click)="goBack()">Powrot do listy</button>
+  <button class="back-button squircle" (click)="goBack()">Powrót do listy</button>
 
-  <p *ngIf="isLoading" class="status-text">Ladowanie quizu...</p>
+  <p *ngIf="isLoading" class="status-text">Ładowanie quizu...</p>
   <p *ngIf="errorMessage" class="status-text error">{{ errorMessage }}</p>
 
   <article *ngIf="quiz && !isLoading" class="quiz-play squircle">
@@ -22,12 +22,12 @@
     </div>
 
     <button class="submit-button squircle" (click)="submitQuiz()" [disabled]="resultReady">
-      Sprawdz wynik
+      Sprawdź wynik
     </button>
 
     <div class="result-box squircle" *ngIf="resultReady">
       <p>Wynik: {{ score }} / {{ totalQuestions }}</p>
-      <p>Skutecznosc: {{ scorePercent }}%</p>
+      <p>Skuteczność: {{ scorePercent }}%</p>
     </div>
   </article>
 </section>

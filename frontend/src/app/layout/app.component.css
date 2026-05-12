@@ -23,6 +23,9 @@
 }
 
 .topbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   padding: 1rem 1.4rem;
   border: 1px solid var(--edge);
   background: linear-gradient(160deg, rgba(30, 32, 37, 0.85), rgba(17, 18, 20, 0.85));
