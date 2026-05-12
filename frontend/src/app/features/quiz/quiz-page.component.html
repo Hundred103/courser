@@ -1,0 +1,33 @@
+<section class="view-shell">
+  <button class="back-button squircle" (click)="goBack()">Powrot do listy</button>
+
+  <p *ngIf="isLoading" class="status-text">Ladowanie quizu...</p>
+  <p *ngIf="errorMessage" class="status-text error">{{ errorMessage }}</p>
+
+  <article *ngIf="quiz && !isLoading" class="quiz-play squircle">
+    <h2 class="neon-title">{{ quiz.title }}</h2>
+
+    <div class="question-block squircle" *ngFor="let question of quiz.questions; let index = index">
+      <h3>{{ index + 1 }}. {{ question.content }}</h3>
+      <label class="answer-row squircle" *ngFor="let answer of question.answers">
+        <input
+          type="radio"
+          name="question-{{ question.id }}"
+          [value]="answer.id"
+          [ngModel]="selectedAnswers[question.id]"
+          (ngModelChange)="setSelectedAnswer(question.id, $event)"
+        />
+        <span>{{ answer.content }}</span>
+      </label>
+    </div>
+
+    <button class="submit-button squircle" (click)="submitQuiz()" [disabled]="resultReady">
+      Sprawdz wynik
+    </button>
+
+    <div class="result-box squircle" *ngIf="resultReady">
+      <p>Wynik: {{ score }} / {{ totalQuestions }}</p>
+      <p>Skutecznosc: {{ scorePercent }}%</p>
+    </div>
+  </article>
+</section>

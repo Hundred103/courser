@@ -1,0 +1,101 @@
+.view-shell {
+  border: 1px solid var(--edge);
+  background: linear-gradient(160deg, rgba(32, 34, 40, 0.85), rgba(18, 20, 24, 0.85));
+  padding: 1.2rem;
+  border-radius: 24px;
+}
+
+.back-button,
+.submit-button {
+  border: 1px solid rgba(255, 107, 53, 0.45);
+  color: #ffe6de;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.65rem 1rem;
+  display: inline-block;
+  background: linear-gradient(90deg, rgba(255, 107, 53, 0.28), rgba(75, 29, 115, 0.35));
+  box-shadow:
+    inset 0 0 10px rgba(255, 107, 53, 0.2),
+    0 0 16px rgba(75, 29, 115, 0.25);
+}
+
+.back-button {
+  margin-bottom: 1rem;
+}
+
+.submit-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quiz-play {
+  border: 1px solid var(--edge);
+  padding: 1rem;
+  background: linear-gradient(155deg, rgba(32, 34, 40, 0.85), rgba(16, 18, 22, 0.9));
+}
+
+.neon-title {
+  font-size: clamp(1.3rem, 2.5vw, 1.8rem);
+  margin: 0 0 1rem;
+  color: #f4eef8;
+  text-shadow:
+    0 0 8px rgba(255, 107, 53, 0.45),
+    0 0 16px rgba(75, 29, 115, 0.5);
+}
+
+.status-text {
+  margin: 0.5rem 0;
+  color: var(--text-soft);
+}
+
+.status-text.error {
+  color: #ff9b86;
+}
+
+.question-block {
+  margin-bottom: 0.9rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(145deg, rgba(40, 43, 50, 0.8), rgba(26, 28, 33, 0.9));
+}
+
+.question-block h3 {
+  margin: 0 0 0.8rem;
+}
+
+.answer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  margin-bottom: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.answer-row:last-child {
+  margin-bottom: 0;
+}
+
+.answer-row input[type='radio'] {
+  accent-color: #ff6b35;
+}
+
+.result-box {
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgba(255, 107, 53, 0.45);
+  background: linear-gradient(140deg, rgba(255, 107, 53, 0.14), rgba(75, 29, 115, 0.24));
+}
+
+.squircle {
+  border-radius: 24px;
+}
+
+@media (max-width: 768px) {
+  .view-shell,
+  .quiz-play {
+    padding: 0.95rem;
+  }
+}
