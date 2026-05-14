@@ -5,9 +5,9 @@
   <p *ngIf="errorMessage" class="status-text error">{{ errorMessage }}</p>
 
   <div class="quiz-grid" *ngIf="!isLoading && !errorMessage">
-    <article class="quiz-card squircle" *ngFor="let quiz of quizzes">
+    <article class="quiz-card squircle glow-hover fade-in" *ngFor="let quiz of quizzes">
       <h3>{{ quiz.title }}</h3>
-      <a class="quiz-button squircle" [routerLink]="['/quiz', quiz.id]">Rozwiąż quiz</a>
+      <a class="quiz-button primary-button squircle" [routerLink]="['/quiz', quiz.id]">Rozwiąż quiz</a>
     </article>
   </div>
 

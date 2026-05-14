@@ -1,5 +1,5 @@
 <section class="view-shell">
-  <button class="back-button squircle" (click)="goBack()">Powrót do listy</button>
+  <button class="back-button primary-button squircle" (click)="goBack()">Powrót do listy</button>
 
   <p *ngIf="isLoading" class="status-text">Ładowanie quizu...</p>
   <p *ngIf="errorMessage" class="status-text error">{{ errorMessage }}</p>
@@ -21,7 +21,7 @@
       </label>
     </div>
 
-    <button class="submit-button squircle" (click)="submitQuiz()" [disabled]="resultReady">
+    <button class="submit-button primary-button squircle" (click)="submitQuiz()" [disabled]="resultReady">
       Sprawdź wynik
     </button>
 
