@@ -35,51 +35,12 @@
     );
 }
 
-.topbar {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 1rem 1.4rem;
-  margin-bottom: 1rem;
-  border: 1px solid var(--edge);
-  background:
-    linear-gradient(
-      160deg,
-      rgba(30, 32, 37, 0.85),
-      rgba(17, 18, 20, 0.85)
-    );
-  backdrop-filter: blur(4px);
-}
-
 main {
   width: 100%;
-}
-
-.brand {
-  font-family: 'Audiowide', cursive;
-  font-size: clamp(2rem, 4vw, 2.9rem);
-  letter-spacing: 0.08em;
-  text-decoration: none;
-  background:
-    linear-gradient(
-      90deg,
-      var(--sunset-orange),
-      #d65563,
-      var(--deep-purple)
-    );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  text-shadow:
-    0 0 10px rgba(255, 107, 53, 0.45),
-    0 0 20px rgba(75, 29, 115, 0.55);
 }
 
 @media (max-width: 768px) {
   .app-shell {
     padding: 0.8rem;
-  }
-  .topbar {
-    padding: 0.95rem;
   }
 }
