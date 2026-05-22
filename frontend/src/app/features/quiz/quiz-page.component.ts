@@ -70,11 +70,13 @@ export class QuizPageComponent {
   );
 
   readonly selectedAnswers = signal<Record<number, number>>({});
+  readonly submittedAnswers = signal<Record<number, number>>({});
   readonly checkedQuestions = signal<ReadonlySet<number>>(new Set());
   readonly currentIndex = signal(0);
   readonly resultReady = signal(false);
   readonly showIncompleteConfirm = signal(false);
   readonly showExitConfirm = signal(false);
+  readonly activeSelectedQuestionId = signal<number | null>(null);
   readonly quiz = computed(() => this.quizState().quiz);
   readonly isLoading = computed(() => this.quizState().status === 'loading');
   readonly errorMessage = computed(() => this.quizState().errorMessage);
@@ -87,8 +89,9 @@ export class QuizPageComponent {
   readonly isLastQuestion = computed(() => this.currentIndex() === this.totalQuestions() - 1);
   readonly checkButtonLabel = computed(() => (this.isLastQuestion() ? 'Sprawdź i zakończ' : 'Sprawdz'));
   readonly hasUnansweredQuestions = computed(() => {
-    const selectedAnswers = this.selectedAnswers();
-    return this.questions().some((question) => selectedAnswers[question.id] === undefined);
+    const currentQuestionId = this.currentQuestion()?.id;
+    const checkedQuestions = this.checkedQuestions();
+    return this.questions().some((question) => question.id !== currentQuestionId && !checkedQuestions.has(question.id));
   });
   readonly currentQuestionChecked = computed(() => {
     const question = this.currentQuestion();
@@ -96,13 +99,18 @@ export class QuizPageComponent {
   });
   readonly canCheckCurrentQuestion = computed(() => {
     const question = this.currentQuestion();
-    return !!question && this.selectedAnswers()[question.id] !== undefined && !this.currentQuestionChecked();
+    return (
+      !!question &&
+      !this.resultReady() &&
+      this.selectedAnswers()[question.id] !== undefined &&
+      !this.currentQuestionChecked()
+    );
   });
   readonly score = computed(() => {
-    const selectedAnswers = this.selectedAnswers();
+    const submittedAnswers = this.submittedAnswers();
 
     return this.questions().reduce((correctAnswers, question) => {
-      const selectedAnswerId = selectedAnswers[question.id];
+      const selectedAnswerId = submittedAnswers[question.id];
       const selected = question.answers.find((answer) => answer.id === selectedAnswerId);
       return selected?.correct ? correctAnswers + 1 : correctAnswers;
     }, 0);
@@ -118,11 +126,13 @@ export class QuizPageComponent {
       if (quizId !== this.currentQuizId) {
         this.currentQuizId = quizId;
         this.selectedAnswers.set({});
+        this.submittedAnswers.set({});
         this.checkedQuestions.set(new Set());
         this.currentIndex.set(0);
         this.resultReady.set(false);
         this.showIncompleteConfirm.set(false);
         this.showExitConfirm.set(false);
+        this.activeSelectedQuestionId.set(null);
       }
     });
   }
@@ -136,6 +146,7 @@ export class QuizPageComponent {
       ...answers,
       [question.id]: answer.id,
     }));
+    this.activeSelectedQuestionId.set(question.id);
     this.showIncompleteConfirm.set(false);
     this.showExitConfirm.set(false);
   }
@@ -201,6 +212,17 @@ export class QuizPageComponent {
   }
 
   private finishCurrentQuestionCheck(question: QuestionPlayDTO): void {
+    const selectedAnswerId = this.selectedAnswers()[question.id];
+
+    if (selectedAnswerId === undefined) {
+      return;
+    }
+
+    this.submittedAnswers.update((answers) => ({
+      ...answers,
+      [question.id]: selectedAnswerId,
+    }));
+
     this.checkedQuestions.update((checkedQuestions) => {
       const next = new Set(checkedQuestions);
       next.add(question.id);
@@ -222,6 +244,8 @@ export class QuizPageComponent {
     if (this.canGoPrevious()) {
       this.showIncompleteConfirm.set(false);
       this.showExitConfirm.set(false);
+      this.clearPendingSelectionForCurrentQuestion();
+      this.activeSelectedQuestionId.set(null);
       this.currentIndex.update((index) => index - 1);
     }
   }
@@ -230,29 +254,54 @@ export class QuizPageComponent {
     if (this.canGoNext()) {
       this.showIncompleteConfirm.set(false);
       this.showExitConfirm.set(false);
+      this.clearPendingSelectionForCurrentQuestion();
+      this.activeSelectedQuestionId.set(null);
       this.currentIndex.update((index) => index + 1);
     }
   }
 
   answerClass(question: QuestionPlayDTO, answer: AnswerPlayDTO): string {
     const selectedAnswerId = this.selectedAnswers()[question.id];
+    const isChecked = this.checkedQuestions().has(question.id);
 
-    if (!this.checkedQuestions().has(question.id)) {
+    if (!this.resultReady() && !isChecked) {
+      if (this.activeSelectedQuestionId() !== question.id) {
+        return '';
+      }
+
       return selectedAnswerId === answer.id ? 'selected' : '';
-    }
-
-    if (answer.correct) {
-      return 'correct';
-    }
-
-    if (selectedAnswerId === answer.id) {
-      return 'wrong';
     }
 
     return '';
   }
 
+  isCorrectAnswerVisible(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
+    return answer.correct && (this.resultReady() || this.checkedQuestions().has(question.id));
+  }
+
+  isSubmittedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
+    return this.submittedAnswers()[question.id] === answer.id;
+  }
+
+  isWrongSubmittedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
+    return this.isSubmittedAnswer(question, answer) && !answer.correct;
+  }
+
   goBack(): void {
     this.router.navigateByUrl('/');
+  }
+
+  private clearPendingSelectionForCurrentQuestion(): void {
+    const question = this.currentQuestion();
+
+    if (!question || this.checkedQuestions().has(question.id)) {
+      return;
+    }
+
+    this.selectedAnswers.update((answers) => {
+      const next = { ...answers };
+      delete next[question.id];
+      return next;
+    });
   }
 }

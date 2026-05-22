@@ -135,6 +135,15 @@
   box-shadow: 0 0 18px rgba(248, 113, 113, 0.16);
 }
 
+.answer-row.submitted-answer {
+  border-color: rgba(96, 165, 250, 0.96);
+  border-width: 3px;
+  color: #93c5fd;
+  box-shadow:
+    0 0 14px rgba(96, 165, 250, 0.42),
+    0 0 30px rgba(59, 130, 246, 0.3);
+}
+
 .quiz-controls {
   align-self: center;
   display: grid;

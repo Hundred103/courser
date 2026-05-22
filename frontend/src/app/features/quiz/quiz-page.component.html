@@ -26,8 +26,9 @@
                 class="answer-row squircle"
                 type="button"
                 [class.selected]="answerClass(question, answer) === 'selected'"
-                [class.correct]="answerClass(question, answer) === 'correct'"
-                [class.wrong]="answerClass(question, answer) === 'wrong'"
+                [class.correct]="isCorrectAnswerVisible(question, answer)"
+                [class.wrong]="isWrongSubmittedAnswer(question, answer)"
+                [class.submitted-answer]="isSubmittedAnswer(question, answer)"
                 [disabled]="currentQuestionChecked() || resultReady()"
                 (click)="selectAnswer(question, answer)">
                 {{ answer.content }}
