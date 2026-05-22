@@ -1,33 +1,121 @@
-<section class="view-shell">
-  <button class="back-button primary-button squircle" (click)="goBack()">Powrót do listy</button>
-
-  <p *ngIf="isLoading" class="status-text">Ładowanie quizu...</p>
-  <p *ngIf="errorMessage" class="status-text error">{{ errorMessage }}</p>
-
-  <article *ngIf="quiz && !isLoading" class="quiz-play squircle">
-    <h2 class="neon-title">{{ quiz.title }}</h2>
-
-    <div class="question-block squircle" *ngFor="let question of quiz.questions; let index = index">
-      <h3>{{ index + 1 }}. {{ question.content }}</h3>
-      <label class="answer-row squircle" *ngFor="let answer of question.answers">
-        <input
-          type="radio"
-          name="question-{{ question.id }}"
-          [value]="answer.id"
-          [ngModel]="selectedAnswers[question.id]"
-          (ngModelChange)="setSelectedAnswer(question.id, $event)"
-        />
-        <span>{{ answer.content }}</span>
-      </label>
-    </div>
-
-    <button class="submit-button primary-button squircle" (click)="submitQuiz()" [disabled]="resultReady">
-      Sprawdź wynik
+<section class="view-shell squircle">
+  <div class="top-actions">
+    <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
+      Powrot do quizow
     </button>
+  </div>
 
-    <div class="result-box squircle" *ngIf="resultReady">
-      <p>Wynik: {{ score }} / {{ totalQuestions }}</p>
-      <p>Skuteczność: {{ scorePercent }}%</p>
-    </div>
-  </article>
+  @if (isLoading()) {
+    <p class="status-text">Ladowanie quizu...</p>
+  } @else if (errorMessage()) {
+    <p class="status-text error">{{ errorMessage() }}</p>
+  } @else if (quiz(); as quizData) {
+    <article class="quiz-play squircle fade-in">
+      <header class="quiz-header">
+        <p>Pytanie {{ currentQuestionNumber() }} / {{ totalQuestions() }}</p>
+        <h2 class="neon-title">{{ quizData.title }}</h2>
+      </header>
+
+      @if (currentQuestion(); as question) {
+        <div class="question-card squircle">
+          <h3>{{ question.content }}</h3>
+
+          <div class="answers-list">
+            @for (answer of question.answers; track answer.id) {
+              <button
+                class="answer-row squircle"
+                type="button"
+                [class.selected]="answerClass(question, answer) === 'selected'"
+                [class.correct]="answerClass(question, answer) === 'correct'"
+                [class.wrong]="answerClass(question, answer) === 'wrong'"
+                [disabled]="currentQuestionChecked() || resultReady()"
+                (click)="selectAnswer(question, answer)">
+                {{ answer.content }}
+              </button>
+            }
+          </div>
+
+          <div class="quiz-controls">
+            <div class="control-side left">
+              @if (canGoPrevious()) {
+                <button
+                  class="nav-button squircle"
+                  type="button"
+                  (click)="goPrevious()"
+                  aria-label="Poprzednie pytanie">
+                  &larr;
+                </button>
+              }
+            </div>
+
+            <button
+              class="submit-button primary-button squircle"
+              type="button"
+              [disabled]="!canCheckCurrentQuestion()"
+              (click)="checkCurrentQuestion()">
+              {{ checkButtonLabel() }}
+            </button>
+
+            <div class="control-side right">
+              @if (canGoNext()) {
+                <button
+                  class="nav-button squircle"
+                  type="button"
+                  (click)="goNext()"
+                  aria-label="Nastepne pytanie">
+                  &rarr;
+                </button>
+              }
+            </div>
+          </div>
+
+        </div>
+      }
+
+      @if (showIncompleteConfirm()) {
+        <div class="confirm-overlay">
+          <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
+            <p>Nie wszystkie pytania zostały rozwiązane. Czy na pewno chcesz zakończyć quiz?</p>
+
+            <div class="confirm-actions">
+              <button class="secondary-button squircle" type="button" (click)="cancelFinishQuiz()">
+                Anuluj
+              </button>
+              <button class="danger-button squircle" type="button" (click)="confirmFinishQuiz()">
+                Potwierdź
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (showExitConfirm()) {
+        <div class="confirm-overlay">
+          <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
+            <p>Twoje wyniki nie zostaną zapisane.<br />Czy na pewno chcesz wyjść z quizu?</p>
+
+            <div class="confirm-actions">
+              <button class="secondary-button squircle" type="button" (click)="cancelExitQuiz()">
+                Anuluj
+              </button>
+              <button class="danger-button squircle" type="button" (click)="confirmExitQuiz()">
+                Potwierdź
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (resultReady()) {
+        <div class="result-box squircle">
+          <p>Wynik: {{ score() }} / {{ totalQuestions() }}</p>
+          <p>Skutecznosc: {{ scorePercent() }}%</p>
+
+          <button class="result-back-button primary-button squircle" type="button" (click)="goBack()">
+            Powrot do quizow
+          </button>
+        </div>
+      }
+    </article>
+  }
 </section>

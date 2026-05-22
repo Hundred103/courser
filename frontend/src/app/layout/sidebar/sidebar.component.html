@@ -1,0 +1,26 @@
+<aside class="sidebar squircle">
+  <div class="sidebar-heading">
+    <h2>Twoje Quizy</h2>
+  </div>
+
+  @if (isLoading()) {
+    <p class="sidebar-status">Ladowanie quizow...</p>
+  } @else if (errorMessage()) {
+    <p class="sidebar-status error">{{ errorMessage() }}</p>
+  } @else if (hasQuizzes()) {
+    <ul class="quiz-list">
+      @for (quiz of quizzes(); track quiz.id) {
+        <li class="quiz-item fade-in">
+          <span>{{ quiz.title }}</span>
+          <a class="primary-button squircle" [routerLink]="['/quiz', quiz.id]">
+            Rozwiaz quiz
+          </a>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="sidebar-status empty">
+      Tutaj pojawia sie Twoje quizy.
+    </p>
+  }
+</aside>

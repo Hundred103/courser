@@ -1,4 +1,6 @@
-.view-shell {
+.welcome-tile {
+  min-height: 260px;
+  padding: 1.4rem;
   border: 1px solid var(--edge);
   background:
     linear-gradient(
@@ -6,74 +8,39 @@
       rgba(32, 34, 40, 0.85),
       rgba(18, 20, 24, 0.85)
     );
-  padding: 1.2rem;
-}
-
-.quiz-grid {
   display: grid;
-  grid-template-columns:
-    repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.9rem;
+  align-content: center;
+  gap: 0.65rem;
 }
 
-.quiz-card {
-  position: relative;
-  overflow: hidden;
-  cursor: pointer;
-  padding: 1rem;
-  border: 1px solid var(--edge);
-  background:
-    linear-gradient(
-      155deg,
-      rgba(35, 37, 45, 0.85),
-      rgba(19, 21, 26, 0.85)
-    );
+.eyebrow {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
-.quiz-card::before {
-  content: '';
-  position: absolute;
-  inset: -40%;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.35s ease;
-  background:
-    radial-gradient(
-      circle,
-      rgba(255, 107, 53, 0.15),
-      transparent 60%
-    );
+h1 {
+  margin: 0;
+  color: #f4eef8;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1.05;
+  text-shadow:
+    0 0 8px rgba(255, 107, 53, 0.45),
+    0 0 16px rgba(75, 29, 115, 0.5);
 }
 
-.quiz-card > * {
-  position: relative;
-  z-index: 1;
-}
-
-.quiz-card:hover::before {
-  opacity: 1;
-}
-
-.quiz-card:hover {
-  transform: translateY(-6px) scale(1.015);
-  border-color: rgba(255, 107, 53, 0.4);
-  box-shadow:
-    0 10px 25px rgba(0,0,0,0.35),
-    0 0 30px rgba(255, 107, 53, 0.15),
-    0 0 45px rgba(75, 29, 115, 0.2);
-}
-
-.quiz-card h3 {
-  margin: 0 0 0.9rem;
-}
-
-.quiz-button:hover {
-  transform: scale(1.04);
+p {
+  max-width: 620px;
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.6;
 }
 
 @media (max-width: 768px) {
-  .view-shell {
-    padding: 0.95rem;
+  .welcome-tile {
+    min-height: 220px;
+    padding: 1rem;
   }
 }
