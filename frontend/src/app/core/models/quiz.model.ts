@@ -1,7 +1,5 @@
 import { QuestionCreateDTO, QuestionPlayDTO } from './question.model';
 
-
-
 export interface QuizRawDTO {
   id: number;
   title: string;

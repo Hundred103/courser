@@ -1,7 +1,5 @@
 import { AnswerCreateDTO, AnswerPlayDTO } from './answer.model';
 
-
-
 export interface QuestionPlayDTO {
   id: number;
   content: string;

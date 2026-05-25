@@ -1,17 +1,12 @@
 .topbar {
+  --surface-from: rgba(30, 32, 37, 0.85);
+  --surface-to: rgba(17, 18, 20, 0.85);
   position: relative;
   display: flex;
   justify-content: flex-end;
   align-items: center;
   padding: 1rem 1.4rem;
   margin-bottom: 1rem;
-  border: 1px solid var(--edge);
-  background:
-    linear-gradient(
-      160deg,
-      rgba(30, 32, 37, 0.85),
-      rgba(17, 18, 20, 0.85)
-    );
   backdrop-filter: blur(4px);
 }
 

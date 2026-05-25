@@ -7,8 +7,6 @@ import { QuestionPlayDTO } from '../../core/models/question.model';
 import { QuizPlayDTO } from '../../core/models/quiz.model';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 
-
-
 type QuizState =
   | { status: 'loading'; quiz: null; errorMessage: '' }
   | { status: 'ready'; quiz: QuizPlayDTO; errorMessage: '' }
@@ -77,6 +75,7 @@ export class QuizPageComponent {
   readonly showIncompleteConfirm = signal(false);
   readonly showExitConfirm = signal(false);
   readonly activeSelectedQuestionId = signal<number | null>(null);
+
   readonly quiz = computed(() => this.quizState().quiz);
   readonly isLoading = computed(() => this.quizState().status === 'loading');
   readonly errorMessage = computed(() => this.quizState().errorMessage);
@@ -88,6 +87,7 @@ export class QuizPageComponent {
   readonly canGoNext = computed(() => this.currentIndex() < this.totalQuestions() - 1);
   readonly isLastQuestion = computed(() => this.currentIndex() === this.totalQuestions() - 1);
   readonly checkButtonLabel = computed(() => (this.isLastQuestion() ? 'Sprawdź i zakończ' : 'Sprawdz'));
+  readonly canLeaveQuiz = computed(() => this.resultReady());
   readonly hasUnansweredQuestions = computed(() => {
     const currentQuestionId = this.currentQuestion()?.id;
     const checkedQuestions = this.checkedQuestions();
@@ -125,14 +125,7 @@ export class QuizPageComponent {
       const quizId = this.quiz()?.id ?? null;
       if (quizId !== this.currentQuizId) {
         this.currentQuizId = quizId;
-        this.selectedAnswers.set({});
-        this.submittedAnswers.set({});
-        this.checkedQuestions.set(new Set());
-        this.currentIndex.set(0);
-        this.resultReady.set(false);
-        this.showIncompleteConfirm.set(false);
-        this.showExitConfirm.set(false);
-        this.activeSelectedQuestionId.set(null);
+        this.resetQuizProgress();
       }
     });
   }
@@ -196,12 +189,15 @@ export class QuizPageComponent {
   }
 
   canDeactivate(): boolean | Promise<boolean> {
-    if (this.resultReady()) {
+    if (this.canLeaveQuiz()) {
       return true;
     }
 
     this.showExitConfirm.set(true);
+    return this.getExitDecision();
+  }
 
+  private getExitDecision(): Promise<boolean> {
     if (!this.exitDecisionPromise) {
       this.exitDecisionPromise = new Promise<boolean>((resolve) => {
         this.exitDecision = resolve;
@@ -209,6 +205,17 @@ export class QuizPageComponent {
     }
 
     return this.exitDecisionPromise;
+  }
+
+  private resetQuizProgress(): void {
+    this.selectedAnswers.set({});
+    this.submittedAnswers.set({});
+    this.checkedQuestions.set(new Set());
+    this.currentIndex.set(0);
+    this.resultReady.set(false);
+    this.showIncompleteConfirm.set(false);
+    this.showExitConfirm.set(false);
+    this.activeSelectedQuestionId.set(null);
   }
 
   private finishCurrentQuestionCheck(question: QuestionPlayDTO): void {
@@ -260,19 +267,16 @@ export class QuizPageComponent {
     }
   }
 
-  answerClass(question: QuestionPlayDTO, answer: AnswerPlayDTO): string {
+  isSelectedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
     const selectedAnswerId = this.selectedAnswers()[question.id];
     const isChecked = this.checkedQuestions().has(question.id);
 
-    if (!this.resultReady() && !isChecked) {
-      if (this.activeSelectedQuestionId() !== question.id) {
-        return '';
-      }
-
-      return selectedAnswerId === answer.id ? 'selected' : '';
-    }
-
-    return '';
+    return (
+      !this.resultReady() &&
+      !isChecked &&
+      this.activeSelectedQuestionId() === question.id &&
+      selectedAnswerId === answer.id
+    );
   }
 
   isCorrectAnswerVisible(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {

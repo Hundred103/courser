@@ -1,12 +1,4 @@
 :host {
-  --bg-0: #111214;
-  --bg-1: #1a1c20;
-  --bg-2: #252830;
-  --text-main: #e6e6e8;
-  --text-soft: #bebec4;
-  --sunset-orange: #ff6b35;
-  --deep-purple: #4b1d73;
-  --edge: rgba(255, 255, 255, 0.08);
   display: block;
   min-height: 100vh;
   color: var(--text-main);

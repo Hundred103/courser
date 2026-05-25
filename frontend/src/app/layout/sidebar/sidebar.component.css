@@ -4,17 +4,12 @@
 }
 
 .sidebar {
+  --surface-from: rgba(30, 32, 37, 0.92);
+  --surface-to: rgba(17, 18, 20, 0.92);
   position: sticky;
   top: 1.2rem;
   min-height: calc(100vh - 2.4rem);
   padding: 1rem;
-  border: 1px solid var(--edge);
-  background:
-    linear-gradient(
-      160deg,
-      rgba(30, 32, 37, 0.92),
-      rgba(17, 18, 20, 0.92)
-    );
   backdrop-filter: blur(4px);
 }
 
@@ -24,7 +19,7 @@
 
 h2 {
   margin: 0;
-  color: #f4eef8;
+  color: var(--text-title);
   font-size: 1.7rem;
 }
 
@@ -37,19 +32,15 @@ h2 {
 }
 
 .quiz-item {
+  --surface-angle: 155deg;
+  --surface-from: rgba(35, 37, 45, 0.85);
+  --surface-to: rgba(19, 21, 26, 0.85);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.85rem;
   padding: 0.85rem;
-  border: 1px solid var(--edge);
   border-radius: 18px;
-  background:
-    linear-gradient(
-      155deg,
-      rgba(35, 37, 45, 0.85),
-      rgba(19, 21, 26, 0.85)
-    );
 }
 
 .quiz-item span {
@@ -75,7 +66,7 @@ h2 {
 }
 
 .sidebar-status.error {
-  color: #ff9b86;
+  color: var(--error-text);
 }
 
 .sidebar-status.empty {

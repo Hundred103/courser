@@ -25,7 +25,7 @@
               <button
                 class="answer-row squircle"
                 type="button"
-                [class.selected]="answerClass(question, answer) === 'selected'"
+                [class.selected]="isSelectedAnswer(question, answer)"
                 [class.correct]="isCorrectAnswerVisible(question, answer)"
                 [class.wrong]="isWrongSubmittedAnswer(question, answer)"
                 [class.submitted-answer]="isSubmittedAnswer(question, answer)"

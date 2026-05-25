@@ -1,13 +1,6 @@
 .welcome-tile {
   min-height: 260px;
   padding: 1.4rem;
-  border: 1px solid var(--edge);
-  background:
-    linear-gradient(
-      160deg,
-      rgba(32, 34, 40, 0.85),
-      rgba(18, 20, 24, 0.85)
-    );
   display: grid;
   align-content: center;
   gap: 0.65rem;
@@ -23,12 +16,10 @@
 
 h1 {
   margin: 0;
-  color: #f4eef8;
+  color: var(--text-title);
   font-size: clamp(2rem, 4vw, 3.4rem);
   line-height: 1.05;
-  text-shadow:
-    0 0 8px rgba(255, 107, 53, 0.45),
-    0 0 16px rgba(75, 29, 115, 0.5);
+  text-shadow: var(--neon-title-shadow);
 }
 
 p {

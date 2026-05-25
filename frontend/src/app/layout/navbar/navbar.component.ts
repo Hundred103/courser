@@ -1,8 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-
-
 @Component({
   selector: 'app-navbar',
   standalone: true,
@@ -11,7 +9,6 @@ import { RouterLink } from '@angular/router';
   styleUrl: './navbar.component.css',
 })
 export class NavbarComponent {
-
   onSettingsClick(): void {
     // TODO: add settings logic
   }
