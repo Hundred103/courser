@@ -1,5 +1,5 @@
 import { Component, ElementRef, HostListener, ViewChild, computed, effect, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { catchError, finalize, map, of, startWith } from 'rxjs';
 import { QuizRawDTO } from '../../core/models/quiz.model';
@@ -13,7 +13,6 @@ type QuizSidebarState =
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.css',
 })
@@ -64,6 +63,8 @@ export class SidebarComponent {
   readonly draftTitle = signal('');
   readonly busyQuizId = signal<number | null>(null);
   readonly quizPendingDelete = signal<QuizRawDTO | null>(null);
+  readonly quizPendingStart = signal<QuizRawDTO | null>(null);
+  readonly randomQuestionsEnabled = signal(false);
 
   constructor() {
     effect(() => {
@@ -148,6 +149,34 @@ export class SidebarComponent {
   requestDeleteQuiz(quiz: QuizRawDTO): void {
     this.openMenuQuizId.set(null);
     this.quizPendingDelete.set(quiz);
+  }
+
+  requestStartQuiz(quiz: QuizRawDTO): void {
+    this.openMenuQuizId.set(null);
+    this.randomQuestionsEnabled.set(false);
+    this.quizPendingStart.set(quiz);
+  }
+
+  updateRandomQuestions(event: Event): void {
+    this.randomQuestionsEnabled.set((event.target as HTMLInputElement).checked);
+  }
+
+  cancelStartQuiz(): void {
+    this.quizPendingStart.set(null);
+    this.randomQuestionsEnabled.set(false);
+  }
+
+  startQuiz(): void {
+    const quiz = this.quizPendingStart();
+
+    if (!quiz) {
+      return;
+    }
+
+    const queryParams = this.randomQuestionsEnabled() ? { randomQuestions: true } : undefined;
+    this.quizPendingStart.set(null);
+    this.randomQuestionsEnabled.set(false);
+    void this.router.navigate(['/quiz', quiz.id], { queryParams });
   }
 
   cancelDeleteQuiz(): void {

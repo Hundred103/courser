@@ -23,6 +23,7 @@ export class QuizPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private currentQuizId: number | null = null;
+  private currentRandomQuestions: boolean | null = null;
   private exitDecision: ((canLeave: boolean) => void) | null = null;
   private exitDecisionPromise: Promise<boolean> | null = null;
 
@@ -70,16 +71,20 @@ export class QuizPageComponent {
   readonly selectedAnswers = signal<Record<number, number>>({});
   readonly submittedAnswers = signal<Record<number, number>>({});
   readonly checkedQuestions = signal<ReadonlySet<number>>(new Set());
+  readonly questions = signal<QuestionPlayDTO[]>([]);
   readonly currentIndex = signal(0);
   readonly resultReady = signal(false);
   readonly showIncompleteConfirm = signal(false);
   readonly showExitConfirm = signal(false);
   readonly activeSelectedQuestionId = signal<number | null>(null);
+  readonly randomQuestions = toSignal(
+    this.route.queryParamMap.pipe(map((params) => params.get('randomQuestions') === 'true')),
+    { initialValue: false },
+  );
 
   readonly quiz = computed(() => this.quizState().quiz);
   readonly isLoading = computed(() => this.quizState().status === 'loading');
   readonly errorMessage = computed(() => this.quizState().errorMessage);
-  readonly questions = computed(() => this.quiz()?.questions ?? []);
   readonly totalQuestions = computed(() => this.questions().length);
   readonly currentQuestion = computed(() => this.questions()[this.currentIndex()] ?? null);
   readonly currentQuestionNumber = computed(() => this.currentIndex() + 1);
@@ -122,9 +127,20 @@ export class QuizPageComponent {
 
   constructor() {
     effect(() => {
-      const quizId = this.quiz()?.id ?? null;
-      if (quizId !== this.currentQuizId) {
-        this.currentQuizId = quizId;
+      const quiz = this.quiz();
+      const randomQuestions = this.randomQuestions();
+
+      if (!quiz) {
+        this.questions.set([]);
+        this.currentQuizId = null;
+        this.currentRandomQuestions = null;
+        return;
+      }
+
+      if (quiz.id !== this.currentQuizId || randomQuestions !== this.currentRandomQuestions) {
+        this.currentQuizId = quiz.id;
+        this.currentRandomQuestions = randomQuestions;
+        this.questions.set(this.prepareQuestions(quiz.questions, randomQuestions));
         this.resetQuizProgress();
       }
     });
@@ -216,6 +232,26 @@ export class QuizPageComponent {
     this.showIncompleteConfirm.set(false);
     this.showExitConfirm.set(false);
     this.activeSelectedQuestionId.set(null);
+  }
+
+  private prepareQuestions(questions: QuestionPlayDTO[], randomQuestions: boolean): QuestionPlayDTO[] {
+    const questionsWithRandomAnswers = questions.map((question) => ({
+      ...question,
+      answers: this.shuffle(question.answers),
+    }));
+
+    return randomQuestions ? this.shuffle(questionsWithRandomAnswers) : questionsWithRandomAnswers;
+  }
+
+  private shuffle<T>(items: readonly T[]): T[] {
+    const shuffled = [...items];
+
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const randomIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+    }
+
+    return shuffled;
   }
 
   private finishCurrentQuestionCheck(question: QuestionPlayDTO): void {

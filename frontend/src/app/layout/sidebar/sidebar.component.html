@@ -28,9 +28,9 @@
           }
 
           <div class="quiz-actions">
-            <a class="primary-button squircle" [routerLink]="['/quiz', quiz.id]">
+            <button class="primary-button squircle" type="button" (click)="requestStartQuiz(quiz)">
               Rozwiaz quiz
-            </a>
+            </button>
 
             <div class="quiz-options">
               <button
@@ -87,6 +87,41 @@
           (click)="confirmDeleteQuiz()"
         >
           Potwierdz
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (quizPendingStart(); as quizToStart) {
+  <div class="confirm-overlay">
+    <div class="confirm-banner settings-banner squircle" role="dialog" aria-modal="true" aria-labelledby="quiz-settings-title">
+      <header class="settings-header">
+        <h3 id="quiz-settings-title">{{ quizToStart.title }}</h3>
+      </header>
+
+      <section class="settings-section" aria-label="Opcje quizu">
+        <label class="setting-row">
+          <input
+            type="checkbox"
+            [checked]="randomQuestionsEnabled()"
+            (change)="updateRandomQuestions($event)"
+          />
+          <span class="toggle-track" aria-hidden="true">
+            <span class="toggle-thumb"></span>
+          </span>
+          <span class="setting-copy">
+            <strong>Losowa kolejnosc pytan</strong>
+          </span>
+        </label>
+      </section>
+
+      <div class="confirm-actions settings-actions">
+        <button class="secondary-button squircle" type="button" (click)="cancelStartQuiz()">
+          Anuluj
+        </button>
+        <button class="primary-button squircle" type="button" (click)="startQuiz()">
+          Rozwiaz
         </button>
       </div>
     </div>
