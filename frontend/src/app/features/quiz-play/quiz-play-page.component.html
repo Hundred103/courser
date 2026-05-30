@@ -1,12 +1,12 @@
 <section class="view-shell squircle">
   <div class="top-actions">
     <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
-      Powrot do quizow
+      Strona główna
     </button>
   </div>
 
   @if (isLoading()) {
-    <p class="status-text">Ladowanie quizu...</p>
+    <p class="status-text">Ładowanie quizu...</p>
   } @else if (errorMessage()) {
     <p class="status-text error">{{ errorMessage() }}</p>
   } @else if (quiz(); as quizData) {
@@ -33,6 +33,12 @@
                 (click)="selectAnswer(question, answer)">
                 {{ answer.content }}
               </button>
+            }
+          </div>
+
+          <div class="question-score-slot" aria-live="polite">
+            @if (isQuestionChecked(question)) {
+              <p>{{ questionScoreText(question) }}</p>
             }
           </div>
 
@@ -63,7 +69,7 @@
                   class="nav-button squircle"
                   type="button"
                   (click)="goNext()"
-                  aria-label="Nastepne pytanie">
+                  aria-label="Następne pytanie">
                   &rarr;
                 </button>
               }
@@ -93,7 +99,7 @@
       @if (showExitConfirm()) {
         <div class="confirm-overlay">
           <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
-            <p>Twoje wyniki nie zostaną zapisane.<br />Czy na pewno chcesz wyjść z quizu?</p>
+            <p>Twoje wyniki nie zostaną zapisane.<br />Czy na pewno chcesz wyjść?</p>
 
             <div class="confirm-actions">
               <button class="secondary-button squircle" type="button" (click)="cancelExitQuiz()">
@@ -109,11 +115,11 @@
 
       @if (resultReady()) {
         <div class="result-box squircle">
-          <p>Wynik: {{ score() }} / {{ totalQuestions() }}</p>
-          <p>Skutecznosc: {{ scorePercent() }}%</p>
+          <p>Wynik: {{ formattedScore() }} / {{ totalQuestions() }}</p>
+          <p>Skuteczność: {{ scorePercent() }}%</p>
 
           <button class="result-back-button primary-button squircle" type="button" (click)="goBack()">
-            Powrot do quizow
+            Strona główna
           </button>
         </div>
       }

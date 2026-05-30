@@ -1,5 +1,5 @@
 import { Component, ElementRef, HostListener, ViewChild, computed, effect, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { catchError, finalize, map, of, startWith } from 'rxjs';
 import { QuizRawDTO } from '../../core/models/quiz.model';
@@ -13,6 +13,7 @@ type QuizSidebarState =
 @Component({
   selector: 'app-sidebar',
   standalone: true,
+  imports: [RouterLink],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.css',
 })
@@ -39,7 +40,7 @@ export class SidebarComponent {
         of({
           status: 'error',
           quizzes: [],
-          errorMessage: 'Nie udalo sie pobrac listy quizow.',
+          errorMessage: 'Nie udało się pobrać listy quizów.',
         } satisfies QuizSidebarState),
       ),
     ),

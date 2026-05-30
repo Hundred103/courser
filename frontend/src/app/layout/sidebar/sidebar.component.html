@@ -1,10 +1,13 @@
 <aside class="sidebar squircle">
+  <a class="create-quiz-button primary-button squircle" routerLink="/quiz/new">Utwórz quiz</a>
+  <div class="sidebar-divider" aria-hidden="true"></div>
+
   <div class="sidebar-heading">
-    <h2>Twoje Quizy</h2>
+    <h2>Twoje quizy</h2>
   </div>
 
   @if (isLoading()) {
-    <p class="sidebar-status">Ladowanie quizow...</p>
+    <p class="sidebar-status">Ładowanie quizów...</p>
   } @else if (errorMessage()) {
     <p class="sidebar-status error">{{ errorMessage() }}</p>
   } @else if (hasQuizzes()) {
@@ -29,7 +32,7 @@
 
           <div class="quiz-actions">
             <button class="primary-button squircle" type="button" (click)="requestStartQuiz(quiz)">
-              Rozwiaz quiz
+              Rozwiąż
             </button>
 
             <div class="quiz-options">
@@ -47,10 +50,41 @@
               @if (openMenuQuizId() === quiz.id) {
                 <div class="options-menu" role="menu">
                   <button type="button" role="menuitem" (click)="startRename(quiz)">
-                    Zmien nazwe
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                      <path d="m15 5 4 4" />
+                    </svg>
+                    Zmień nazwę
                   </button>
                   <button class="danger-option" type="button" role="menuitem" (click)="requestDeleteQuiz(quiz)">
-                    Usun
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4h8v2" />
+                      <path d="M19 6l-1 14H6L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                    </svg>
+                    Usuń
                   </button>
                 </div>
               }
@@ -61,7 +95,7 @@
     </ul>
   } @else {
     <p class="sidebar-status empty">
-      Tutaj pojawia sie Twoje quizy.
+      Tutaj pojawią się Twoje quizy.
     </p>
   }
 </aside>
@@ -69,7 +103,7 @@
 @if (quizPendingDelete(); as quizToDelete) {
   <div class="confirm-overlay">
     <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
-      <p>Czy na pewno chcesz usunac quiz?</p>
+      <p>Czy na pewno chcesz usunąć quiz?</p>
 
       <div class="confirm-actions">
         <button
@@ -86,7 +120,7 @@
           [disabled]="busyQuizId() === quizToDelete.id"
           (click)="confirmDeleteQuiz()"
         >
-          Potwierdz
+          Potwierdź
         </button>
       </div>
     </div>
@@ -111,7 +145,7 @@
             <span class="toggle-thumb"></span>
           </span>
           <span class="setting-copy">
-            <strong>Losowa kolejnosc pytan</strong>
+            <strong>Losowa kolejność pytań</strong>
           </span>
         </label>
       </section>
@@ -121,7 +155,7 @@
           Anuluj
         </button>
         <button class="primary-button squircle" type="button" (click)="startQuiz()">
-          Rozwiaz
+          Rozwiąż
         </button>
       </div>
     </div>

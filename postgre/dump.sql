@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5pfB0mMnJJOXw0ofWViEY2GfXWYpm6dRbXKOlWMZbXY0XjevgnRtWOAJmqHFwTO
+\restrict cvDHqUmc5klXHTmF4nV6byIGtrGIVQ0ZybeCFdTxrZvagrf6yxcosdpvG4Z6vrp
 
--- Dumped from database version 16.13 (Debian 16.13-1.pgdg13+1)
--- Dumped by pg_dump version 16.13 (Debian 16.13-1.pgdg13+1)
+-- Dumped from database version 16.14 (Debian 16.14-1.pgdg13+1)
+-- Dumped by pg_dump version 16.14 (Debian 16.14-1.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -17,6 +17,22 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
+
+--
+-- Name: public; Type: SCHEMA; Schema: -; Owner: courseruser
+--
+
+-- *not* creating schema, since initdb creates it
+
+
+ALTER SCHEMA public OWNER TO courseruser;
+
+--
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: courseruser
+--
+
+COMMENT ON SCHEMA public IS '';
+
 
 SET default_tablespace = '';
 
@@ -190,6 +206,24 @@ COPY public.answers (id, content, correct, question_id, answer_order) FROM stdin
 78	Google	f	20	1
 79	Apple	t	20	2
 80	Intel	f	20	3
+125	Atak Niemiec na Polskę w 1939 roku	t	53	0
+126	Bitwa pod Grunwaldem	f	53	1
+127	Lądowanie aliantów w Normandii	t	53	2
+128	Zrzucenie bomb atomowych na Hiroszimę i Nagasaki	t	53	3
+129	Powstanie Cesarstwa Rzymskiego	t	54	0
+130	Budowa piramid w Egipcie	t	54	1
+131	Odkrycie Ameryki przez Kolumba	f	54	2
+132	Rewolucja francuska	f	54	3
+133	Chrzest Polski	t	55	0
+134	Bitwa pod Grunwaldem	t	55	1
+135	Wybuch I wojny światowej	f	55	2
+136	Lądowanie człowieka na Księżycu	f	55	3
+137	1918	t	56	0
+138	1795	f	56	1
+139	1945	f	56	2
+140	Bolesław Chrobry	t	57	0
+141	Kazimierz Wielki	f	57	1
+142	Władysław Jagiełło	f	57	2
 \.
 
 
@@ -218,6 +252,11 @@ COPY public.questions (id, content, quiz_id, question_order) FROM stdin;
 18	Które urządzenie pozwala połączyć się z internetem bezprzewodowo?	2	7
 19	Jak nazywa się małe przenośne urządzenie do przechowywania danych USB?	2	8
 20	Która firma stworzyła iPhone’a?	2	9
+53	Które wydarzenia są związane z II wojną światową?	23	0
+54	Które wydarzenia miały miejsce w starożytności?	23	1
+55	Które wydarzenia są związane z okresem średniowiecza?	23	2
+56	W którym roku Polska odzyskała niepodległość?	23	3
+57	Kto był pierwszym koronowanym królem Polski?	23	4
 \.
 
 
@@ -226,8 +265,9 @@ COPY public.questions (id, content, quiz_id, question_order) FROM stdin;
 --
 
 COPY public.quizzes (id, title) FROM stdin;
-1	Geografia
 2	Informatyka
+1	Geografia
+23	Historia
 \.
 
 
@@ -235,21 +275,21 @@ COPY public.quizzes (id, title) FROM stdin;
 -- Name: answers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: courseruser
 --
 
-SELECT pg_catalog.setval('public.answers_id_seq', 80, true);
+SELECT pg_catalog.setval('public.answers_id_seq', 152, true);
 
 
 --
 -- Name: questions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: courseruser
 --
 
-SELECT pg_catalog.setval('public.questions_id_seq', 20, true);
+SELECT pg_catalog.setval('public.questions_id_seq', 60, true);
 
 
 --
 -- Name: quizzes_id_seq; Type: SEQUENCE SET; Schema: public; Owner: courseruser
 --
 
-SELECT pg_catalog.setval('public.quizzes_id_seq', 2, true);
+SELECT pg_catalog.setval('public.quizzes_id_seq', 26, true);
 
 
 --
@@ -293,8 +333,15 @@ ALTER TABLE ONLY public.questions
 
 
 --
+-- Name: SCHEMA public; Type: ACL; Schema: -; Owner: courseruser
+--
+
+REVOKE USAGE ON SCHEMA public FROM PUBLIC;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5pfB0mMnJJOXw0ofWViEY2GfXWYpm6dRbXKOlWMZbXY0XjevgnRtWOAJmqHFwTO
+\unrestrict cvDHqUmc5klXHTmF4nV6byIGtrGIVQ0ZybeCFdTxrZvagrf6yxcosdpvG4Z6vrp
 

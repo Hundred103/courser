@@ -1,11 +1,14 @@
 import { CanDeactivateFn, Routes } from '@angular/router';
 import { HomePageComponent } from './features/home/home-page.component';
-import { QuizPageComponent } from './features/quiz/quiz-page.component';
+import { QuizCreatePageComponent } from './features/quiz-create/quiz-create-page.component';
+import { QuizPlayPageComponent } from './features/quiz-play/quiz-play-page.component';
 
-const canDeactivateQuiz: CanDeactivateFn<QuizPageComponent> = (component) => component.canDeactivate();
+const canDeactivateQuiz: CanDeactivateFn<QuizPlayPageComponent> = (component) => component.canDeactivate();
+const canDeactivateQuizCreate: CanDeactivateFn<QuizCreatePageComponent> = (component) => component.canDeactivate();
 
 export const APP_ROUTES: Routes = [
   { path: '', component: HomePageComponent },
-  { path: 'quiz/:id', component: QuizPageComponent, canDeactivate: [canDeactivateQuiz] },
+  { path: 'quiz/new', component: QuizCreatePageComponent, canDeactivate: [canDeactivateQuizCreate] },
+  { path: 'quiz/:id', component: QuizPlayPageComponent, canDeactivate: [canDeactivateQuiz] },
   { path: '**', redirectTo: '' },
 ];

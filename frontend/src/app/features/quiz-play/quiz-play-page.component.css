@@ -129,6 +129,19 @@
     0 0 30px rgba(59, 130, 246, 0.3);
 }
 
+.question-score-slot {
+  display: grid;
+  min-height: 2.4rem;
+  place-items: center;
+}
+
+.question-score-slot p {
+  margin: 0;
+  color: var(--text-accent);
+  font-weight: 900;
+  text-align: center;
+}
+
 .quiz-controls {
   align-self: center;
   display: grid;
