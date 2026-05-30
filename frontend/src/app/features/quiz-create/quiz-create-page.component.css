@@ -5,8 +5,21 @@
 
 .top-actions {
   display: flex;
+  gap: 0.65rem;
   justify-content: flex-start;
+  flex-wrap: wrap;
   margin-bottom: 1rem;
+}
+
+.undo-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.undo-button:disabled:hover {
+  transform: none;
+  border-color: var(--edge-strong);
+  box-shadow: none;
 }
 
 .quiz-create {

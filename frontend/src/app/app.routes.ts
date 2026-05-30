@@ -8,7 +8,8 @@ const canDeactivateQuizCreate: CanDeactivateFn<QuizCreatePageComponent> = (compo
 
 export const APP_ROUTES: Routes = [
   { path: '', component: HomePageComponent },
-  { path: 'quiz/new', component: QuizCreatePageComponent, canDeactivate: [canDeactivateQuizCreate] },
-  { path: 'quiz/:id', component: QuizPlayPageComponent, canDeactivate: [canDeactivateQuiz] },
+  { path: 'quizzes/new', component: QuizCreatePageComponent, canDeactivate: [canDeactivateQuizCreate] },
+  { path: 'quizzes/:id/edit', component: QuizCreatePageComponent, canDeactivate: [canDeactivateQuizCreate] },
+  { path: 'quizzes/:id/play', component: QuizPlayPageComponent, canDeactivate: [canDeactivateQuiz] },
   { path: '**', redirectTo: '' },
 ];

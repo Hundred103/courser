@@ -3,6 +3,16 @@
     <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
       Strona główna
     </button>
+    @if (isEditMode()) {
+      <button
+        class="undo-button secondary-button squircle"
+        type="button"
+        [disabled]="!canUndoChanges()"
+        (click)="undoChanges()"
+      >
+        Cofnij zmiany
+      </button>
+    }
   </div>
 
   <article class="quiz-create squircle fade-in">

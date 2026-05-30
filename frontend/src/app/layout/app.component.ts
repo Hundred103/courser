@@ -18,8 +18,8 @@ export class AppComponent {
   readonly showSidebar = toSignal(
     this.router.events.pipe(
       filter((event): event is NavigationEnd => event instanceof NavigationEnd),
-      map((event) => !event.urlAfterRedirects.startsWith('/quiz/')),
-      startWith(!this.router.url.startsWith('/quiz/')),
+      map((event) => !event.urlAfterRedirects.startsWith('/quizzes/')),
+      startWith(!this.router.url.startsWith('/quizzes/')),
     ),
     { initialValue: true },
   );

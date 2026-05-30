@@ -103,6 +103,11 @@ export class SidebarComponent {
     });
   }
 
+  editQuiz(quiz: QuizRawDTO): void {
+    this.openMenuQuizId.set(null);
+    void this.router.navigate(['/quizzes', quiz.id, 'edit']);
+  }
+
   updateDraftTitle(event: Event): void {
     this.draftTitle.set((event.target as HTMLInputElement).value);
   }
@@ -177,7 +182,7 @@ export class SidebarComponent {
     const queryParams = this.randomQuestionsEnabled() ? { randomQuestions: true } : undefined;
     this.quizPendingStart.set(null);
     this.randomQuestionsEnabled.set(false);
-    void this.router.navigate(['/quiz', quiz.id], { queryParams });
+    void this.router.navigate(['/quizzes', quiz.id, 'play'], { queryParams });
   }
 
   cancelDeleteQuiz(): void {
@@ -204,7 +209,10 @@ export class SidebarComponent {
           this.localQuizzes.update((quizzes) => quizzes.filter((currentQuiz) => currentQuiz.id !== quiz.id));
           this.quizPendingDelete.set(null);
 
-          if (this.router.url === `/quiz/${quiz.id}`) {
+          if (
+            this.router.url === `/quizzes/${quiz.id}/play` ||
+            this.router.url === `/quizzes/${quiz.id}/edit`
+          ) {
             void this.router.navigate(['/']);
           }
         },
