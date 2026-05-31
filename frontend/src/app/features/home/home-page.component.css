@@ -30,7 +30,10 @@ p {
   line-height: 1.6;
 }
 
-.create-quiz-link {
+.home-actions {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
   margin-top: 0.35rem;
 }
 

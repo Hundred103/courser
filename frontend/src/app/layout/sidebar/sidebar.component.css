@@ -13,6 +13,12 @@
   backdrop-filter: blur(4px);
 }
 
+.sidebar-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
 .create-quiz-button {
   display: block;
   width: 100%;
