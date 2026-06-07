@@ -1,0 +1,184 @@
+<aside class="sidebar squircle">
+  <div class="sidebar-actions">
+    <a class="create-quiz-button primary-button squircle" routerLink="/quizzes/new">Utwórz</a>
+    <a class="create-quiz-button primary-button squircle" routerLink="/quizzes/import">Importuj</a>
+  </div>
+  <div class="sidebar-divider" aria-hidden="true"></div>
+
+  <div class="sidebar-heading">
+    <h2>Twoje quizy</h2>
+  </div>
+
+  @if (isLoading()) {
+    <p class="sidebar-status">Ładowanie quizów...</p>
+  } @else if (errorMessage()) {
+    <p class="sidebar-status error">{{ errorMessage() }}</p>
+  } @else if (hasQuizzes()) {
+    <ul class="quiz-list">
+      @for (quiz of quizzes(); track quiz.id) {
+        <li class="quiz-item fade-in">
+          @if (editingQuizId() === quiz.id) {
+            <input
+              #titleInput
+              class="quiz-title-input"
+              type="text"
+              [value]="draftTitle()"
+              [disabled]="busyQuizId() === quiz.id"
+              (input)="updateDraftTitle($event)"
+              (keydown.enter)="saveRename(quiz)"
+              (keydown.escape)="cancelRename()"
+              (blur)="cancelRename()"
+            />
+          } @else {
+            <span>{{ quiz.title }}</span>
+          }
+
+          <div class="quiz-actions">
+            <button class="primary-button squircle" type="button" (click)="requestStartQuiz(quiz)">
+              Rozwiąż
+            </button>
+
+            <div class="quiz-options">
+              <button
+                class="icon-button"
+                type="button"
+                aria-label="Opcje quizu"
+                [attr.aria-expanded]="openMenuQuizId() === quiz.id"
+                [disabled]="busyQuizId() === quiz.id"
+                (click)="toggleMenu(quiz.id, $event)"
+              >
+                <span aria-hidden="true"></span>
+              </button>
+
+              @if (openMenuQuizId() === quiz.id) {
+                <div class="options-menu" role="menu">
+                  <button type="button" role="menuitem" (click)="startRename(quiz)">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M17 22h-1a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h1" />
+                      <path d="M7 22h1a4 4 0 0 0 4-4v-1" />
+                      <path d="M7 2h1a4 4 0 0 1 4 4v1" />
+                    </svg>
+                    Zmień nazwę
+                  </button>
+                  <button type="button" role="menuitem" (click)="editQuiz(quiz)">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                      <path d="m15 5 4 4" />
+                    </svg>
+                    Edytuj
+                  </button>
+                  <button class="danger-option" type="button" role="menuitem" (click)="requestDeleteQuiz(quiz)">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4h8v2" />
+                      <path d="M19 6l-1 14H6L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                    </svg>
+                    Usuń
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="sidebar-status empty">
+      Tutaj pojawią się Twoje quizy.
+    </p>
+  }
+</aside>
+
+@if (quizPendingDelete(); as quizToDelete) {
+  <div class="confirm-overlay">
+    <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
+      <p>Czy na pewno chcesz usunąć quiz?</p>
+
+      <div class="confirm-actions">
+        <button
+          class="secondary-button squircle"
+          type="button"
+          [disabled]="busyQuizId() === quizToDelete.id"
+          (click)="cancelDeleteQuiz()"
+        >
+          Anuluj
+        </button>
+        <button
+          class="danger-button squircle"
+          type="button"
+          [disabled]="busyQuizId() === quizToDelete.id"
+          (click)="confirmDeleteQuiz()"
+        >
+          Potwierdź
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (quizPendingStart(); as quizToStart) {
+  <div class="confirm-overlay">
+    <div class="confirm-banner settings-banner squircle" role="dialog" aria-modal="true" aria-labelledby="quiz-settings-title">
+      <header class="settings-header">
+        <h3 id="quiz-settings-title">{{ quizToStart.title }}</h3>
+      </header>
+
+      <section class="settings-section" aria-label="Opcje quizu">
+        <label class="setting-row">
+          <input
+            type="checkbox"
+            [checked]="randomQuestionsEnabled()"
+            (change)="updateRandomQuestions($event)"
+          />
+          <span class="toggle-track" aria-hidden="true">
+            <span class="toggle-thumb"></span>
+          </span>
+          <span class="setting-copy">
+            <strong>Losowa kolejność pytań</strong>
+          </span>
+        </label>
+      </section>
+
+      <div class="confirm-actions settings-actions">
+        <button class="secondary-button squircle" type="button" (click)="cancelStartQuiz()">
+          Anuluj
+        </button>
+        <button class="primary-button squircle" type="button" (click)="startQuiz()">
+          Rozwiąż
+        </button>
+      </div>
+    </div>
+  </div>
+}

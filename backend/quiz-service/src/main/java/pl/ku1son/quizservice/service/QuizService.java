@@ -2,6 +2,7 @@ package pl.ku1son.quizservice.service;
 import pl.ku1son.quizservice.dto.*;
 import pl.ku1son.quizservice.repository.QuizRepository;
 import pl.ku1son.quizservice.entity.*;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import jakarta.persistence.EntityNotFoundException;
@@ -18,7 +19,7 @@ public class QuizService {
     }
 
     public List<Quiz> findAll() {
-        return quizRepository.findAll();
+        return quizRepository.findAll(Sort.by(Sort.Direction.ASC, "id"));
     }
 
     public Quiz findById(Long id) {  //sam quiz bez pytan i odpowiedzi

@@ -10,12 +10,12 @@ CREATE SCHEMA public;
 \q
 (na windows):
 cmd /c "docker exec -i courser-postgres psql -U courseruser -d courserdb < dump.sql"
-(na linxu):
+(na linux):
 docker exec -i courser-postgres psql -U courseruser -d courserdb < dump.sql
 
 
 ---EXPORT---
-(na windowns):
+(na windows):
 cmd /c "docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d courserdb > dump.sql"
 (na linux):
 docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d courserdb > dump.sql
