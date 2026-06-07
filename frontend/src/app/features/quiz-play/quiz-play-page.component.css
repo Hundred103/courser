@@ -121,12 +121,12 @@
 }
 
 .answer-row.submitted-answer {
-  border-color: rgba(96, 165, 250, 0.96);
+  border-color: rgba(248, 113, 113, 0.95);
   border-width: 3px;
-  color: var(--selection-text);
+  color: var(--danger-text);
   box-shadow:
-    0 0 14px rgba(96, 165, 250, 0.42),
-    0 0 30px rgba(59, 130, 246, 0.3);
+    0 0 14px rgba(248, 113, 113, 0.42),
+    0 0 30px rgba(239, 68, 68, 0.3);
 }
 
 .question-score-slot {
