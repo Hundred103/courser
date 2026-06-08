@@ -3,6 +3,8 @@ import { HomePageComponent } from './features/home/home-page.component';
 import { QuizCreatePageComponent } from './features/quiz-create/quiz-create-page.component';
 import { QuizImportPageComponent } from './features/quiz-import/quiz-import-page.component';
 import { QuizPlayPageComponent } from './features/quiz-play/quiz-play-page.component';
+import { LoginPageComponent } from './features/login/login-page.component';
+import { RegisterPageComponent } from './features/register/register-page.component';
 
 const canDeactivateQuiz: CanDeactivateFn<QuizPlayPageComponent> = (component) => component.canDeactivate();
 const canDeactivateQuizCreate: CanDeactivateFn<QuizCreatePageComponent> = (component) => component.canDeactivate();
@@ -13,5 +15,7 @@ export const APP_ROUTES: Routes = [
   { path: 'quizzes/new', component: QuizCreatePageComponent, canDeactivate: [canDeactivateQuizCreate] },
   { path: 'quizzes/:id/edit', component: QuizCreatePageComponent, canDeactivate: [canDeactivateQuizCreate] },
   { path: 'quizzes/:id/play', component: QuizPlayPageComponent, canDeactivate: [canDeactivateQuiz] },
+  { path: 'login', component: LoginPageComponent },
+  { path: 'register', component: RegisterPageComponent },
   { path: '**', redirectTo: '' },
 ];
