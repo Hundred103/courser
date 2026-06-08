@@ -8,7 +8,7 @@ spring:
     gateway:
       routes:
         - id: quiz-service
-          uri: ${QUIZ_SERVICE_URL:http://localhost:8082}
+          uri: ${QUIZ_SERVICE_URL:http://localhost:8081}
           predicates:
             - name: Path
               args:
@@ -19,7 +19,7 @@ spring:
                 parts: 1
 
         - id: user-service
-          uri: ${USER_SERVICE_URL:http://localhost:8083}
+          uri: ${USER_SERVICE_URL:http://localhost:8082}
           predicates:
             - name: Path
               args:

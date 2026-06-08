@@ -34,11 +34,11 @@ public class UserService {
 
     @Transactional
     public User createUser(User user) {
-        if (userRepository.existsByUsername(user.getUsername())) {
-            throw new RuntimeException("Username already exists");
-        }
         if (userRepository.existsByEmail(user.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new RuntimeException("Ten adres e-mail jest już zajęty");
+        }
+        if (userRepository.existsByUsername(user.getUsername())) {
+            throw new RuntimeException("Ta nazwa użytkownika jest już zajęta");
         }
         
         user.setPassword(passwordEncoder.encode(user.getPassword()));
@@ -49,10 +49,10 @@ public class UserService {
     @Transactional
     public User login(String email, String password) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Nieprawidłowy email lub hasło"));
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Invalid password");
+            throw new RuntimeException("Nieprawidłowy email lub hasło");
         }
 
         updateLastLogin(user.getId());

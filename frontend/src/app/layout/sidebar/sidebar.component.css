@@ -67,14 +67,26 @@ h2 {
   border-radius: 18px;
 }
 
-.quiz-item span {
+.quiz-info {
+  display: grid;
   flex: 1 1 auto;
+  gap: 0.2rem;
   min-width: 0;
+}
+
+.quiz-title {
   color: var(--text-main);
   font-size: 1.12rem;
   font-weight: 900;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.quiz-best-score {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .quiz-title-input {

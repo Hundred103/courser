@@ -30,7 +30,12 @@
               (blur)="cancelRename()"
             />
           } @else {
-            <span>{{ quiz.title }}</span>
+            <div class="quiz-info">
+              <span class="quiz-title">{{ quiz.title }}</span>
+              @if (isLoggedIn() && bestScoreLabel(quiz.id); as bestScore) {
+                <span class="quiz-best-score">Najlepszy: {{ bestScore }}</span>
+              }
+            </div>
           }
 
           <div class="quiz-actions">

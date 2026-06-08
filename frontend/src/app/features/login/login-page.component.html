@@ -2,21 +2,23 @@
   <div class="auth-card squircle">
     <h2>Zaloguj się</h2>
     <form (ngSubmit)="onSubmit()" #f="ngForm">
-      <div class="error-message" *ngIf="error">{{ error }}</div>
+      @if (error()) {
+        <div class="error-message">{{ error() }}</div>
+      }
 
       <label class="field">
         <span>Adres e-mail</span>
-        <input name="username" [(ngModel)]="model.username" type="email" required [disabled]="loading" />
+        <input name="email" [(ngModel)]="model.email" type="email" required [disabled]="loading()" />
       </label>
 
       <label class="field">
         <span>Hasło</span>
-        <input type="password" name="password" [(ngModel)]="model.password" required [disabled]="loading" />
+        <input type="password" name="password" [(ngModel)]="model.password" required [disabled]="loading()" />
       </label>
 
       <div class="actions">
-        <button class="primary-button squircle" type="submit" [disabled]="loading">
-          {{ loading ? 'Zaloguj...' : 'Zaloguj' }}
+        <button class="primary-button squircle" type="submit" [disabled]="loading()">
+          {{ loading() ? 'Logowanie...' : 'Zaloguj' }}
         </button>
         <a class="secondary-button squircle" routerLink="/">Anuluj</a>
       </div>

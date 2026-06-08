@@ -20,13 +20,13 @@ services:
     depends_on:
       - postgres
     ports:
-      - "8082:8082"
+      - "8081:8081"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
       SPRING_DATASOURCE_USERNAME: courseruser
       SPRING_DATASOURCE_PASSWORD: courserpassword
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
-      SERVER_PORT: 8082
+      SERVER_PORT: 8081
 
   user-service:
     build:
@@ -36,13 +36,13 @@ services:
     depends_on:
       - postgres
     ports:
-      - "8083:8083"
+      - "8082:8082"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
       SPRING_DATASOURCE_USERNAME: courseruser
       SPRING_DATASOURCE_PASSWORD: courserpassword
       SPRING_PROFILES_ACTIVE: docker
-      SERVER_PORT: 8083
+      SERVER_PORT: 8082
 
   gateway:
     build:
@@ -55,8 +55,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      QUIZ_SERVICE_URL: http://quiz-service:8082
-      USER_SERVICE_URL: http://user-service:8083
+      QUIZ_SERVICE_URL: http://quiz-service:8081
+      USER_SERVICE_URL: http://user-service:8082
 
   frontend:
     build:

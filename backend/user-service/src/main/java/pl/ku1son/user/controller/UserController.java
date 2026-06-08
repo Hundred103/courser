@@ -4,10 +4,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import pl.ku1son.user.dto.BestQuizScoreResponse;
 import pl.ku1son.user.dto.LoginRequest;
 import pl.ku1son.user.dto.LoginResponse;
 import pl.ku1son.user.dto.RegisterRequest;
+import pl.ku1son.user.dto.SaveQuizResultRequest;
+import pl.ku1son.user.entity.QuizResult;
 import pl.ku1son.user.entity.User;
+import pl.ku1son.user.service.QuizResultService;
 import pl.ku1son.user.service.UserService;
 
 import java.util.List;
@@ -18,6 +22,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final QuizResultService quizResultService;
 
     @GetMapping
     public ResponseEntity<List<User>> getAllUsers() {
@@ -97,5 +102,27 @@ public class UserController {
     @GetMapping("/leaderboard")
     public ResponseEntity<List<User>> getLeaderboard() {
         return ResponseEntity.ok(userService.getLeaderboard());
+    }
+
+    @PostMapping("/{id}/quiz-results")
+    public ResponseEntity<?> saveQuizResult(@PathVariable Long id, @RequestBody SaveQuizResultRequest request) {
+        try {
+            QuizResult saved = quizResultService.saveResult(id, request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(java.util.Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/quiz-results/best")
+    public ResponseEntity<?> getBestQuizScores(@PathVariable Long id) {
+        try {
+            List<BestQuizScoreResponse> scores = quizResultService.getBestScoresByUser(id);
+            return ResponseEntity.ok(scores);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(java.util.Collections.singletonMap("error", e.getMessage()));
+        }
     }
 }

@@ -2,21 +2,23 @@
   <div class="auth-card squircle">
     <h2>Utwórz konto</h2>
     <form (ngSubmit)="onSubmit()" #f="ngForm">
-      <div class="error-message" *ngIf="error">{{ error }}</div>
+      @if (error()) {
+        <div class="error-message">{{ error() }}</div>
+      }
 
       <label class="field">
         <span>Adres e-mail</span>
-        <input name="email" [(ngModel)]="model.email" type="email" required [disabled]="loading" />
+        <input name="email" [(ngModel)]="model.email" type="email" required [disabled]="loading()" />
       </label>
 
       <label class="field">
         <span>Nazwa wyświetlana</span>
-        <input name="displayName" [(ngModel)]="model.displayName" required [disabled]="loading" />
+        <input name="displayName" [(ngModel)]="model.displayName" required [disabled]="loading()" />
       </label>
 
       <label class="field">
         <span>Hasło</span>
-        <input type="password" name="password" [(ngModel)]="model.password" required [disabled]="loading" />
+        <input type="password" name="password" [(ngModel)]="model.password" required [disabled]="loading()" />
       </label>
 
       <label class="field">
@@ -26,15 +28,17 @@
           name="passwordConfirm"
           [(ngModel)]="model.passwordConfirm"
           required
-          [disabled]="loading"
-          [class.error]="passwordMismatch" />
+          [disabled]="loading()"
+          [class.error]="passwordMismatch()" />
       </label>
 
-      <p class="error-message" *ngIf="passwordMismatch">Hasła nie są takie same</p>
+      @if (passwordMismatch()) {
+        <p class="error-message">Hasła nie są takie same</p>
+      }
 
       <div class="actions">
-        <button class="primary-button squircle" type="submit" [disabled]="loading">
-          {{ loading ? 'Rejestruj...' : 'Zarejestruj' }}
+        <button class="primary-button squircle" type="submit" [disabled]="loading()">
+          {{ loading() ? 'Rejestrowanie...' : 'Zarejestruj' }}
         </button>
         <a class="secondary-button squircle" routerLink="/">Anuluj</a>
       </div>

@@ -5,7 +5,9 @@ import { catchError, map, of, startWith, switchMap } from 'rxjs';
 import { AnswerPlayDTO } from '../../core/models/answer.model';
 import { QuestionPlayDTO } from '../../core/models/question.model';
 import { QuizPlayDTO } from '../../core/models/quiz.model';
+import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
+import { QuizScoreService } from '../../core/services/quiz-score.service';
 
 type QuizState =
   | { status: 'loading'; quiz: null; errorMessage: '' }
@@ -20,6 +22,8 @@ type QuizState =
 })
 export class QuizPlayPageComponent {
   private readonly quizApiService = inject(QuizApiService);
+  private readonly authService = inject(AuthService);
+  private readonly quizScoreService = inject(QuizScoreService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private currentQuizId: number | null = null;
@@ -74,6 +78,8 @@ export class QuizPlayPageComponent {
   readonly questions = signal<QuestionPlayDTO[]>([]);
   readonly currentIndex = signal(0);
   readonly resultReady = signal(false);
+  readonly resultSaved = signal(false);
+  readonly resultSaveError = signal<string | null>(null);
   readonly showIncompleteConfirm = signal(false);
   readonly showExitConfirm = signal(false);
   readonly activeSelectedQuestionId = signal<number | null>(null);
@@ -92,6 +98,7 @@ export class QuizPlayPageComponent {
   readonly canGoNext = computed(() => this.currentIndex() < this.totalQuestions() - 1);
   readonly isLastQuestion = computed(() => this.currentIndex() === this.totalQuestions() - 1);
   readonly checkButtonLabel = computed(() => (this.isLastQuestion() ? 'Sprawdź i zakończ' : 'Sprawdź'));
+  readonly isLoggedIn = this.authService.isLoggedIn;
   readonly canLeaveQuiz = computed(() => this.resultReady() || this.checkedQuestions().size === 0);
   readonly hasUnansweredQuestions = computed(() => {
     const currentQuestionId = this.currentQuestion()?.id;
@@ -143,6 +150,41 @@ export class QuizPlayPageComponent {
         this.questions.set(this.prepareQuestions(quiz.questions, randomQuestions));
         this.resetQuizProgress();
       }
+    });
+
+    effect(() => {
+      if (!this.resultReady() || this.resultSaved()) {
+        return;
+      }
+
+      const user = this.authService.user();
+      const quiz = this.quiz();
+
+      if (!user || !quiz) {
+        return;
+      }
+
+      const totalQuestions = this.totalQuestions();
+
+      if (totalQuestions === 0) {
+        return;
+      }
+
+      this.resultSaved.set(true);
+      this.resultSaveError.set(null);
+
+      this.quizScoreService
+        .saveQuizResult(user.id, {
+          quizId: quiz.id,
+          score: this.quizScoreService.toScaledScore(this.score()),
+          maxScore: totalQuestions * 100,
+        })
+        .subscribe({
+          error: () => {
+            this.resultSaved.set(false);
+            this.resultSaveError.set('Nie udało się zapisać wyniku.');
+          },
+        });
     });
   }
 
@@ -237,6 +279,8 @@ export class QuizPlayPageComponent {
     this.checkedQuestions.set(new Set());
     this.currentIndex.set(0);
     this.resultReady.set(false);
+    this.resultSaved.set(false);
+    this.resultSaveError.set(null);
     this.showIncompleteConfirm.set(false);
     this.showExitConfirm.set(false);
     this.activeSelectedQuestionId.set(null);
@@ -333,6 +377,10 @@ export class QuizPlayPageComponent {
 
   isWrongSubmittedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
     return this.isSubmittedAnswer(question, answer) && !answer.correct;
+  }
+
+  isCorrectSubmittedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
+    return this.isSubmittedAnswer(question, answer) && answer.correct;
   }
 
   goBack(): void {
