@@ -28,7 +28,8 @@
                 [class.selected]="isSelectedAnswer(question, answer)"
                 [class.correct]="isCorrectAnswerVisible(question, answer)"
                 [class.wrong]="isWrongSubmittedAnswer(question, answer)"
-                [class.submitted-answer]="isSubmittedAnswer(question, answer)"
+                [class.submitted-correct]="isCorrectSubmittedAnswer(question, answer)"
+                [class.submitted-answer]="isWrongSubmittedAnswer(question, answer)"
                 [disabled]="currentQuestionChecked() || resultReady()"
                 (click)="selectAnswer(question, answer)">
                 {{ answer.content }}
@@ -99,7 +100,13 @@
       @if (showExitConfirm()) {
         <div class="confirm-overlay">
           <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
-            <p>Twoje wyniki nie zostaną zapisane.<br />Czy na pewno chcesz wyjść?</p>
+            <p>
+              @if (isLoggedIn()) {
+                Postęp nie zostanie zapisany.<br />Czy na pewno chcesz wyjść?
+              } @else {
+                Twoje wyniki nie zostaną zapisane.<br />Czy na pewno chcesz wyjść?
+              }
+            </p>
 
             <div class="confirm-actions">
               <button class="secondary-button squircle" type="button" (click)="cancelExitQuiz()">
@@ -117,6 +124,16 @@
         <div class="result-box squircle">
           <p>Wynik: {{ formattedScore() }} / {{ totalQuestions() }}</p>
           <p>Skuteczność: {{ scorePercent() }}%</p>
+
+          @if (isLoggedIn()) {
+            @if (resultSaveError()) {
+              <p class="result-status error">{{ resultSaveError() }}</p>
+            } @else if (resultSaved()) {
+              <p class="result-status success">Wynik został zapisany.</p>
+            } @else {
+              <p class="result-status">Zapisywanie wyniku...</p>
+            }
+          }
 
           <button class="result-back-button primary-button squircle" type="button" (click)="goBack()">
             Strona główna

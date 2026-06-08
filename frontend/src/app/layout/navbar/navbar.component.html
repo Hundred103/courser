@@ -11,11 +11,20 @@
       Ustawienia
     </button>
 
-    <button
-      class="primary-button squircle"
-      type="button"
-      (click)="onAccountClick()">
-      Konto
-    </button>
+    @if (isLoggedIn()) {
+      <span class="user-badge squircle">{{ user()!.displayName }}</span>
+      <button
+        class="secondary-button squircle"
+        type="button"
+        (click)="logout()">
+        Wyloguj
+      </button>
+    } @else {
+      <a
+        class="primary-button squircle"
+        routerLink="/login">
+        Zaloguj
+      </a>
+    }
   </nav>
 </header>

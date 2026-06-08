@@ -10,21 +10,53 @@ services:
       - "5433:5432"
     volumes:
       - courser-postgres-data:/var/lib/postgresql/data
+      - ./postgre/dump.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
-  backend:
+  quiz-service:
     build:
       context: ./backend/quiz-service
       dockerfile: Dockerfile
-    container_name: courser-backend
+    container_name: courser-quiz
     depends_on:
       - postgres
     ports:
-      - "8080:8080"
+      - "8081:8081"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
       SPRING_DATASOURCE_USERNAME: courseruser
       SPRING_DATASOURCE_PASSWORD: courserpassword
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SERVER_PORT: 8081
+
+  user-service:
+    build:
+      context: ./backend/user-service
+      dockerfile: Dockerfile
+    container_name: courser-user-service
+    depends_on:
+      - postgres
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
+      SPRING_DATASOURCE_USERNAME: courseruser
+      SPRING_DATASOURCE_PASSWORD: courserpassword
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8082
+
+  gateway:
+    build:
+      context: ./backend/gateway
+      dockerfile: Dockerfile
+    container_name: courser-gateway
+    depends_on:
+      - quiz-service
+      - user-service
+    ports:
+      - "8080:8080"
+    environment:
+      QUIZ_SERVICE_URL: http://quiz-service:8081
+      USER_SERVICE_URL: http://user-service:8082
 
   frontend:
     build:
@@ -32,7 +64,7 @@ services:
       dockerfile: Dockerfile
     container_name: courser-frontend
     depends_on:
-      - backend
+      - gateway
     ports:
       - "4200:80"
 

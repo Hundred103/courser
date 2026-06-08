@@ -1,14 +1,23 @@
 import { Component, ElementRef, HostListener, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { catchError, finalize, map, of, startWith } from 'rxjs';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { catchError, combineLatest, finalize, map, of, startWith, switchMap } from 'rxjs';
+import { BestQuizScore } from '../../core/models/quiz-score.model';
 import { QuizRawDTO } from '../../core/models/quiz.model';
+import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
+import { QuizScoreService } from '../../core/services/quiz-score.service';
 
 type QuizSidebarState =
   | { status: 'loading'; quizzes: QuizRawDTO[]; errorMessage: '' }
   | { status: 'ready'; quizzes: QuizRawDTO[]; errorMessage: '' }
   | { status: 'error'; quizzes: QuizRawDTO[]; errorMessage: string };
+
+type BestScoresState =
+  | { status: 'guest'; scores: BestQuizScore[] }
+  | { status: 'loading'; scores: BestQuizScore[] }
+  | { status: 'ready'; scores: BestQuizScore[] }
+  | { status: 'error'; scores: BestQuizScore[] };
 
 @Component({
   selector: 'app-sidebar',
@@ -19,6 +28,8 @@ type QuizSidebarState =
 })
 export class SidebarComponent {
   private readonly quizApiService = inject(QuizApiService);
+  private readonly authService = inject(AuthService);
+  private readonly quizScoreService = inject(QuizScoreService);
   private readonly router = inject(Router);
   private readonly elementRef = inject(ElementRef<HTMLElement>);
 
@@ -55,7 +66,30 @@ export class SidebarComponent {
 
   private readonly localQuizzes = signal<QuizRawDTO[]>([]);
 
+  private readonly bestScoresState = toSignal(
+    combineLatest([
+      toObservable(this.authService.user),
+      toObservable(this.quizScoreService.scoresVersion).pipe(startWith(0)),
+    ]).pipe(
+      switchMap(([user]) => {
+        if (!user) {
+          return of({ status: 'guest', scores: [] } satisfies BestScoresState);
+        }
+
+        return this.quizScoreService.getBestScores(user.id).pipe(
+          map((scores) => ({ status: 'ready', scores } satisfies BestScoresState)),
+          startWith({ status: 'loading', scores: [] } satisfies BestScoresState),
+          catchError(() => of({ status: 'error', scores: [] } satisfies BestScoresState)),
+        );
+      }),
+    ),
+    {
+      initialValue: { status: 'loading', scores: [] } satisfies BestScoresState,
+    },
+  );
+
   readonly quizzes = computed(() => this.localQuizzes());
+  readonly isLoggedIn = this.authService.isLoggedIn;
   readonly isLoading = computed(() => this.quizState().status === 'loading');
   readonly errorMessage = computed(() => this.quizState().errorMessage);
   readonly hasQuizzes = computed(() => this.quizzes().length > 0);
@@ -66,6 +100,11 @@ export class SidebarComponent {
   readonly quizPendingDelete = signal<QuizRawDTO | null>(null);
   readonly quizPendingStart = signal<QuizRawDTO | null>(null);
   readonly randomQuestionsEnabled = signal(false);
+
+  private readonly bestScoresByQuizId = computed(() => {
+    const scores = this.bestScoresState().scores;
+    return new Map(scores.map((score) => [score.quizId, score]));
+  });
 
   constructor() {
     effect(() => {
@@ -155,6 +194,16 @@ export class SidebarComponent {
   requestDeleteQuiz(quiz: QuizRawDTO): void {
     this.openMenuQuizId.set(null);
     this.quizPendingDelete.set(quiz);
+  }
+
+  bestScoreLabel(quizId: number): string | null {
+    const bestScore = this.bestScoresByQuizId().get(quizId);
+
+    if (!bestScore) {
+      return null;
+    }
+
+    return this.quizScoreService.formatScoreValue(bestScore.score, bestScore.maxScore);
   }
 
   requestStartQuiz(quiz: QuizRawDTO): void {
