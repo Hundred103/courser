@@ -29,6 +29,7 @@ public class Question {
     //private Set<Answer> answers = new HashSet<>();
     @OrderColumn(name = "answer_order")
     private List<Answer> answers = new ArrayList<>();
+    @Column(columnDefinition = "TEXT")
     private String content;
 
     public void addAnswer(Answer answer) {

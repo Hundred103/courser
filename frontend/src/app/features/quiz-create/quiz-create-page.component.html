@@ -1,0 +1,185 @@
+<section class="view-shell create-shell squircle">
+  <div class="top-actions">
+    <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
+      Strona główna
+    </button>
+    @if (isEditMode()) {
+      <button
+        class="undo-button secondary-button squircle"
+        type="button"
+        [disabled]="!canUndoChanges()"
+        (click)="undoChanges()"
+      >
+        Cofnij zmiany
+      </button>
+    }
+  </div>
+
+  <article class="quiz-create squircle fade-in">
+    <header class="create-header">
+      <input
+        id="quiz-title"
+        class="title-input squircle"
+        type="text"
+        [value]="title()"
+        (input)="updateTitle($event)"
+        placeholder="Wpisz tytuł quizu"
+      />
+    </header>
+
+    @if (currentQuestion(); as question) {
+      <section class="question-editor squircle">
+        <div class="section-heading">
+          <span>Pytanie {{ currentQuestionNumber() }}</span>
+          <div class="question-heading-actions">
+            @if (totalQuestions() > 1) {
+              <button
+                class="delete-icon-button question-delete-button"
+                type="button"
+                aria-label="Usuń pytanie"
+                (click)="removeCurrentQuestion()"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4h8v2" />
+                  <path d="M19 6l-1 14H6L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                </svg>
+              </button>
+            }
+            <small>{{ currentQuestionNumber() }} / {{ totalQuestions() }}</small>
+          </div>
+        </div>
+
+        <textarea
+          id="question-content"
+          class="question-input squircle"
+          [value]="question.content"
+          (input)="updateQuestionContent($event)"
+          placeholder="Wpisz pytanie"
+        ></textarea>
+
+        <div class="answers-section">
+          <div class="section-heading answer-heading">
+            <span>Odpowiedzi</span>
+            <button class="secondary-button add-answer-button squircle" type="button" (click)="addAnswer()">
+              Dodaj odpowiedź
+            </button>
+          </div>
+
+          <div class="answers-list">
+            @for (answer of question.answers; track answer.id; let answerIndex = $index) {
+              <div class="answer-editor squircle">
+                <span class="answer-number">{{ answerIndex + 1 }}</span>
+                <input
+                  class="answer-input"
+                  type="text"
+                  [value]="answer.content"
+                  (input)="updateAnswerContent(answer.id, $event)"
+                  placeholder="Wpisz odpowiedź"
+                />
+                <label class="correct-toggle">
+                  <input
+                    type="checkbox"
+                    [checked]="answer.correct"
+                    (change)="toggleCorrectAnswer(answer.id, $event)"
+                  />
+                  <span class="toggle-track" aria-hidden="true">
+                    <span class="toggle-thumb"></span>
+                  </span>
+                  <span>Poprawna</span>
+                </label>
+                @if (question.answers.length > 1) {
+                  <button
+                    class="delete-icon-button delete-answer-button"
+                    type="button"
+                    aria-label="Usuń odpowiedź"
+                    (click)="removeAnswer(answer.id)"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4h8v2" />
+                      <path d="M19 6l-1 14H6L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                    </svg>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+    }
+
+    @if (saveError()) {
+      <p class="status-text error">{{ saveError() }}</p>
+    }
+
+    <footer class="create-controls">
+      <div class="control-side left">
+        @if (canGoPrevious()) {
+          <button class="question-nav-button secondary-button squircle" type="button" (click)="goPrevious()">
+            <span aria-hidden="true">&larr;</span>
+            Poprzednie pytanie
+          </button>
+        }
+      </div>
+
+      <button
+        class="save-button primary-button squircle"
+        type="button"
+        [disabled]="!canSave()"
+        [title]="saveButtonTitle()"
+        (click)="saveQuiz()"
+      >
+        {{ isSaving() ? 'Zapisywanie...' : 'Zapisz quiz' }}
+      </button>
+
+      <div class="control-side right">
+        <button class="question-nav-button secondary-button squircle" type="button" (click)="goNext()">
+          Następne pytanie
+          <span aria-hidden="true">&rarr;</span>
+        </button>
+      </div>
+    </footer>
+  </article>
+
+  @if (showExitConfirm()) {
+    <div class="confirm-overlay">
+      <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
+        <p>Twoje zmiany nie zostaną zapisane.<br />Czy na pewno chcesz wyjść?</p>
+
+        <div class="confirm-actions">
+          <button class="secondary-button squircle" type="button" (click)="cancelExitQuiz()">
+            Anuluj
+          </button>
+          <button class="danger-button squircle" type="button" (click)="confirmExitQuiz()">
+            Potwierdź
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</section>

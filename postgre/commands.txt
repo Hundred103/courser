@@ -1,22 +1,38 @@
+
 !!!!!!!!!!!!!!!KONTENERY MUSZA CHODZIC!!!!!!!!!!!!!!!
 ---------------komendy wykonywac w folderze postgre---------------
 
+Uwaga: teraz postgres jest skonfigurowany tak, by przy pierwszym uruchomieniu wykonać plik `dump.sql` umieszczony w `/docker-entrypoint-initdb.d/`.
+Jeżeli chcesz zainicjalizować bazę automatycznie, umieść `dump.sql` w tym katalogu (już zmapowane w `docker-compose.yml`).
 
+---INICJALIZACJA (pierwsze uruchomienie)---
+- Umieść `dump.sql` w tym katalogu repo: `./postgre/dump.sql` i uruchom `docker-compose up -d`.
+	Postgres wykona skrypt tylko jeśli wolumen danych jest pusty.
 
----IMPORT---
-docker exec -it courser-postgres psql -U courseruser -d courserdb
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-\q
-(na windows):
-cmd /c "docker exec -i courser-postgres psql -U courseruser -d courserdb < dump.sql"
-(na linxu):
+---RĘCZNY IMPORT (kontener już działa)---
+(Linux/Mac):
 docker exec -i courser-postgres psql -U courseruser -d courserdb < dump.sql
 
+(Windows PowerShell):
+Get-Content .\dump.sql | docker exec -i courser-postgres psql -U courseruser -d courserdb
 
----EXPORT---
-(na windowns):
-cmd /c "docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d courserdb > dump.sql"
-(na linux):
+Jeżeli chcesz wyczyścić schemat przed importem:
+docker exec -it courser-postgres psql -U courseruser -d courserdb -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
+---EXPORT (zrzut istniejącej bazy)---
+(Linux/Mac):
 docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d courserdb > dump.sql
+
+(Windows cmd):
+cmd /c "docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d courserdb > dump.sql"
+
+---UWAGI DLA USŁUG (quiz-service i user-service)---
+- Obie usługi korzystają z tej samej bazy `courserdb` (użytkownik `courseruser`).
+- Jeżeli chcesz zresetować bazę i ponownie uruchomić inicjalizację z `dump.sql`: zatrzymaj kontenery, usuń wolumen danych i uruchom ponownie:
+
+docker-compose down
+docker volume rm courser-postgres-data
+docker-compose up -d
+
+To spowoduje, że postgres wykona `dump.sql` ponownie przy starcie i utworzy schemat wymagany przez obie usługi.
 
