@@ -1,13 +1,1 @@
-<div class="app-shell">
-  <app-navbar></app-navbar>
-
-  <div class="content-shell" [class.full-page]="!showSidebar()">
-    @if (showSidebar()) {
-      <app-sidebar></app-sidebar>
-    }
-
-    <main>
-      <router-outlet></router-outlet>
-    </main>
-  </div>
-</div>
+<router-outlet></router-outlet>
