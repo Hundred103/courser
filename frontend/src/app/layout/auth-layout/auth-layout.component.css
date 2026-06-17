@@ -62,7 +62,7 @@
   left: 50%;
   z-index: -1;
   color: rgba(255, 230, 222, 0.08);
-  font-size: clamp(7rem, 24vw, 22rem);
+  font-size: clamp(6rem, 22vw, 22rem);
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1.08;
@@ -94,6 +94,11 @@
   .auth-shell {
     align-items: stretch;
     padding: 4.5rem 1rem 1rem;
+  }
+
+  .brand-backdrop {
+    font-size: clamp(4.6rem, 19vw, 7rem);
+    transform: translate(-50%, -58%) scaleX(1.02) scaleY(1.06);
   }
 
   .auth-stage {

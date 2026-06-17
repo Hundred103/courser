@@ -15,7 +15,7 @@ export class RegisterPageComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
 
-  model = { email: '', password: '', passwordConfirm: '', displayName: '' };
+  model = { email: '', password: '', passwordConfirm: '', username: '' };
   readonly error = signal<string | null>(null);
   readonly loading = signal(false);
   readonly submitAttempted = signal(false);
@@ -31,7 +31,7 @@ export class RegisterPageComponent {
     this.loading.set(true);
 
     this.authService
-      .register(this.model.email.trim(), this.model.password, this.model.displayName.trim())
+      .register(this.model.email.trim(), this.model.password, this.model.username.trim())
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: (response) => {
@@ -63,7 +63,7 @@ export class RegisterPageComponent {
   }
 
   usernameError(): string | null {
-    const username = this.model.displayName;
+    const username = this.model.username;
 
     if (!this.submitAttempted() && !username) {
       return null;
@@ -85,7 +85,7 @@ export class RegisterPageComponent {
   }
 
   hasRequiredLength(): boolean {
-    return this.model.password.length > 8;
+    return this.model.password.length >= 8;
   }
 
   hasDigit(): boolean {

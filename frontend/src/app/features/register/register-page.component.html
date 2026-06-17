@@ -26,8 +26,8 @@
       <label class="field">
         <span>Nazwa użytkownika</span>
         <input
-          name="displayName"
-          [(ngModel)]="model.displayName"
+          name="username"
+          [(ngModel)]="model.username"
           required
           [disabled]="loading()"
           [class.error]="usernameError()" />
@@ -45,7 +45,7 @@
         <ul class="password-rules" aria-label="Wymagania hasła">
           <li [class.valid]="hasRequiredLength()">
             <span>{{ hasRequiredLength() ? '✓' : '×' }}</span>
-            Powyżej 8 znaków
+            Przynajmniej 8 znaków
           </li>
           <li [class.valid]="hasDigit()">
             <span>{{ hasDigit() ? '✓' : '×' }}</span>
@@ -73,7 +73,7 @@
         <ul class="password-rules single-rule" aria-label="Zgodność haseł">
           <li [class.valid]="passwordsMatch()">
             <span>{{ passwordsMatch() ? '✓' : '×' }}</span>
-            Hasła są takie same
+            {{ passwordsMatch() ? 'Hasła są takie same' : 'Hasła nie są takie same' }}
           </li>
         </ul>
       }

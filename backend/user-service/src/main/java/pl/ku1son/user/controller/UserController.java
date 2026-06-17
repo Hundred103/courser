@@ -48,20 +48,19 @@ public class UserController {
         try {
             User user = User.builder()
                     .email(request.getEmail())
-                    .username(request.getEmail())
+                    .username(request.getUsername())
                     .password(request.getPassword())
-                    .displayName(request.getDisplayName())
                     .build();
-            
+
             User created = userService.createUser(user);
-            
+
             LoginResponse response = LoginResponse.builder()
                     .id(created.getId())
                     .email(created.getEmail())
-                    .displayName(created.getDisplayName())
+                    .username(created.getUsername())
                     .message("Rejestracja powiodła się")
                     .build();
-            
+
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -73,14 +72,14 @@ public class UserController {
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
             User user = userService.login(request.getEmail(), request.getPassword());
-            
+
             LoginResponse response = LoginResponse.builder()
                     .id(user.getId())
                     .email(user.getEmail())
-                    .displayName(user.getDisplayName())
+                    .username(user.getUsername())
                     .message("Zalogowano pomyślnie")
                     .build();
-            
+
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

@@ -12,7 +12,7 @@
     </button>
 
     @if (isLoggedIn()) {
-      <span class="user-badge squircle">{{ user()!.displayName }}</span>
+      <span class="user-badge squircle">{{ user()!.username }}</span>
       <button
         class="secondary-button squircle"
         type="button"

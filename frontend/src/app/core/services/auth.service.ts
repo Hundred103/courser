@@ -11,13 +11,13 @@ export interface LoginRequest {
 export interface RegisterRequest {
   email: string;
   password: string;
-  displayName: string;
+  username: string;
 }
 
 export interface AuthResponse {
   id: number;
   email: string;
-  displayName: string;
+  username: string;
   message: string;
 }
 
@@ -39,11 +39,11 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, { email, password });
   }
 
-  register(email: string, password: string, displayName: string): Observable<AuthResponse> {
+  register(email: string, password: string, username: string): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.apiUrl}/register`, {
       email,
       password,
-      displayName,
+      username,
     });
   }
 
@@ -72,7 +72,14 @@ export class AuthService {
     }
 
     try {
-      return JSON.parse(stored) as AuthResponse;
+      const user = JSON.parse(stored) as AuthResponse;
+
+      if (!user.username) {
+        localStorage.removeItem(STORAGE_KEY);
+        return null;
+      }
+
+      return user;
     } catch {
       localStorage.removeItem(STORAGE_KEY);
       return null;
