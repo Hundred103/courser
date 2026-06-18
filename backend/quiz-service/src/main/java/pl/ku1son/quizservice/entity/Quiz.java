@@ -25,6 +25,8 @@ public class Quiz {
     @OrderColumn(name = "question_order")
     private List<Question> questions = new ArrayList<>();
     private String title;
+    @Column(name = "owner_user_id")
+    private Long ownerUserId;
 
     public void addQuestion(Question question) {
         questions.add(question);

@@ -160,7 +160,7 @@ export class QuizPlayPageComponent {
       const user = this.authService.user();
       const quiz = this.quiz();
 
-      if (!user || !quiz) {
+      if (!user || !quiz || quiz.id < 0) {
         return;
       }
 

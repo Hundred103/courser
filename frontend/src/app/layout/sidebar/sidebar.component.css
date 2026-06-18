@@ -89,8 +89,22 @@ h2 {
   line-height: 1.2;
 }
 
-.quiz-title-input {
+.rename-editor {
+  display: grid;
   flex: 1 1 auto;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.rename-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.quiz-title-input {
   min-width: 0;
   width: 100%;
   border: 1px solid rgba(255, 107, 53, 0.45);
@@ -107,6 +121,13 @@ h2 {
 
 .quiz-title-input:disabled {
   opacity: 0.65;
+}
+
+.rename-error {
+  color: var(--error-text);
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1.25;
 }
 
 .quiz-actions {

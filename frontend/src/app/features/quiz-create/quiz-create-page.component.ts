@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription, finalize } from 'rxjs';
 import { QuizCreateDTO, QuizPlayDTO } from '../../core/models/quiz.model';
+import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 
 interface DraftAnswer {
@@ -30,6 +31,7 @@ interface DraftSnapshot {
   styleUrl: './quiz-create-page.component.css',
 })
 export class QuizCreatePageComponent implements OnDestroy {
+  private readonly authService = inject(AuthService);
   private readonly quizApiService = inject(QuizApiService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -56,6 +58,7 @@ export class QuizCreatePageComponent implements OnDestroy {
   readonly saveError = signal('');
   readonly loadError = signal('');
   readonly showExitConfirm = signal(false);
+  readonly showAuthPrompt = signal(false);
   readonly editingQuizId = signal<number | null>(null);
 
   readonly isEditMode = computed(() => this.editingQuizId() !== null);
@@ -173,6 +176,16 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.resolveExitDecision(true);
   }
 
+  cancelAuthPrompt(): void {
+    this.showAuthPrompt.set(false);
+    void this.router.navigate(['/']);
+  }
+
+  goToLogin(): void {
+    this.showAuthPrompt.set(false);
+    void this.router.navigate(['/login']);
+  }
+
   undoChanges(): void {
     if (!this.canUndoChanges() || !this.initialDraft) {
       return;
@@ -220,6 +233,11 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   saveQuiz(): void {
+    if (!this.authService.isLoggedIn()) {
+      this.showAuthPrompt.set(true);
+      return;
+    }
+
     if (!this.canSave()) {
       return;
     }
@@ -252,6 +270,7 @@ export class QuizCreatePageComponent implements OnDestroy {
 
   private prepareNewQuiz(): void {
     this.editingQuizId.set(null);
+    this.showAuthPrompt.set(!this.authService.isLoggedIn());
     this.initialDraftSignature = '';
     this.initialDraft = null;
     this.quizSaved = false;

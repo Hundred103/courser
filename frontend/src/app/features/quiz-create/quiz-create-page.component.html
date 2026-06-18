@@ -166,6 +166,23 @@
     </footer>
   </article>
 
+  @if (showAuthPrompt()) {
+    <div class="confirm-overlay">
+      <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
+        <p>Żeby utworzyć quiz, musisz się zalogować.</p>
+
+        <div class="confirm-actions">
+          <button class="secondary-button squircle" type="button" (click)="cancelAuthPrompt()">
+            Anuluj
+          </button>
+          <button class="primary-button squircle" type="button" (click)="goToLogin()">
+            Zaloguj
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
   @if (showExitConfirm()) {
     <div class="confirm-overlay">
       <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">

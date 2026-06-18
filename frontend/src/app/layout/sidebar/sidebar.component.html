@@ -1,6 +1,8 @@
 <aside class="sidebar squircle">
   <div class="sidebar-actions">
-    <a class="create-quiz-button primary-button squircle" routerLink="/quizzes/new">Utwórz</a>
+    <button class="create-quiz-button primary-button squircle" type="button" (click)="requestCreateQuiz()">
+      Utwórz
+    </button>
     <a class="create-quiz-button primary-button squircle" routerLink="/quizzes/import">Importuj</a>
   </div>
   <div class="sidebar-divider" aria-hidden="true"></div>
@@ -18,17 +20,24 @@
       @for (quiz of quizzes(); track quiz.id) {
         <li class="quiz-item fade-in">
           @if (editingQuizId() === quiz.id) {
-            <input
-              #titleInput
-              class="quiz-title-input"
-              type="text"
-              [value]="draftTitle()"
-              [disabled]="busyQuizId() === quiz.id"
-              (input)="updateDraftTitle($event)"
-              (keydown.enter)="saveRename(quiz)"
-              (keydown.escape)="cancelRename()"
-              (blur)="cancelRename()"
-            />
+            <div class="rename-editor">
+              <div class="rename-row">
+                <input
+                  #titleInput
+                  class="quiz-title-input"
+                  type="text"
+                  [value]="draftTitle()"
+                  [disabled]="busyQuizId() === quiz.id"
+                  (input)="updateDraftTitle($event)"
+                  (keydown.enter)="saveRenameFromKeyboard(quiz, $event)"
+                  (keydown.escape)="cancelRenameFromKeyboard($event)"
+                  (blur)="saveRenameFromInput(quiz, $event)"
+                />
+              </div>
+              @if (renameError()) {
+                <span class="rename-error">{{ renameError() }}</span>
+              }
+            </div>
           } @else {
             <div class="quiz-info">
               <span class="quiz-title">{{ quiz.title }}</span>
@@ -147,6 +156,23 @@
           (click)="confirmDeleteQuiz()"
         >
           Potwierdź
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (authPromptMessage(); as message) {
+  <div class="confirm-overlay">
+    <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
+      <p>{{ message }}</p>
+
+      <div class="confirm-actions">
+        <button class="secondary-button squircle" type="button" (click)="cancelAuthPrompt()">
+          Anuluj
+        </button>
+        <button class="primary-button squircle" type="button" (click)="goToLogin()">
+          Zaloguj
         </button>
       </div>
     </div>

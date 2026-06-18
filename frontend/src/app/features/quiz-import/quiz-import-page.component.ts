@@ -115,7 +115,7 @@ export class QuizImportPageComponent {
     this.importError.set('');
 
     this.quizApiService
-      .createQuiz(quiz)
+      .importQuiz(quiz)
       .pipe(finalize(() => this.isImporting.set(false)))
       .subscribe({
         next: () => {

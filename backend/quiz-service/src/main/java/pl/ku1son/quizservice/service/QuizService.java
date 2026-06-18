@@ -18,17 +18,17 @@ public class QuizService {
         this.quizRepository = quizRepository;
     }
 
-    public List<Quiz> findAll() {
-        return quizRepository.findAll(Sort.by(Sort.Direction.ASC, "id"));
+    public List<Quiz> findAllByOwnerUserId(Long ownerUserId) {
+        return quizRepository.findByOwnerUserId(ownerUserId, Sort.by(Sort.Direction.ASC, "id"));
     }
 
-    public Quiz findById(Long id) {  //sam quiz bez pytan i odpowiedzi
-        return quizRepository.findById(id)
+    public Quiz findByIdAndOwnerUserId(Long id, Long ownerUserId) {
+        return quizRepository.findByIdAndOwnerUserId(id, ownerUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
     }
 
-    public Quiz findWholeQuizById(Long id) {  //caly quiz z pytaniami i odpowiedziami
-        return quizRepository.findWholeQuizById(id)
+    public Quiz findWholeQuizByIdAndOwnerUserId(Long id, Long ownerUserId) {
+        return quizRepository.findWholeQuizByIdAndOwnerUserId(id, ownerUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
     }
 
@@ -41,8 +41,8 @@ public class QuizService {
     }
 
     @Transactional
-    public Quiz update(Long id, QuizCreateDTO dto) {
-        Quiz quiz = quizRepository.findById(id)
+    public Quiz update(Long id, Long ownerUserId, QuizCreateDTO dto) {
+        Quiz quiz = quizRepository.findByIdAndOwnerUserId(id, ownerUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
         quiz.setTitle(dto.title());
         quiz.getQuestions().clear();
@@ -63,8 +63,8 @@ public class QuizService {
     }
 
     @Transactional
-    public Quiz updateTitle(Long id, QuizEditTitleDTO dto) {
-        Quiz quiz = quizRepository.findById(id)
+    public Quiz updateTitle(Long id, Long ownerUserId, QuizEditTitleDTO dto) {
+        Quiz quiz = quizRepository.findByIdAndOwnerUserId(id, ownerUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
         quiz.setTitle(dto.title());
         return quiz;

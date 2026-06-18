@@ -1,7 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, forkJoin, of, tap } from 'rxjs';
 import { environment } from '../../../environment';
+import { GuestQuizStorageService } from './guest-quiz-storage.service';
 
 export interface LoginRequest {
   email: string;
@@ -28,7 +29,9 @@ const STORAGE_KEY = 'user';
 })
 export class AuthService {
   private readonly http = inject(HttpClient);
+  private readonly guestQuizStorage = inject(GuestQuizStorageService);
   private readonly apiUrl = `${environment.apiUrl}/users`;
+  private readonly quizzesApiUrl = `${environment.apiUrl}/quizzes`;
 
   private readonly currentUser = signal<AuthResponse | null>(this.loadStoredUser());
 
@@ -50,6 +53,18 @@ export class AuthService {
   setCurrentUser(user: AuthResponse): void {
     this.currentUser.set(user);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  }
+
+  migrateGuestQuizzesToUser(user: AuthResponse): Observable<unknown[]> {
+    const guestQuizzes = this.guestQuizStorage.getAllCreateDtos();
+
+    if (guestQuizzes.length === 0) {
+      return of([]);
+    }
+
+    return forkJoin(guestQuizzes.map((quiz) => this.http.post(this.quizzesApiUrl, quiz, { params: { userId: user.id } }))).pipe(
+      tap(() => this.guestQuizStorage.clear()),
+    );
   }
 
   getCurrentUser(): AuthResponse | null {
@@ -74,7 +89,7 @@ export class AuthService {
     try {
       const user = JSON.parse(stored) as AuthResponse;
 
-      if (!user.username) {
+      if (!Number.isFinite(user.id) || !user.email || !user.username) {
         localStorage.removeItem(STORAGE_KEY);
         return null;
       }
