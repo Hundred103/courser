@@ -118,8 +118,10 @@ export class QuizImportPageComponent {
       .importQuiz(quiz)
       .pipe(finalize(() => this.isImporting.set(false)))
       .subscribe({
-        next: () => {
-          void this.router.navigate(['/']);
+        next: (createdQuiz) => {
+          void this.router.navigate(['/quizzes', createdQuiz.id, 'details'], {
+            queryParams: { imported: 'true' },
+          });
         },
         error: () => {
           this.importError.set('Nie udało się zaimportować quizu. Spróbuj ponownie.');

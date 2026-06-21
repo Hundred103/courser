@@ -18,8 +18,11 @@ export class MainLayoutComponent {
   readonly showSidebar = toSignal(
     this.router.events.pipe(
       filter((event): event is NavigationEnd => event instanceof NavigationEnd),
-      map((event) => !event.urlAfterRedirects.startsWith('/quizzes/')),
-      startWith(!this.router.url.startsWith('/quizzes/')),
+      map((event) => {
+        const url = event.urlAfterRedirects;
+        return url === '/' || url === '';
+      }),
+      startWith(this.router.url === '/' || this.router.url === ''),
     ),
     { initialValue: true },
   );

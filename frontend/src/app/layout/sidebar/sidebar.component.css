@@ -82,6 +82,18 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.quiz-title-link {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.quiz-title-link:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-shadow: 0 0 10px rgba(255, 107, 53, 0.4);
+}
+
 .quiz-best-score {
   color: var(--text-soft);
   font-size: 0.82rem;

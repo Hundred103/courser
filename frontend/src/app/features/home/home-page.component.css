@@ -37,9 +37,6 @@ p {
   margin-top: 0.35rem;
 }
 
-.home-actions button {
-  font: inherit;
-}
 
 .confirm-overlay {
   position: fixed;

@@ -40,7 +40,7 @@
             </div>
           } @else {
             <div class="quiz-info">
-              <span class="quiz-title">{{ quiz.title }}</span>
+              <a class="quiz-title quiz-title-link" [routerLink]="['/quizzes', quiz.id, 'details']">{{ quiz.title }}</a>
               @if (isLoggedIn() && bestScoreLabel(quiz.id); as bestScore) {
                 <span class="quiz-best-score">Najlepszy: {{ bestScore }}</span>
               }
