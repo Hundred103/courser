@@ -174,7 +174,7 @@ export class QuizPlayPageComponent {
       this.resultSaveError.set(null);
 
       this.quizScoreService
-        .saveQuizResult(user.id, {
+        .saveQuizResult({
           quizId: quiz.id,
           score: this.quizScoreService.toScaledScore(this.score()),
           maxScore: totalQuestions * 100,

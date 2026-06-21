@@ -23,9 +23,7 @@ export class QuizApiService {
       return of(this.guestQuizStorage.getAllRaw());
     }
 
-    return this.http.get<QuizRawDTO[]>(this.apiUrl, {
-      params: { userId: user.id },
-    });
+    return this.http.get<QuizRawDTO[]>(this.apiUrl);
   }
 
   // GET /quizzes/{id} -> caly quiz z pytaniami i odpowiedziami
@@ -41,9 +39,7 @@ export class QuizApiService {
       return throwError(() => new Error('Login required'));
     }
 
-    return this.http.get<QuizPlayDTO>(`${this.apiUrl}/${id}`, {
-      params: { userId: user.id },
-    });
+    return this.http.get<QuizPlayDTO>(`${this.apiUrl}/${id}`);
   }
 
   // GET /quizzes/{id}/raw -> tylko quiz
@@ -59,9 +55,7 @@ export class QuizApiService {
       return throwError(() => new Error('Login required'));
     }
 
-    return this.http.get<QuizRawDTO>(`${this.apiUrl}/${id}/raw`, {
-      params: { userId: user.id },
-    });
+    return this.http.get<QuizRawDTO>(`${this.apiUrl}/${id}/raw`);
   }
 
   // DELETE /quizzes/{id}
@@ -77,9 +71,7 @@ export class QuizApiService {
       return throwError(() => new Error('Login required'));
     }
 
-    return this.http.delete<void>(`${this.apiUrl}/${id}`, {
-      params: { userId: user.id },
-    });
+    return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
 
   // POST /quizzes
@@ -90,9 +82,7 @@ export class QuizApiService {
       return throwError(() => new Error('Login required'));
     }
 
-    return this.http.post<QuizRawDTO>(this.apiUrl, dto, {
-      params: { userId: user.id },
-    });
+    return this.http.post<QuizRawDTO>(this.apiUrl, dto);
   }
 
   importQuiz(dto: QuizCreateDTO): Observable<QuizRawDTO> {
@@ -113,9 +103,7 @@ export class QuizApiService {
       return throwError(() => new Error('Login required'));
     }
 
-    return this.http.put<QuizRawDTO>(`${this.apiUrl}/${id}`, dto, {
-      params: { userId: user.id },
-    });
+    return this.http.put<QuizRawDTO>(`${this.apiUrl}/${id}`, dto);
   }
 
   // PATCH /quizzes/{id} -> zmiana tylko tabeli quiz (obecnie tylko tytul)
@@ -126,8 +114,6 @@ export class QuizApiService {
       return throwError(() => new Error('Login required'));
     }
 
-    return this.http.patch<QuizRawDTO>(`${this.apiUrl}/${id}`, dto, {
-      params: { userId: user.id },
-    });
+    return this.http.patch<QuizRawDTO>(`${this.apiUrl}/${id}`, dto);
   }
 }

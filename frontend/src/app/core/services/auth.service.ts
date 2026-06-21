@@ -19,6 +19,7 @@ export interface AuthResponse {
   id: number;
   email: string;
   username: string;
+  token: string;
   message: string;
 }
 
@@ -62,7 +63,7 @@ export class AuthService {
       return of([]);
     }
 
-    return forkJoin(guestQuizzes.map((quiz) => this.http.post(this.quizzesApiUrl, quiz, { params: { userId: user.id } }))).pipe(
+    return forkJoin(guestQuizzes.map((quiz) => this.http.post(this.quizzesApiUrl, quiz))).pipe(
       tap(() => this.guestQuizStorage.clear()),
     );
   }
@@ -80,6 +81,10 @@ export class AuthService {
     return this.isLoggedIn();
   }
 
+  getToken(): string | null {
+    return this.currentUser()?.token ?? null;
+  }
+
   private loadStoredUser(): AuthResponse | null {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
@@ -89,7 +94,7 @@ export class AuthService {
     try {
       const user = JSON.parse(stored) as AuthResponse;
 
-      if (!Number.isFinite(user.id) || !user.email || !user.username) {
+      if (!Number.isFinite(user.id) || !user.email || !user.username || !user.token) {
         localStorage.removeItem(STORAGE_KEY);
         return null;
       }

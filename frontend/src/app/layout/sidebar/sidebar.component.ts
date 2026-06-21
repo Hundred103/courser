@@ -80,7 +80,7 @@ export class SidebarComponent {
           return of({ status: 'guest', scores: [] } satisfies BestScoresState);
         }
 
-        return this.quizScoreService.getBestScores(user.id).pipe(
+        return this.quizScoreService.getBestScores().pipe(
           map((scores) => ({ status: 'ready', scores } satisfies BestScoresState)),
           startWith({ status: 'loading', scores: [] } satisfies BestScoresState),
           catchError(() => of({ status: 'error', scores: [] } satisfies BestScoresState)),
