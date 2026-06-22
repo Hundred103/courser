@@ -66,6 +66,26 @@
 
               @if (openMenuQuizId() === quiz.id) {
                 <div class="options-menu" role="menu">
+                  <button type="button" role="menuitem" (click)="requestShareQuiz(quiz)">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <circle cx="18" cy="5" r="3" />
+                      <circle cx="6" cy="12" r="3" />
+                      <circle cx="18" cy="19" r="3" />
+                      <path d="m8.6 10.5 6.8-4" />
+                      <path d="m8.6 13.5 6.8 4" />
+                    </svg>
+                    Udostępnij
+                  </button>
                   <button type="button" role="menuitem" (click)="startRename(quiz)">
                     <svg
                       viewBox="0 0 24 24"
@@ -156,6 +176,59 @@
           (click)="confirmDeleteQuiz()"
         >
           Potwierdź
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (quizPendingShare(); as quizToShare) {
+  <div class="confirm-overlay">
+    <div class="confirm-banner share-banner squircle" role="dialog" aria-modal="true" aria-labelledby="share-title">
+      <header class="share-header">
+        <h3 id="share-title">{{ quizToShare.title }}</h3>
+      </header>
+
+      @if (!shareCode()) {
+        <div class="share-field">
+          <span>Ważność kodu</span>
+          <div class="share-expiration-list" role="listbox" aria-label="Ważność kodu">
+            @for (option of shareExpirationOptions; track option.label) {
+              <button
+                class="share-expiration-option"
+                type="button"
+                role="option"
+                [class.active]="shareExpiresInSeconds() === option.value"
+                [attr.aria-selected]="shareExpiresInSeconds() === option.value"
+                [disabled]="busyQuizId() === quizToShare.id"
+                (click)="setShareExpiration(option.value)"
+              >
+                {{ option.label }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      @if (shareCode()) {
+        <div class="share-code-box squircle">
+          <span>{{ shareCode() }}</span>
+          <button class="share-copy-button secondary-button squircle" type="button" [disabled]="shareCopied()" (click)="copyShareCode()">
+            {{ shareCopied() ? 'Skopiowano' : 'Kopiuj' }}
+          </button>
+        </div>
+      }
+
+      @if (shareError()) {
+        <p class="share-error">{{ shareError() }}</p>
+      }
+
+      <div class="confirm-actions share-actions">
+        <button class="secondary-button squircle" type="button" [disabled]="busyQuizId() === quizToShare.id" (click)="cancelShareQuiz()">
+          {{ shareCopied() ? 'Wyjdź' : 'Anuluj' }}
+        </button>
+        <button class="primary-button squircle" type="button" [disabled]="busyQuizId() === quizToShare.id || !!shareCode()" (click)="confirmShareQuiz()">
+          {{ busyQuizId() === quizToShare.id ? 'Generowanie...' : 'Generuj' }}
         </button>
       </div>
     </div>

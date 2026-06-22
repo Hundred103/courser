@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, of, throwError } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { QuizPlayDTO, QuizRawDTO, QuizCreateDTO, QuizEditTitleDTO } from '../models/quiz.model';
 import { environment } from '../../../environment';
 import { AuthService } from './auth.service';
@@ -95,6 +96,28 @@ export class QuizApiService {
     return this.createQuiz(dto);
   }
 
+  createShareCode(id: number, expiresInSeconds: number | null): Observable<QuizShareCodeDTO> {
+    const user = this.authService.getCurrentUser();
+
+    if (!user || id < 0) {
+      return throwError(() => new Error('Login required'));
+    }
+
+    return this.http.post<QuizShareCodeDTO>(`${this.apiUrl}/${id}/share-codes`, { expiresInSeconds });
+  }
+
+  importQuizByCode(code: string): Observable<QuizRawDTO> {
+    const user = this.authService.getCurrentUser();
+
+    if (!user) {
+      return this.http
+        .post<QuizCreateDTO>(`${this.apiUrl}/share-code-preview`, { code })
+        .pipe(switchMap((quiz) => this.importQuiz(quiz)));
+    }
+
+    return this.http.post<QuizRawDTO>(`${this.apiUrl}/import-code`, { code });
+  }
+
   // PUT /quizzes/{id} -> zastapienie calego quizu z pytaniami i odpowiedziami
   updateQuiz(id: number, dto: QuizCreateDTO): Observable<QuizRawDTO> {
     const user = this.authService.getCurrentUser();
@@ -116,4 +139,9 @@ export class QuizApiService {
 
     return this.http.patch<QuizRawDTO>(`${this.apiUrl}/${id}`, dto);
   }
+}
+
+export interface QuizShareCodeDTO {
+  code: string;
+  expiresAt: string | null;
 }

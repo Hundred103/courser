@@ -104,8 +104,21 @@ export class SidebarComponent {
   readonly busyQuizId = signal<number | null>(null);
   readonly quizPendingDelete = signal<QuizRawDTO | null>(null);
   readonly quizPendingStart = signal<QuizRawDTO | null>(null);
+  readonly quizPendingShare = signal<QuizRawDTO | null>(null);
   readonly randomQuestionsEnabled = signal(false);
   readonly authPromptMessage = signal<string | null>(null);
+  readonly shareExpiresInSeconds = signal<number | null>(604800);
+  readonly shareCode = signal('');
+  readonly shareError = signal('');
+  readonly shareCopied = signal(false);
+
+  readonly shareExpirationOptions = [
+    { label: '1 godzina', value: 3600 },
+    { label: '24 godziny', value: 86400 },
+    { label: '7 dni', value: 604800 },
+    { label: '30 dni', value: 2592000 },
+    { label: 'Na zawsze', value: null },
+  ];
 
   private readonly bestScoresByQuizId = computed(() => {
     const scores = this.bestScoresState().scores;
@@ -178,6 +191,21 @@ export class SidebarComponent {
 
     this.openMenuQuizId.set(null);
     void this.router.navigate(['/quizzes', quiz.id, 'edit']);
+  }
+
+  requestShareQuiz(quiz: QuizRawDTO): void {
+    this.openMenuQuizId.set(null);
+
+    if (!this.isLoggedIn() || quiz.id < 0) {
+      this.authPromptMessage.set('Żeby udostępnić quiz, musisz się zalogować.');
+      return;
+    }
+
+    this.quizPendingShare.set(quiz);
+    this.shareExpiresInSeconds.set(604800);
+    this.shareCode.set('');
+    this.shareError.set('');
+    this.shareCopied.set(false);
   }
 
   updateDraftTitle(event: Event): void {
@@ -258,6 +286,60 @@ export class SidebarComponent {
   requestDeleteQuiz(quiz: QuizRawDTO): void {
     this.openMenuQuizId.set(null);
     this.quizPendingDelete.set(quiz);
+  }
+
+  setShareExpiration(value: number | null): void {
+    if (this.shareCode()) {
+      return;
+    }
+
+    this.shareExpiresInSeconds.set(value);
+    this.shareCode.set('');
+    this.shareError.set('');
+    this.shareCopied.set(false);
+  }
+
+  cancelShareQuiz(): void {
+    this.quizPendingShare.set(null);
+    this.shareCode.set('');
+    this.shareError.set('');
+    this.shareCopied.set(false);
+  }
+
+  confirmShareQuiz(): void {
+    const quiz = this.quizPendingShare();
+
+    if (!quiz || this.busyQuizId() === quiz.id || this.shareCode()) {
+      return;
+    }
+
+    this.busyQuizId.set(quiz.id);
+    this.shareError.set('');
+    this.shareCopied.set(false);
+
+    this.quizApiService
+      .createShareCode(quiz.id, this.shareExpiresInSeconds())
+      .pipe(finalize(() => this.busyQuizId.set(null)))
+      .subscribe({
+        next: (shareCode) => {
+          this.shareCode.set(shareCode.code);
+        },
+        error: () => {
+          this.shareError.set('Nie udało się wygenerować kodu. Spróbuj ponownie.');
+        },
+      });
+  }
+
+  copyShareCode(): void {
+    const code = this.shareCode();
+
+    if (!code || !navigator.clipboard) {
+      return;
+    }
+
+    navigator.clipboard.writeText(code).then(() => {
+      this.shareCopied.set(true);
+    });
   }
 
   bestScoreLabel(quizId: number): string | null {

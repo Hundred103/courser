@@ -63,6 +63,32 @@ public class QuizController {
                 .body(mapperDTO.toQuizRawDTO(saved));
     }
 
+    @PostMapping("/{id}/share-codes")
+    public ResponseEntity<QuizShareCodeDTO> createShareCode(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestBody QuizShareCodeCreateDTO dto
+    ) {
+        QuizShareCode shareCode = quizService.createShareCode(id, userId, dto.expiresInSeconds());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new QuizShareCodeDTO(formatShareCode(shareCode.getCode()), shareCode.getExpiresAt()));
+    }
+
+    @PostMapping("/import-code")
+    public ResponseEntity<QuizRawDTO> importByCode(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestBody QuizImportByCodeDTO dto
+    ) {
+        Quiz importedQuiz = quizService.importByShareCode(dto.code(), userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(mapperDTO.toQuizRawDTO(importedQuiz));
+    }
+
+    @PostMapping("/share-code-preview")
+    public QuizCreateDTO previewByCode(@RequestBody QuizImportByCodeDTO dto) {
+        return quizService.getCreateDtoByShareCode(dto.code());
+    }
+
     //PUT /quizzes/id -> zmienia caly quiz wraz z pytaniami i odpowiedziami
     //                -> (mozliwosc edycji pytan i odpowiedzi quizu)
     @PutMapping("/{id}")
@@ -90,5 +116,9 @@ public class QuizController {
         return ResponseEntity.ok(
                 mapperDTO.toQuizRawDTO(updated)
         );
+    }
+
+    private String formatShareCode(String code) {
+        return code.substring(0, 5) + "-" + code.substring(5);
     }
 }

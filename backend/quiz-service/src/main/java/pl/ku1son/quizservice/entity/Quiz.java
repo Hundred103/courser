@@ -22,7 +22,7 @@ public class Quiz {
     @Builder.Default
     @OneToMany(mappedBy = "quiz", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     //private Set<Question> questions = new HashSet<>();
-    @OrderColumn(name = "question_order")
+    @OrderBy("id ASC")
     private List<Question> questions = new ArrayList<>();
     private String title;
     @Column(name = "owner_user_id")

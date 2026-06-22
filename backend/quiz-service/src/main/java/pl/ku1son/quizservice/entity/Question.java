@@ -27,7 +27,7 @@ public class Question {
     @Builder.Default
     @OneToMany(mappedBy = "question", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     //private Set<Answer> answers = new HashSet<>();
-    @OrderColumn(name = "answer_order")
+    @OrderBy("id ASC")
     private List<Answer> answers = new ArrayList<>();
     @Column(columnDefinition = "TEXT")
     private String content;
