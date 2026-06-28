@@ -7,7 +7,9 @@ import { BestQuizScore } from '../../core/models/quiz-score.model';
 import { QuizRawDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
+import { GuestQuizStorageService } from '../../core/services/guest-quiz-storage.service';
 import { QuizScoreService } from '../../core/services/quiz-score.service';
+import { buildQuizZip } from '../../core/utils/quiz-zip.util';
 
 type QuizSidebarState =
   | { status: 'loading'; quizzes: QuizRawDTO[]; errorMessage: '' }
@@ -29,6 +31,7 @@ type BestScoresState =
 })
 export class SidebarComponent {
   private readonly quizApiService = inject(QuizApiService);
+  private readonly guestQuizStorage = inject(GuestQuizStorageService);
   private readonly authService = inject(AuthService);
   private readonly quizScoreService = inject(QuizScoreService);
   private readonly router = inject(Router);
@@ -191,6 +194,69 @@ export class SidebarComponent {
 
     this.openMenuQuizId.set(null);
     void this.router.navigate(['/quizzes', quiz.id, 'edit']);
+  }
+
+  exportQuiz(quiz: QuizRawDTO): void {
+    this.openMenuQuizId.set(null);
+
+    if (quiz.id < 0) {
+      void this.exportGuestQuiz(quiz);
+      return;
+    }
+
+    if (!this.isLoggedIn()) {
+      this.authPromptMessage.set('Żeby wyeksportować quiz, musisz się zalogować.');
+      return;
+    }
+
+    if (this.busyQuizId() === quiz.id) {
+      return;
+    }
+
+    this.busyQuizId.set(quiz.id);
+
+    this.quizApiService
+      .exportQuiz(quiz.id)
+      .pipe(finalize(() => this.busyQuizId.set(null)))
+      .subscribe({
+        next: (blob) => this.downloadQuizZip(blob, quiz.title),
+        error: () => {
+          this.authPromptMessage.set('Nie udało się wyeksportować quizu.');
+        },
+      });
+  }
+
+  private async exportGuestQuiz(quiz: QuizRawDTO): Promise<void> {
+    const fullQuiz = this.guestQuizStorage.getById(quiz.id);
+
+    if (!fullQuiz) {
+      return;
+    }
+
+    const blob = await buildQuizZip({
+      title: fullQuiz.title,
+      questions: fullQuiz.questions.map((question) => ({
+        content: question.content,
+        image: question.image ?? null,
+        answers: question.answers.map((answer) => ({
+          content: answer.content,
+          correct: answer.correct,
+        })),
+      })),
+    });
+
+    this.downloadQuizZip(blob, quiz.title);
+  }
+
+  private downloadQuizZip(blob: Blob, title: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const safeTitle = title.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'quiz';
+
+    link.href = url;
+    link.download = `${safeTitle}.zip`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   requestShareQuiz(quiz: QuizRawDTO): void {

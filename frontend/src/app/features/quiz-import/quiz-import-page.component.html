@@ -32,7 +32,7 @@
 
       <div class="import-grid">
         <section class="upload-area squircle" [class.dragging]="isDraggingFile()">
-          <input id="quiz-json-file" type="file" accept=".json,application/json" (change)="selectFile($event)" />
+          <input id="quiz-json-file" type="file" accept=".zip,.json,application/json,application/zip" (change)="selectFile($event)" />
           <label
             for="quiz-json-file"
             class="drop-zone squircle"
@@ -56,8 +56,8 @@
                 <path d="M12 3v12" />
               </svg>
             </span>
-            <strong>Wybierz albo upuść plik .json</strong>
-            <span>{{ selectedFileName() || 'Nie wybrano pliku' }}</span>
+            <strong>Wybierz albo upuść plik .zip</strong>
+            <span>{{ selectedFileName() || 'ZIP z quiz.json w katalogu głównym i opcjonalnym folderem images/' }}</span>
           </label>
 
           @if (isReadingFile()) {
@@ -114,10 +114,15 @@
         <section class="template-panel squircle">
           <div class="template-heading">
             <div>
-              <h2>Przykładowy JSON</h2>
+              <h2>Format pliku ZIP</h2>
+              <p class="template-note">
+                Spakuj folder z plikiem <code>quiz.json</code> w katalogu głównym oraz opcjonalnym folderem
+                <code>images/</code>. W JSON każde pytanie może mieć pole <code>image</code> (np.
+                <code>"image1.jpg"</code>) albo <code>null</code>.
+              </p>
             </div>
             <button class="secondary-button squircle" type="button" (click)="downloadTemplate()">
-              Pobierz
+              Pobierz szablon
             </button>
           </div>
 

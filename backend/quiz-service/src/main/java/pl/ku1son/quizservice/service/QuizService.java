@@ -24,15 +24,24 @@ public class QuizService {
     private final QuizRepository quizRepository;
     private final QuestionRepository questionRepository;
     private final QuizShareCodeRepository quizShareCodeRepository;
+    private final MapperDTO mapperDTO;
+    private final ImageCompressor imageCompressor;
+    private final QuizExportService quizExportService;
 
     public QuizService(
             QuizRepository quizRepository,
             QuestionRepository questionRepository,
-            QuizShareCodeRepository quizShareCodeRepository
+            QuizShareCodeRepository quizShareCodeRepository,
+            MapperDTO mapperDTO,
+            ImageCompressor imageCompressor,
+            QuizExportService quizExportService
     ) {
         this.quizRepository = quizRepository;
         this.questionRepository = questionRepository;
         this.quizShareCodeRepository = quizShareCodeRepository;
+        this.mapperDTO = mapperDTO;
+        this.imageCompressor = imageCompressor;
+        this.quizExportService = quizExportService;
     }
 
     public List<Quiz> findAllByOwnerUserId(Long ownerUserId) {
@@ -47,6 +56,24 @@ public class QuizService {
     public Quiz findWholeQuizByIdAndOwnerUserId(Long id, Long ownerUserId) {
         return quizRepository.findWholeQuizByIdAndOwnerUserId(id, ownerUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public QuizPlayDTO getQuizForPlay(Long id, Long ownerUserId) {
+        Quiz quiz = findWholeQuizByIdAndOwnerUserId(id, ownerUserId);
+        quiz.getQuestions().forEach(question -> question.getAnswers().size());
+        return mapperDTO.toQuizPlayDTO(quiz);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportQuizArchive(Long id, Long ownerUserId) {
+        Quiz quiz = findByIdAndOwnerUserId(id, ownerUserId);
+        List<Question> questions = questionRepository.findWholeByQuizId(quiz.getId());
+        return quizExportService.exportAsZip(quiz, questions);
+    }
+
+    public List<Question> findWholeQuestionsByQuizId(Long quizId) {
+        return questionRepository.findWholeByQuizId(quizId);
     }
 
     public Quiz save(Quiz quiz) {
@@ -89,12 +116,7 @@ public class QuizService {
         return new QuizCreateDTO(
                 sourceQuiz.getTitle(),
                 sourceQuestions.stream()
-                        .map(question -> new QuestionCreateDTO(
-                                question.getContent(),
-                                question.getAnswers().stream()
-                                        .map(answer -> new AnswerCreateDTO(answer.getContent(), answer.isCorrect()))
-                                        .toList()
-                        ))
+                        .map(this::toQuestionCreateDTO)
                         .toList()
         );
     }
@@ -105,19 +127,9 @@ public class QuizService {
                 .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
         quiz.setTitle(dto.title());
         quiz.getQuestions().clear();
-        dto.questions().forEach(qDto -> {
-            Question question = Question.builder()
-                    .content(qDto.content())
-                    .build();
-            qDto.answers().forEach(aDto -> {
-                Answer answer = Answer.builder()
-                        .content(aDto.content())
-                        .correct(aDto.correct())
-                        .build();
-                question.addAnswer(answer);
-            });
-            quiz.addQuestion(question);
-        });
+        for (int index = 0; index < dto.questions().size(); index++) {
+            quiz.addQuestion(mapperDTO.toQuestionEntity(dto.questions().get(index), index));
+        }
         return quiz;
     }
 
@@ -129,6 +141,16 @@ public class QuizService {
         return quiz;
     }
 
+    private QuestionCreateDTO toQuestionCreateDTO(Question question) {
+        return new QuestionCreateDTO(
+                question.getContent(),
+                question.getAnswers().stream()
+                        .map(answer -> new AnswerCreateDTO(answer.getContent(), answer.isCorrect()))
+                        .toList(),
+                imageCompressor.toBase64(question.getImageData())
+        );
+    }
+
     private Quiz copyQuiz(Quiz sourceQuiz, List<Question> sourceQuestions, Long ownerUserId) {
         Quiz copiedQuiz = Quiz.builder()
                 .title(sourceQuiz.getTitle())
@@ -138,6 +160,8 @@ public class QuizService {
         sourceQuestions.forEach(sourceQuestion -> {
             Question copiedQuestion = Question.builder()
                     .content(sourceQuestion.getContent())
+                    .imageFilename(sourceQuestion.getImageFilename())
+                    .imageData(sourceQuestion.getImageData())
                     .build();
 
             sourceQuestion.getAnswers().forEach(sourceAnswer -> {

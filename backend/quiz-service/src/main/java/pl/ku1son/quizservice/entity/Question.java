@@ -31,6 +31,11 @@ public class Question {
     private List<Answer> answers = new ArrayList<>();
     @Column(columnDefinition = "TEXT")
     private String content;
+    @Column(name = "image_filename")
+    private String imageFilename;
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "image_data", columnDefinition = "bytea")
+    private byte[] imageData;
 
     public void addAnswer(Answer answer) {
         answers.add(answer);

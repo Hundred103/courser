@@ -139,6 +139,16 @@ export class QuizApiService {
 
     return this.http.patch<QuizRawDTO>(`${this.apiUrl}/${id}`, dto);
   }
+
+  exportQuiz(id: number): Observable<Blob> {
+    const user = this.authService.getCurrentUser();
+
+    if (!user || id < 0) {
+      return throwError(() => new Error('Login required'));
+    }
+
+    return this.http.get(`${this.apiUrl}/${id}/export`, { responseType: 'blob' });
+  }
 }
 
 export interface QuizShareCodeDTO {

@@ -52,6 +52,7 @@ export class GuestQuizStorageService {
       questions: dto.questions.map((question) => ({
         id: nextQuestionId--,
         content: question.content,
+        image: question.image ?? null,
         answers: question.answers.map((answer) => ({
           id: nextAnswerId--,
           content: answer.content,
@@ -66,6 +67,7 @@ export class GuestQuizStorageService {
       title: quiz.title,
       questions: quiz.questions.map((question) => ({
         content: question.content,
+        image: question.image ?? null,
         answers: question.answers.map((answer) => ({
           content: answer.content,
           correct: answer.correct,

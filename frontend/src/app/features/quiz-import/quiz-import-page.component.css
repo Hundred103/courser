@@ -275,6 +275,18 @@ h2 {
   justify-content: space-between;
 }
 
+.template-note {
+  margin: 0.35rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  max-width: 42rem;
+}
+
+.template-note code {
+  color: var(--text-main);
+}
+
 pre {
   max-height: 430px;
   margin: 0;

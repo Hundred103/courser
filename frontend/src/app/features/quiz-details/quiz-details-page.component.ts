@@ -2,6 +2,8 @@ import { Component, inject, signal, computed } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { QuizPlayDTO } from '../../core/models/quiz.model';
+import { QuestionPlayDTO } from '../../core/models/question.model';
+import { toImageSrc } from '../../core/utils/image-compression.util';
 
 @Component({
   selector: 'app-quiz-details-page',
@@ -54,5 +56,9 @@ export class QuizDetailsPageComponent {
       current.add(index);
     }
     this.expandedQuestions.set(current);
+  }
+
+  questionImageSrc(question: QuestionPlayDTO): string | null {
+    return toImageSrc(question.image);
   }
 }

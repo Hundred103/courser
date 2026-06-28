@@ -48,6 +48,12 @@
             </button>
 
             @if (isExpanded(i)) {
+              @if (questionImageSrc(question); as imageSrc) {
+                <figure class="question-image squircle">
+                  <img [src]="imageSrc" alt="Ilustracja do pytania" />
+                </figure>
+              }
+
               <ul class="answers-list" role="list">
                 @for (answer of question.answers; track answer.id) {
                   <li class="answer-item">

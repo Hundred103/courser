@@ -1,4 +1,5 @@
 package pl.ku1son.quizservice.controller;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
@@ -32,8 +33,7 @@ public class QuizController {
     //GET /quizzes/id -> pojedynczy quiz z pytaniami i odpowiedziami
     @GetMapping("/{id}")
     public QuizPlayDTO getWholeQuiz(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
-        Quiz quiz = quizService.findWholeQuizByIdAndOwnerUserId(id, userId);
-        return mapperDTO.toQuizPlayDTO(quiz);
+        return quizService.getQuizForPlay(id, userId);
     }
 
     //GET /quizzes/id/raw -> pojedynczy quiz bez zaciagania pytan i odpowiedzi
@@ -42,6 +42,18 @@ public class QuizController {
     public QuizRawDTO getRawQuiz(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
         Quiz quiz = quizService.findByIdAndOwnerUserId(id, userId);
         return mapperDTO.toQuizRawDTO(quiz);
+    }
+
+    @GetMapping("/{id}/export")
+    public ResponseEntity<byte[]> exportQuiz(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
+        Quiz quiz = quizService.findByIdAndOwnerUserId(id, userId);
+        byte[] archive = quizService.exportQuizArchive(id, userId);
+        String filename = sanitizeFilename(quiz.getTitle()) + ".zip";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .header(HttpHeaders.CONTENT_TYPE, "application/zip")
+                .body(archive);
     }
 
     //DELETE /quizzes/id
@@ -120,5 +132,10 @@ public class QuizController {
 
     private String formatShareCode(String code) {
         return code.substring(0, 5) + "-" + code.substring(5);
+    }
+
+    private String sanitizeFilename(String title) {
+        String sanitized = title.replaceAll("[^A-Za-z0-9._-]+", "_").replaceAll("^_+|_+$", "");
+        return sanitized.isEmpty() ? "quiz" : sanitized;
     }
 }

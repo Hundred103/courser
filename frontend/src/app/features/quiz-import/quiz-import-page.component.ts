@@ -4,12 +4,14 @@ import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { QuizCreateDTO } from '../../core/models/quiz.model';
 import { QuizApiService } from '../../core/services/quiz-api.service';
+import { buildQuizZip, parseQuizZip } from '../../core/utils/quiz-zip.util';
 
 const QUIZ_TEMPLATE: QuizCreateDTO = {
   title: 'Przykładowy quiz',
   questions: [
     {
       content: 'Która odpowiedź jest poprawna?',
+      image: null,
       answers: [
         {
           content: 'Pierwsza odpowiedź',
@@ -46,7 +48,18 @@ export class QuizImportPageComponent {
   readonly shareCode = signal('');
   readonly codeImportError = signal('');
   readonly isCodeImporting = signal(false);
-  readonly templateJson = JSON.stringify(QUIZ_TEMPLATE, null, 2);
+  readonly templateJson = JSON.stringify(
+    {
+      title: QUIZ_TEMPLATE.title,
+      questions: QUIZ_TEMPLATE.questions.map((question) => ({
+        content: question.content,
+        image: question.image,
+        answers: question.answers,
+      })),
+    },
+    null,
+    2,
+  );
 
   readonly canImport = computed(() => this.importedQuiz() !== null && !this.validationError() && !this.isImporting());
   readonly questionCount = computed(() => this.importedQuiz()?.questions.length ?? 0);
@@ -65,7 +78,7 @@ export class QuizImportPageComponent {
     const file = input.files?.[0];
 
     if (file) {
-      this.readJsonFile(file);
+      void this.readQuizFile(file);
     }
 
     input.value = '';
@@ -91,17 +104,17 @@ export class QuizImportPageComponent {
     const file = event.dataTransfer?.files?.[0];
 
     if (file) {
-      this.readJsonFile(file);
+      void this.readQuizFile(file);
     }
   }
 
-  downloadTemplate(): void {
-    const blob = new Blob([this.templateJson], { type: 'application/json' });
+  async downloadTemplate(): Promise<void> {
+    const blob = await buildQuizZip(QUIZ_TEMPLATE);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
 
     link.href = url;
-    link.download = 'quiz-template.json';
+    link.download = 'quiz-template.zip';
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -174,44 +187,40 @@ export class QuizImportPageComponent {
       });
   }
 
-  private readJsonFile(file: File): void {
+  private async readQuizFile(file: File): Promise<void> {
     this.selectedFileName.set(file.name);
     this.importedQuiz.set(null);
     this.validationError.set('');
     this.importError.set('');
 
-    if (!file.name.toLowerCase().endsWith('.json')) {
-      this.validationError.set('Wybierz plik z rozszerzeniem .json.');
+    const lowerName = file.name.toLowerCase();
+
+    if (!lowerName.endsWith('.zip') && !lowerName.endsWith('.json')) {
+      this.validationError.set('Wybierz plik .zip albo .json.');
       return;
     }
 
     this.isReadingFile.set(true);
 
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      this.isReadingFile.set(false);
-      this.parseJson(String(reader.result ?? ''));
-    };
-
-    reader.onerror = () => {
-      this.isReadingFile.set(false);
-      this.validationError.set('Nie udało się odczytać pliku.');
-    };
-
-    reader.readAsText(file);
-  }
-
-  private parseJson(rawJson: string): void {
     try {
-      const parsed = JSON.parse(rawJson) as unknown;
-      const quiz = this.normalizeQuiz(parsed);
-
-      this.importedQuiz.set(quiz);
+      if (lowerName.endsWith('.zip')) {
+        const buffer = await file.arrayBuffer();
+        this.importedQuiz.set(await parseQuizZip(buffer));
+      } else {
+        const rawJson = await file.text();
+        this.importedQuiz.set(this.parseJsonQuiz(rawJson));
+      }
     } catch (error) {
       this.importedQuiz.set(null);
-      this.validationError.set(error instanceof Error ? error.message : 'Plik JSON ma niepoprawną strukturę.');
+      this.validationError.set(error instanceof Error ? error.message : 'Nie udało się odczytać pliku.');
+    } finally {
+      this.isReadingFile.set(false);
     }
+  }
+
+  private parseJsonQuiz(rawJson: string): QuizCreateDTO {
+    const parsed = JSON.parse(rawJson) as unknown;
+    return this.normalizeQuiz(parsed);
   }
 
   private normalizeQuiz(value: unknown): QuizCreateDTO {
@@ -246,8 +255,20 @@ export class QuizImportPageComponent {
       throw new Error(`Pytanie ${questionIndex + 1} musi mieć co najmniej jedną odpowiedź.`);
     }
 
+    const imageValue = value['image'];
+    let image: string | null = null;
+
+    if (imageValue !== null && imageValue !== undefined && imageValue !== '') {
+      if (typeof imageValue !== 'string') {
+        throw new Error(`Pole image w pytaniu ${questionIndex + 1} musi być null albo nazwą pliku.`);
+      }
+
+      image = imageValue.trim();
+    }
+
     return {
       content: value['content'].trim(),
+      image,
       answers: value['answers'].map((answer, answerIndex) =>
         this.normalizeAnswer(answer, questionIndex, answerIndex),
       ),

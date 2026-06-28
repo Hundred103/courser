@@ -54,6 +54,20 @@
   text-align: center;
 }
 
+.question-image {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.question-image img {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+}
+
 .answers-list {
   display: grid;
   gap: 0.65rem;
