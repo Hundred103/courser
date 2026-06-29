@@ -27,10 +27,15 @@ public class Question {
     @Builder.Default
     @OneToMany(mappedBy = "question", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     //private Set<Answer> answers = new HashSet<>();
-    @OrderColumn(name = "answer_order")
+    @OrderBy("id ASC")
     private List<Answer> answers = new ArrayList<>();
     @Column(columnDefinition = "TEXT")
     private String content;
+    @Column(name = "image_filename")
+    private String imageFilename;
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "image_data", columnDefinition = "bytea")
+    private byte[] imageData;
 
     public void addAnswer(Answer answer) {
         answers.add(answer);

@@ -19,10 +19,10 @@ public class GlobalExceptionHandler {
     }
 
     //400
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<String> handleValidation(MethodArgumentNotValidException ex) {
+    @ExceptionHandler({MethodArgumentNotValidException.class, IllegalArgumentException.class})
+    public ResponseEntity<String> handleValidation(Exception ex) {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body("Validation error");
+                .body(ex.getMessage());
     }
 }

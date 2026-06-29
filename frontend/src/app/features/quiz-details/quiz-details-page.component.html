@@ -1,0 +1,73 @@
+<section class="view-shell details-shell squircle">
+  <div class="top-actions">
+    <a class="primary-button squircle" routerLink="/">Strona główna</a>
+  </div>
+
+  @if (isLoading()) {
+    <p class="status-text">Ładowanie quizu...</p>
+  } @else if (errorMessage()) {
+    <p class="status-text error">{{ errorMessage() }}</p>
+  } @else if (quiz(); as q) {
+
+    @if (showImportedBanner()) {
+      <div class="import-success-banner squircle">
+        <span class="import-success-icon" aria-hidden="true">✓</span>
+        Quiz został dodany poprawnie.
+      </div>
+    }
+
+    <article class="details-panel fade-in">
+
+      <header class="details-header">
+        <h1 class="neon-title">{{ q.title }}</h1>
+        <div class="question-count-badge squircle">
+          <span class="count-number">{{ questionCount() }}</span>
+          <span class="count-label">{{ questionCount() === 1 ? 'pytanie' : questionCount() < 5 ? 'pytania' : 'pytań' }}</span>
+        </div>
+      </header>
+
+      <div class="questions-list">
+        @for (question of q.questions; track question.id; let i = $index) {
+          <div class="question-block squircle" [class.expanded]="isExpanded(i)">
+
+            <button
+              class="question-toggle"
+              type="button"
+              [attr.aria-expanded]="isExpanded(i)"
+              (click)="toggleQuestion(i)"
+            >
+              <span class="question-number">{{ i + 1 }}</span>
+              <span class="question-text">{{ question.content }}</span>
+              <span class="toggle-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+                     stroke="currentColor" stroke-width="2.5"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
+              </span>
+            </button>
+
+            @if (isExpanded(i)) {
+              @if (questionImageSrc(question); as imageSrc) {
+                <figure class="question-image squircle">
+                  <img [src]="imageSrc" alt="Ilustracja do pytania" />
+                </figure>
+              }
+
+              <ul class="answers-list" role="list">
+                @for (answer of question.answers; track answer.id) {
+                  <li class="answer-item">
+                    <span class="answer-dot" aria-hidden="true"></span>
+                    {{ answer.content }}
+                  </li>
+                }
+              </ul>
+            }
+
+          </div>
+        }
+      </div>
+
+    </article>
+  }
+</section>

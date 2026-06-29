@@ -3,7 +3,9 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription, finalize } from 'rxjs';
 import { QuizCreateDTO, QuizPlayDTO } from '../../core/models/quiz.model';
+import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
+import { compressImageFile, toImageSrc } from '../../core/utils/image-compression.util';
 
 interface DraftAnswer {
   id: number;
@@ -14,6 +16,7 @@ interface DraftAnswer {
 interface DraftQuestion {
   id: number;
   content: string;
+  image: string | null;
   answers: DraftAnswer[];
 }
 
@@ -30,6 +33,7 @@ interface DraftSnapshot {
   styleUrl: './quiz-create-page.component.css',
 })
 export class QuizCreatePageComponent implements OnDestroy {
+  private readonly authService = inject(AuthService);
   private readonly quizApiService = inject(QuizApiService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -47,6 +51,7 @@ export class QuizCreatePageComponent implements OnDestroy {
     {
       id: 1,
       content: '',
+      image: null,
       answers: [{ id: 1, content: '', correct: false }],
     },
   ]);
@@ -56,6 +61,7 @@ export class QuizCreatePageComponent implements OnDestroy {
   readonly saveError = signal('');
   readonly loadError = signal('');
   readonly showExitConfirm = signal(false);
+  readonly showAuthPrompt = signal(false);
   readonly editingQuizId = signal<number | null>(null);
 
   readonly isEditMode = computed(() => this.editingQuizId() !== null);
@@ -110,6 +116,50 @@ export class QuizCreatePageComponent implements OnDestroy {
       questions.map((question) => (question.id === currentQuestion.id ? { ...question, content } : question)),
     );
     this.saveError.set('');
+  }
+
+  async selectQuestionImage(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const currentQuestion = this.currentQuestion();
+
+    input.value = '';
+
+    if (!file || !currentQuestion) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      this.saveError.set('Wybierz plik graficzny.');
+      return;
+    }
+
+    try {
+      const image = await compressImageFile(file);
+      this.questions.update((questions) =>
+        questions.map((question) => (question.id === currentQuestion.id ? { ...question, image } : question)),
+      );
+      this.saveError.set('');
+    } catch {
+      this.saveError.set('Nie udało się przetworzyć obrazu.');
+    }
+  }
+
+  removeQuestionImage(): void {
+    const currentQuestion = this.currentQuestion();
+
+    if (!currentQuestion) {
+      return;
+    }
+
+    this.questions.update((questions) =>
+      questions.map((question) => (question.id === currentQuestion.id ? { ...question, image: null } : question)),
+    );
+    this.saveError.set('');
+  }
+
+  questionImageSrc(image: string | null): string | null {
+    return toImageSrc(image);
   }
 
   updateAnswerContent(answerId: number, event: Event): void {
@@ -173,6 +223,16 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.resolveExitDecision(true);
   }
 
+  cancelAuthPrompt(): void {
+    this.showAuthPrompt.set(false);
+    void this.router.navigate(['/']);
+  }
+
+  goToLogin(): void {
+    this.showAuthPrompt.set(false);
+    void this.router.navigate(['/login']);
+  }
+
   undoChanges(): void {
     if (!this.canUndoChanges() || !this.initialDraft) {
       return;
@@ -208,6 +268,7 @@ export class QuizCreatePageComponent implements OnDestroy {
         {
           id: this.nextQuestionId,
           content: '',
+          image: null,
           answers: [{ id: this.nextAnswerId, content: '', correct: false }],
         },
       ]);
@@ -220,6 +281,11 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   saveQuiz(): void {
+    if (!this.authService.isLoggedIn()) {
+      this.showAuthPrompt.set(true);
+      return;
+    }
+
     if (!this.canSave()) {
       return;
     }
@@ -252,6 +318,7 @@ export class QuizCreatePageComponent implements OnDestroy {
 
   private prepareNewQuiz(): void {
     this.editingQuizId.set(null);
+    this.showAuthPrompt.set(!this.authService.isLoggedIn());
     this.initialDraftSignature = '';
     this.initialDraft = null;
     this.quizSaved = false;
@@ -263,6 +330,7 @@ export class QuizCreatePageComponent implements OnDestroy {
       {
         id: 1,
         content: '',
+        image: null,
         answers: [{ id: 1, content: '', correct: false }],
       },
     ]);
@@ -292,6 +360,7 @@ export class QuizCreatePageComponent implements OnDestroy {
     const questions = quiz.questions.map((question, questionIndex) => ({
       id: question.id || questionIndex + 1,
       content: question.content,
+      image: question.image ?? null,
       answers: question.answers.map((answer, answerIndex) => ({
         id: answer.id || answerIndex + 1,
         content: answer.content,
@@ -307,6 +376,7 @@ export class QuizCreatePageComponent implements OnDestroy {
             {
               id: 1,
               content: '',
+              image: null,
               answers: [{ id: 1, content: '', correct: false }],
             },
           ],
@@ -378,6 +448,7 @@ export class QuizCreatePageComponent implements OnDestroy {
       this.questions().some(
         (question) =>
           question.content.trim().length > 0 ||
+          question.image ||
           question.answers.some((answer) => answer.content.trim().length > 0),
       )
     );
@@ -396,6 +467,7 @@ export class QuizCreatePageComponent implements OnDestroy {
       title: this.title().trim(),
       questions: this.questions().map((question) => ({
         content: question.content.trim(),
+        image: question.image,
         answers: question.answers.map((answer) => ({
           content: answer.content.trim(),
           correct: answer.correct,

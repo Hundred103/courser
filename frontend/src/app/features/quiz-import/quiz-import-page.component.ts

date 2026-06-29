@@ -1,0 +1,27 @@
+import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
+import { QuizCreateDTO } from '../../core/models/quiz.model';
+import { QuizApiService } from '../../core/services/quiz-api.service';
+import { buildCrsFile- wait I need to fix the import name } from '../../core/utils/quiz-crs.util';
+
+const QUIZ_TEMPLATE: QuizCreateDTO = {
+  title: 'Przykładowy quiz',
+  questions: [
+    {
+      content: 'Która odpowiedź jest poprawna?',
+      image: null,
+      answers: [
+        {
+          content: 'Pierwsza odpowiedź',
+          correct: true,
+        },
+        {
+          content: 'Druga odpowiedź',
+          correct: false,
+        },
+      ],
+    },
+  ],
+};
