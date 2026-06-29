@@ -1,9 +1,6 @@
-<section class="auth-view">
-  <div class="auth-card squircle fade-in">
-    <div class="auth-heading">
-      <h1>Zaloguj się</h1>
-    </div>
-
+<section class="view-shell">
+  <div class="auth-card squircle">
+    <h2>Zaloguj się</h2>
     <form (ngSubmit)="onSubmit()" #f="ngForm">
       @if (error()) {
         <div class="error-message">{{ error() }}</div>
@@ -23,6 +20,7 @@
         <button class="primary-button squircle" type="submit" [disabled]="loading()">
           {{ loading() ? 'Logowanie...' : 'Zaloguj' }}
         </button>
+        <a class="secondary-button squircle" routerLink="/">Anuluj</a>
       </div>
 
       <div class="auth-footer">

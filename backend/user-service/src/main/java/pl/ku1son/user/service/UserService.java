@@ -34,19 +34,13 @@ public class UserService {
 
     @Transactional
     public User createUser(User user) {
-        boolean emailTaken = userRepository.existsByEmail(user.getEmail());
-        boolean usernameTaken = userRepository.existsByUsername(user.getUsername());
-
-        if (emailTaken && usernameTaken) {
-            throw new RuntimeException("Podany email oraz nazwa użytkownika są zajęte");
+        if (userRepository.existsByEmail(user.getEmail())) {
+            throw new RuntimeException("Ten adres e-mail jest już zajęty");
         }
-        if (emailTaken) {
-            throw new RuntimeException("Podany email jest zajęty");
+        if (userRepository.existsByUsername(user.getUsername())) {
+            throw new RuntimeException("Ta nazwa użytkownika jest już zajęta");
         }
-        if (usernameTaken) {
-            throw new RuntimeException("Podana nazwa użytkownika jest zajęta");
-        }
-
+        
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRole(UserRole.STUDENT);
         return userRepository.save(user);
@@ -69,10 +63,10 @@ public class UserService {
     public User updateUser(Long id, User userDetails) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
-
-        user.setUsername(userDetails.getUsername());
+        
+        user.setDisplayName(userDetails.getDisplayName());
         user.setEmail(userDetails.getEmail());
-
+        
         return userRepository.save(user);
     }
 
@@ -80,7 +74,7 @@ public class UserService {
     public void updateUserScore(Long userId, int additionalScore) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-
+        
         user.setTotalScore(user.getTotalScore() + additionalScore);
         user.setQuizzesCompleted(user.getQuizzesCompleted() + 1);
         userRepository.save(user);

@@ -116,43 +116,6 @@
   line-height: 1.45;
 }
 
-.image-section {
-  display: grid;
-  gap: 0.75rem;
-  margin-top: 1.25rem;
-}
-
-.image-upload-button {
-  cursor: pointer;
-}
-
-.image-hint {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 0.88rem;
-}
-
-.question-image-preview {
-  position: relative;
-  margin: 0;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.question-image-preview img {
-  display: block;
-  width: 100%;
-  max-height: 280px;
-  object-fit: contain;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.remove-image-button {
-  position: absolute;
-  top: 0.65rem;
-  right: 0.65rem;
-}
-
 .answers-section {
   display: grid;
   gap: 0.75rem;

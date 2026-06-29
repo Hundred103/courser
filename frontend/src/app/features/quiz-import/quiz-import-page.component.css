@@ -23,10 +23,10 @@
   background: linear-gradient(var(--surface-angle), var(--surface-from), var(--surface-to));
 }
 
-.section-info {
+.import-header {
   display: grid;
   gap: 0.45rem;
-  padding: 0.1rem 0.2rem 0.25rem;
+  padding: 0.35rem 0.2rem 0.8rem;
 }
 
 .eyebrow {
@@ -53,41 +53,11 @@ h2 {
   font-size: 1.25rem;
 }
 
-.section-info p {
-  max-width: none;
+.import-header p:last-child {
+  max-width: 720px;
   margin: 0;
   color: var(--text-soft);
   line-height: 1.55;
-  white-space: nowrap;
-}
-
-.import-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
-  padding: 0.35rem;
-  border: 1px solid var(--edge);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.035);
-}
-
-.import-tabs button {
-  cursor: pointer;
-  border: 0;
-  border-radius: 12px;
-  padding: 0.75rem 0.9rem;
-  color: var(--text-soft);
-  font: inherit;
-  font-weight: 900;
-  background: transparent;
-  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
-}
-
-.import-tabs button.active,
-.import-tabs button[aria-selected='true'] {
-  color: var(--text-title);
-  background: linear-gradient(135deg, rgba(255, 184, 77, 0.16), rgba(255, 107, 53, 0.14));
-  box-shadow: 0 0 18px rgba(255, 107, 53, 0.12);
 }
 
 .import-grid {
@@ -98,46 +68,12 @@ h2 {
 }
 
 .upload-area,
-.template-panel,
-.code-import-panel {
+.template-panel {
   display: grid;
   gap: 0.85rem;
   padding: 1rem;
   border: 1px solid var(--edge);
   background: rgba(255, 255, 255, 0.035);
-}
-
-.code-import-panel {
-  width: min(680px, 100%);
-  margin: 0 auto;
-}
-
-.code-input-field {
-  display: grid;
-  gap: 0.45rem;
-  color: var(--text-main);
-  font-weight: 850;
-}
-
-.code-input-field input {
-  width: 100%;
-  border: 1px solid rgba(255, 184, 77, 0.34);
-  border-radius: 14px;
-  padding: 0.9rem 1rem;
-  color: var(--text-title);
-  font: inherit;
-  font-family: Consolas, 'Courier New', monospace;
-  font-size: clamp(1.25rem, 4vw, 2rem);
-  font-weight: 900;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  background: rgba(5, 6, 8, 0.45);
-  outline: none;
-}
-
-.code-input-field input:focus {
-  border-color: rgba(255, 184, 77, 0.72);
-  box-shadow: 0 0 0 3px rgba(255, 184, 77, 0.14);
 }
 
 .upload-area input[type='file'] {
@@ -275,18 +211,6 @@ h2 {
   justify-content: space-between;
 }
 
-.template-note {
-  margin: 0.35rem 0 0;
-  color: var(--text-soft);
-  font-size: 0.88rem;
-  line-height: 1.45;
-  max-width: 42rem;
-}
-
-.template-note code {
-  color: var(--text-main);
-}
-
 pre {
   max-height: 430px;
   margin: 0;
@@ -313,19 +237,12 @@ code {
   .import-shell,
   .import-panel,
   .upload-area,
-  .template-panel,
-  .code-import-panel {
+  .template-panel {
     padding: 0.95rem;
   }
 
   .template-heading {
     align-items: stretch;
     flex-direction: column;
-  }
-}
-
-@media (max-width: 560px) {
-  .import-tabs {
-    grid-template-columns: 1fr;
   }
 }

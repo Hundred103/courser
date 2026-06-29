@@ -19,8 +19,8 @@ services:
     container_name: courser-quiz
     depends_on:
       - postgres
-    expose:
-      - "8081"
+    ports:
+      - "8081:8081"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
       SPRING_DATASOURCE_USERNAME: courseruser
@@ -35,15 +35,14 @@ services:
     container_name: courser-user-service
     depends_on:
       - postgres
-    expose:
-      - "8082"
+    ports:
+      - "8082:8082"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
       SPRING_DATASOURCE_USERNAME: courseruser
       SPRING_DATASOURCE_PASSWORD: courserpassword
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 8082
-      APP_JWT_SECRET: courser-local-development-secret-change-me
 
   gateway:
     build:
@@ -58,7 +57,6 @@ services:
     environment:
       QUIZ_SERVICE_URL: http://quiz-service:8081
       USER_SERVICE_URL: http://user-service:8082
-      APP_JWT_SECRET: courser-local-development-secret-change-me
 
   frontend:
     build:

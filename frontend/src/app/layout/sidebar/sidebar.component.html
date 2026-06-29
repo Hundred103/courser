@@ -1,8 +1,6 @@
 <aside class="sidebar squircle">
   <div class="sidebar-actions">
-    <button class="create-quiz-button primary-button squircle" type="button" (click)="requestCreateQuiz()">
-      Utwórz
-    </button>
+    <a class="create-quiz-button primary-button squircle" routerLink="/quizzes/new">Utwórz</a>
     <a class="create-quiz-button primary-button squircle" routerLink="/quizzes/import">Importuj</a>
   </div>
   <div class="sidebar-divider" aria-hidden="true"></div>
@@ -20,27 +18,20 @@
       @for (quiz of quizzes(); track quiz.id) {
         <li class="quiz-item fade-in">
           @if (editingQuizId() === quiz.id) {
-            <div class="rename-editor">
-              <div class="rename-row">
-                <input
-                  #titleInput
-                  class="quiz-title-input"
-                  type="text"
-                  [value]="draftTitle()"
-                  [disabled]="busyQuizId() === quiz.id"
-                  (input)="updateDraftTitle($event)"
-                  (keydown.enter)="saveRenameFromKeyboard(quiz, $event)"
-                  (keydown.escape)="cancelRenameFromKeyboard($event)"
-                  (blur)="saveRenameFromInput(quiz, $event)"
-                />
-              </div>
-              @if (renameError()) {
-                <span class="rename-error">{{ renameError() }}</span>
-              }
-            </div>
+            <input
+              #titleInput
+              class="quiz-title-input"
+              type="text"
+              [value]="draftTitle()"
+              [disabled]="busyQuizId() === quiz.id"
+              (input)="updateDraftTitle($event)"
+              (keydown.enter)="saveRename(quiz)"
+              (keydown.escape)="cancelRename()"
+              (blur)="cancelRename()"
+            />
           } @else {
             <div class="quiz-info">
-              <a class="quiz-title quiz-title-link" [routerLink]="['/quizzes', quiz.id, 'details']">{{ quiz.title }}</a>
+              <span class="quiz-title">{{ quiz.title }}</span>
               @if (isLoggedIn() && bestScoreLabel(quiz.id); as bestScore) {
                 <span class="quiz-best-score">Najlepszy: {{ bestScore }}</span>
               }
@@ -66,44 +57,6 @@
 
               @if (openMenuQuizId() === quiz.id) {
                 <div class="options-menu" role="menu">
-                  <button type="button" role="menuitem" (click)="requestShareQuiz(quiz)">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="18"
-                      height="18"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <circle cx="18" cy="5" r="3" />
-                      <circle cx="6" cy="12" r="3" />
-                      <circle cx="18" cy="19" r="3" />
-                      <path d="m8.6 10.5 6.8-4" />
-                      <path d="m8.6 13.5 6.8 4" />
-                    </svg>
-                    Udostępnij
-                  </button>
-                  <button type="button" role="menuitem" (click)="exportQuiz(quiz)">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="18"
-                      height="18"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <path d="M7 10l5 5 5-5" />
-                      <path d="M12 15V3" />
-                    </svg>
-                    Eksportuj .zip
-                  </button>
                   <button type="button" role="menuitem" (click)="startRename(quiz)">
                     <svg
                       viewBox="0 0 24 24"
@@ -194,76 +147,6 @@
           (click)="confirmDeleteQuiz()"
         >
           Potwierdź
-        </button>
-      </div>
-    </div>
-  </div>
-}
-
-@if (quizPendingShare(); as quizToShare) {
-  <div class="confirm-overlay">
-    <div class="confirm-banner share-banner squircle" role="dialog" aria-modal="true" aria-labelledby="share-title">
-      <header class="share-header">
-        <h3 id="share-title">{{ quizToShare.title }}</h3>
-      </header>
-
-      @if (!shareCode()) {
-        <div class="share-field">
-          <span>Ważność kodu</span>
-          <div class="share-expiration-list" role="listbox" aria-label="Ważność kodu">
-            @for (option of shareExpirationOptions; track option.label) {
-              <button
-                class="share-expiration-option"
-                type="button"
-                role="option"
-                [class.active]="shareExpiresInSeconds() === option.value"
-                [attr.aria-selected]="shareExpiresInSeconds() === option.value"
-                [disabled]="busyQuizId() === quizToShare.id"
-                (click)="setShareExpiration(option.value)"
-              >
-                {{ option.label }}
-              </button>
-            }
-          </div>
-        </div>
-      }
-
-      @if (shareCode()) {
-        <div class="share-code-box squircle">
-          <span>{{ shareCode() }}</span>
-          <button class="share-copy-button secondary-button squircle" type="button" [disabled]="shareCopied()" (click)="copyShareCode()">
-            {{ shareCopied() ? 'Skopiowano' : 'Kopiuj' }}
-          </button>
-        </div>
-      }
-
-      @if (shareError()) {
-        <p class="share-error">{{ shareError() }}</p>
-      }
-
-      <div class="confirm-actions share-actions">
-        <button class="secondary-button squircle" type="button" [disabled]="busyQuizId() === quizToShare.id" (click)="cancelShareQuiz()">
-          {{ shareCopied() ? 'Wyjdź' : 'Anuluj' }}
-        </button>
-        <button class="primary-button squircle" type="button" [disabled]="busyQuizId() === quizToShare.id || !!shareCode()" (click)="confirmShareQuiz()">
-          {{ busyQuizId() === quizToShare.id ? 'Generowanie...' : 'Generuj' }}
-        </button>
-      </div>
-    </div>
-  </div>
-}
-
-@if (authPromptMessage(); as message) {
-  <div class="confirm-overlay">
-    <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
-      <p>{{ message }}</p>
-
-      <div class="confirm-actions">
-        <button class="secondary-button squircle" type="button" (click)="cancelAuthPrompt()">
-          Anuluj
-        </button>
-        <button class="primary-button squircle" type="button" (click)="goToLogin()">
-          Zaloguj
         </button>
       </div>
     </div>

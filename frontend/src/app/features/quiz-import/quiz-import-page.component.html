@@ -4,163 +4,104 @@
   </div>
 
   <article class="import-panel squircle fade-in">
-    <div class="import-tabs" role="tablist" aria-label="Sposób dodania quizu">
-      <button
-        type="button"
-        role="tab"
-        [attr.aria-selected]="activeTab() === 'file'"
-        [class.active]="activeTab() === 'file'"
-        (click)="showFileTab()"
-      >
-        Dodaj quiz z pliku
-      </button>
-      <button
-        type="button"
-        role="tab"
-        [attr.aria-selected]="activeTab() === 'code'"
-        [class.active]="activeTab() === 'code'"
-        (click)="showCodeTab()"
-      >
-        Dodaj quiz przez kod
-      </button>
-    </div>
+    <header class="import-header">
+      <h1>Dodaj quiz z pliku</h1>
+      <p>Wgraj plik zgodny ze strukturą quizu. Po poprawnej walidacji quiz trafi do Twojej listy.</p>
+    </header>
 
-    @if (activeTab() === 'file') {
-      <header class="section-info">
-        <p aria-hidden="true"></p>
-      </header>
+    <div class="import-grid">
+      <section class="upload-area squircle" [class.dragging]="isDraggingFile()">
+        <input id="quiz-json-file" type="file" accept=".json,application/json" (change)="selectFile($event)" />
+        <label
+          for="quiz-json-file"
+          class="drop-zone squircle"
+          (dragover)="handleDragOver($event)"
+          (dragleave)="handleDragLeave($event)"
+          (drop)="handleDrop($event)"
+        >
+          <span class="upload-icon" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="34"
+              height="34"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <path d="M17 8 12 3 7 8" />
+              <path d="M12 3v12" />
+            </svg>
+          </span>
+          <strong>Wybierz albo upuść plik .json</strong>
+          <span>{{ selectedFileName() || 'Nie wybrano pliku' }}</span>
+        </label>
 
-      <div class="import-grid">
-        <section class="upload-area squircle" [class.dragging]="isDraggingFile()">
-          <input id="quiz-json-file" type="file" accept=".zip,.json,application/json,application/zip" (change)="selectFile($event)" />
-          <label
-            for="quiz-json-file"
-            class="drop-zone squircle"
-            (dragover)="handleDragOver($event)"
-            (dragleave)="handleDragLeave($event)"
-            (drop)="handleDrop($event)"
-          >
-            <span class="upload-icon" aria-hidden="true">
+        @if (isReadingFile()) {
+          <p class="status-text">Odczytywanie pliku...</p>
+        }
+
+        @if (validationError()) {
+          <p class="status-text error">{{ validationError() }}</p>
+        }
+
+        @if (importedQuiz(); as quiz) {
+          <div class="quiz-preview squircle">
+            <div class="quiz-preview-copy">
+              <strong>{{ quiz.title }}</strong>
+              <small>{{ questionCount() }} pytań</small>
+            </div>
+            <button
+              class="delete-icon-button"
+              type="button"
+              aria-label="Usuń wybrany quiz"
+              [disabled]="isImporting()"
+              (click)="removeSelectedQuiz()"
+            >
               <svg
                 viewBox="0 0 24 24"
-                width="34"
-                height="34"
+                width="18"
+                height="18"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                aria-hidden="true"
               >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <path d="M17 8 12 3 7 8" />
-                <path d="M12 3v12" />
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
               </svg>
-            </span>
-            <strong>Wybierz albo upuść plik .zip</strong>
-            <span>{{ selectedFileName() || 'ZIP z quiz.json w katalogu głównym i opcjonalnym folderem images/' }}</span>
-          </label>
-
-          @if (isReadingFile()) {
-            <p class="status-text">Odczytywanie pliku...</p>
-          }
-
-          @if (validationError()) {
-            <p class="status-text error">{{ validationError() }}</p>
-          }
-
-          @if (importedQuiz(); as quiz) {
-            <div class="quiz-preview squircle">
-              <div class="quiz-preview-copy">
-                <strong>{{ quiz.title }}</strong>
-                <small>{{ questionCount() }} pytań</small>
-              </div>
-              <button
-                class="delete-icon-button"
-                type="button"
-                aria-label="Usuń wybrany quiz"
-                [disabled]="isImporting()"
-                (click)="removeSelectedQuiz()"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  width="18"
-                  height="18"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3 6h18" />
-                  <path d="M8 6V4h8v2" />
-                  <path d="M19 6l-1 14H6L5 6" />
-                  <path d="M10 11v6" />
-                  <path d="M14 11v6" />
-                </svg>
-              </button>
-            </div>
-          }
-
-          @if (importError()) {
-            <p class="status-text error">{{ importError() }}</p>
-          }
-
-          <button class="primary-button import-button squircle" type="button" [disabled]="!canImport()" (click)="importQuiz()">
-            {{ isImporting() ? 'Importowanie...' : 'Importuj quiz' }}
-          </button>
-        </section>
-
-        <section class="template-panel squircle">
-          <div class="template-heading">
-            <div>
-              <h2>Format pliku ZIP</h2>
-              <p class="template-note">
-                Spakuj folder z plikiem <code>quiz.json</code> w katalogu głównym oraz opcjonalnym folderem
-                <code>images/</code>. W JSON każde pytanie może mieć pole <code>image</code> (np.
-                <code>"image1.jpg"</code>) albo <code>null</code>.
-              </p>
-            </div>
-            <button class="secondary-button squircle" type="button" (click)="downloadTemplate()">
-              Pobierz szablon
             </button>
           </div>
-
-          <pre><code>{{ templateJson }}</code></pre>
-        </section>
-      </div>
-    } @else {
-      <header class="section-info">
-        <p aria-hidden="true"></p>
-      </header>
-
-      <section class="code-import-panel squircle">
-        <label class="code-input-field">
-          <input
-            type="text"
-            inputmode="text"
-            autocomplete="off"
-            maxlength="11"
-            placeholder="ABCDE-FGHIJ"
-            [ngModel]="shareCode()"
-            (ngModelChange)="updateShareCode($event)"
-            (keydown.enter)="importQuizByCode()"
-          />
-        </label>
-
-        @if (codeImportError()) {
-          <p class="status-text error">{{ codeImportError() }}</p>
         }
 
-        <button
-          class="primary-button import-button squircle"
-          type="button"
-          [disabled]="!canImportByCode()"
-          (click)="importQuizByCode()"
-        >
-          {{ isCodeImporting() ? 'Dodawanie...' : 'Dodaj quiz' }}
+        @if (importError()) {
+          <p class="status-text error">{{ importError() }}</p>
+        }
+
+        <button class="primary-button import-button squircle" type="button" [disabled]="!canImport()" (click)="importQuiz()">
+          {{ isImporting() ? 'Importowanie...' : 'Importuj quiz' }}
         </button>
       </section>
-    }
+
+      <section class="template-panel squircle">
+        <div class="template-heading">
+          <div>
+            <h2>Przykładowy JSON</h2>
+          </div>
+          <button class="secondary-button squircle" type="button" (click)="downloadTemplate()">
+            Pobierz
+          </button>
+        </div>
+
+        <pre><code>{{ templateJson }}</code></pre>
+      </section>
+    </div>
   </article>
 </section>

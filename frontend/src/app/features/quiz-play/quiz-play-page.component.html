@@ -20,12 +20,6 @@
         <div class="question-card squircle">
           <h3>{{ question.content }}</h3>
 
-          @if (questionImageSrc(question); as imageSrc) {
-            <figure class="question-image squircle">
-              <img [src]="imageSrc" alt="Ilustracja do pytania" />
-            </figure>
-          }
-
           <div class="answers-list">
             @for (answer of question.answers; track answer.id) {
               <button

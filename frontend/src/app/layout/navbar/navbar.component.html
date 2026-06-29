@@ -5,14 +5,14 @@
 
   <nav class="topbar-actions">
     <button
-      class="secondary-button squircle"
+      class="primary-button squircle"
       type="button"
       (click)="onSettingsClick()">
       Ustawienia
     </button>
 
     @if (isLoggedIn()) {
-      <span class="user-badge squircle">{{ user()!.username }}</span>
+      <span class="user-badge squircle">{{ user()!.displayName }}</span>
       <button
         class="secondary-button squircle"
         type="button"
@@ -21,7 +21,7 @@
       </button>
     } @else {
       <a
-        class="secondary-button squircle"
+        class="primary-button squircle"
         routerLink="/login">
         Zaloguj
       </a>

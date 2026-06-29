@@ -70,33 +70,6 @@
           placeholder="Wpisz pytanie"
         ></textarea>
 
-        <div class="image-section">
-          <div class="section-heading answer-heading">
-            <span>Obraz pytania</span>
-            <label class="secondary-button add-answer-button squircle image-upload-button">
-              {{ question.image ? 'Zmień obraz' : 'Dodaj obraz' }}
-              <input type="file" accept="image/*" hidden (change)="selectQuestionImage($event)" />
-            </label>
-          </div>
-
-          @if (questionImageSrc(question.image); as imageSrc) {
-            <figure class="question-image-preview squircle">
-              <img [src]="imageSrc" alt="Podgląd obrazu pytania" />
-              <button class="delete-icon-button remove-image-button" type="button" aria-label="Usuń obraz" (click)="removeQuestionImage()">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M3 6h18" />
-                  <path d="M8 6V4h8v2" />
-                  <path d="M19 6l-1 14H6L5 6" />
-                  <path d="M10 11v6" />
-                  <path d="M14 11v6" />
-                </svg>
-              </button>
-            </figure>
-          } @else {
-            <p class="image-hint">Opcjonalnie. Akceptowane do 4K (3840×2160 px), zapisywane jako skompresowany JPEG do 800×600 px.</p>
-          }
-        </div>
-
         <div class="answers-section">
           <div class="section-heading answer-heading">
             <span>Odpowiedzi</span>
@@ -192,23 +165,6 @@
       </div>
     </footer>
   </article>
-
-  @if (showAuthPrompt()) {
-    <div class="confirm-overlay">
-      <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
-        <p>Żeby utworzyć quiz, musisz się zalogować.</p>
-
-        <div class="confirm-actions">
-          <button class="secondary-button squircle" type="button" (click)="cancelAuthPrompt()">
-            Anuluj
-          </button>
-          <button class="primary-button squircle" type="button" (click)="goToLogin()">
-            Zaloguj
-          </button>
-        </div>
-      </div>
-    </div>
-  }
 
   @if (showExitConfirm()) {
     <div class="confirm-overlay">

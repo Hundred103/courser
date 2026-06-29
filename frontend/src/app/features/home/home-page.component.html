@@ -2,24 +2,7 @@
   <h1>Witaj z powrotem</h1>
   <p>Wybierz quiz z panelu bocznego i kontynuuj naukę w swoim tempie.</p>
   <div class="home-actions">
-    <button class="primary-button squircle" type="button" (click)="requestCreateQuiz()">Utwórz</button>
+    <a class="primary-button squircle" routerLink="/quizzes/new">Utwórz</a>
     <a class="primary-button squircle" routerLink="/quizzes/import">Importuj</a>
   </div>
 </section>
-
-@if (showAuthPrompt()) {
-  <div class="confirm-overlay">
-    <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
-      <p>Żeby utworzyć quiz, musisz się zalogować.</p>
-
-      <div class="confirm-actions">
-        <button class="secondary-button squircle" type="button" (click)="cancelAuthPrompt()">
-          Anuluj
-        </button>
-        <button class="primary-button squircle" type="button" (click)="goToLogin()">
-          Zaloguj
-        </button>
-      </div>
-    </div>
-  </div>
-}
