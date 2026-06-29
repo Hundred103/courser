@@ -8,6 +8,7 @@ import { QuizPlayDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { QuizScoreService } from '../../core/services/quiz-score.service';
+import { toImageSrc } from '../../core/utils/image-compression.util';
 
 type QuizState =
   | { status: 'loading'; quiz: null; errorMessage: '' }
@@ -160,7 +161,7 @@ export class QuizPlayPageComponent {
       const user = this.authService.user();
       const quiz = this.quiz();
 
-      if (!user || !quiz) {
+      if (!user || !quiz || quiz.id < 0) {
         return;
       }
 
@@ -174,7 +175,7 @@ export class QuizPlayPageComponent {
       this.resultSaveError.set(null);
 
       this.quizScoreService
-        .saveQuizResult(user.id, {
+        .saveQuizResult({
           quizId: quiz.id,
           score: this.quizScoreService.toScaledScore(this.score()),
           maxScore: totalQuestions * 100,
@@ -393,6 +394,10 @@ export class QuizPlayPageComponent {
 
   questionScoreText(question: QuestionPlayDTO): string {
     return `${this.formatScore(this.calculateQuestionScore(question, this.submittedAnswers()[question.id] ?? []))}/1`;
+  }
+
+  questionImageSrc(question: QuestionPlayDTO): string | null {
+    return toImageSrc(question.image);
   }
 
   private clearPendingSelectionForCurrentQuestion(): void {

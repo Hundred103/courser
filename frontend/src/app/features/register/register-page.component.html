@@ -1,25 +1,62 @@
-<section class="view-shell">
-  <div class="auth-card squircle">
-    <h2>Utwórz konto</h2>
-    <form (ngSubmit)="onSubmit()" #f="ngForm">
+<section class="auth-view">
+  <div class="auth-card squircle fade-in">
+    <div class="auth-heading">
+      <h1>Utwórz konto</h1>
+    </div>
+
+    <form (ngSubmit)="onSubmit()" #f="ngForm" novalidate>
       @if (error()) {
         <div class="error-message">{{ error() }}</div>
       }
 
       <label class="field">
         <span>Adres e-mail</span>
-        <input name="email" [(ngModel)]="model.email" type="email" required [disabled]="loading()" />
+        <input
+          name="email"
+          [(ngModel)]="model.email"
+          type="email"
+          required
+          [disabled]="loading()"
+          [class.error]="emailError()" />
+        @if (emailError(); as message) {
+          <small class="field-error">{{ message }}</small>
+        }
       </label>
 
       <label class="field">
-        <span>Nazwa wyświetlana</span>
-        <input name="displayName" [(ngModel)]="model.displayName" required [disabled]="loading()" />
+        <span>Nazwa użytkownika</span>
+        <input
+          name="username"
+          [(ngModel)]="model.username"
+          required
+          [disabled]="loading()"
+          [class.error]="usernameError()" />
+        @if (usernameError(); as message) {
+          <small class="field-error">{{ message }}</small>
+        }
       </label>
 
       <label class="field">
         <span>Hasło</span>
         <input type="password" name="password" [(ngModel)]="model.password" required [disabled]="loading()" />
       </label>
+
+      @if (model.password || submitAttempted()) {
+        <ul class="password-rules" aria-label="Wymagania hasła">
+          <li [class.valid]="hasRequiredLength()">
+            <span>{{ hasRequiredLength() ? '✓' : '×' }}</span>
+            Przynajmniej 8 znaków
+          </li>
+          <li [class.valid]="hasDigit()">
+            <span>{{ hasDigit() ? '✓' : '×' }}</span>
+            Co najmniej jedna cyfra
+          </li>
+          <li [class.valid]="hasSpecialCharacter()">
+            <span>{{ hasSpecialCharacter() ? '✓' : '×' }}</span>
+            Co najmniej jeden znak specjalny
+          </li>
+        </ul>
+      }
 
       <label class="field">
         <span>Powtórz hasło</span>
@@ -29,18 +66,22 @@
           [(ngModel)]="model.passwordConfirm"
           required
           [disabled]="loading()"
-          [class.error]="passwordMismatch()" />
+          [class.error]="submitAttempted() && !passwordsMatch()" />
       </label>
 
-      @if (passwordMismatch()) {
-        <p class="error-message">Hasła nie są takie same</p>
+      @if (model.passwordConfirm || submitAttempted()) {
+        <ul class="password-rules single-rule" aria-label="Zgodność haseł">
+          <li [class.valid]="passwordsMatch()">
+            <span>{{ passwordsMatch() ? '✓' : '×' }}</span>
+            {{ passwordsMatch() ? 'Hasła są takie same' : 'Hasła nie są takie same' }}
+          </li>
+        </ul>
       }
 
       <div class="actions">
         <button class="primary-button squircle" type="submit" [disabled]="loading()">
           {{ loading() ? 'Rejestrowanie...' : 'Zarejestruj' }}
         </button>
-        <a class="secondary-button squircle" routerLink="/">Anuluj</a>
       </div>
 
       <div class="auth-footer">

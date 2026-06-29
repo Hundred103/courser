@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink, Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 
@@ -34,7 +34,14 @@ export class LoginPageComponent {
       .subscribe({
         next: (response) => {
           this.authService.setCurrentUser(response);
-          this.router.navigate(['/']);
+          this.authService.migrateGuestQuizzesToUser(response).subscribe({
+            next: () => {
+              this.router.navigate(['/']);
+            },
+            error: () => {
+              this.error.set('Zalogowano, ale nie udało się przenieść lokalnych quizów.');
+            },
+          });
         },
         error: (err) => {
           this.error.set(err.error?.error || 'Błąd logowania');

@@ -14,14 +14,14 @@ export class QuizScoreService {
   private readonly refreshTick = signal(0);
   readonly scoresVersion = this.refreshTick.asReadonly();
 
-  saveQuizResult(userId: number, request: SaveQuizResultRequest): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/${userId}/quiz-results`, request).pipe(
+  saveQuizResult(request: SaveQuizResultRequest): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/me/quiz-results`, request).pipe(
       tap(() => this.requestRefresh()),
     );
   }
 
-  getBestScores(userId: number): Observable<BestQuizScore[]> {
-    return this.http.get<BestQuizScore[]>(`${this.apiUrl}/${userId}/quiz-results/best`);
+  getBestScores(): Observable<BestQuizScore[]> {
+    return this.http.get<BestQuizScore[]>(`${this.apiUrl}/me/quiz-results/best`);
   }
 
   requestRefresh(): void {
