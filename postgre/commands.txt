@@ -2,14 +2,14 @@
 !!!!!!!!!!!!!!!KONTENERY MUSZA CHODZIC!!!!!!!!!!!!!!!
 ---------------komendy wykonywac w folderze postgre---------------
 
-Schemat bazy jest zarządzany przez Liquibase (katalog `liquibase/changelog/`).
-Przy `docker-compose up` kontener `liquibase` uruchamia migracje po starcie PostgreSQL.
+Wymagania: Docker z wtyczką Compose v2 (`docker compose`, nie `docker-compose`).
 
----PIERWSZE URUCHOMIENIE / RESET BAZY---
-docker-compose down
+---URUCHOMIENIE / RESET BAZY (z katalogu głównego repo)---
+docker compose down
 docker volume rm courser-postgres-data
-docker-compose up -d
+docker compose up -d --wait
 
+`--wait` czeka, aż PostgreSQL będzie healthy i Liquibase zakończy migracje.
 Liquibase utworzy schemat i dane startowe (kontekst `seed`).
 
 ---RĘCZNE URUCHOMIENIE LIQUIBASE (lokalnie, bez Dockera)---
@@ -23,22 +23,23 @@ liquibase --defaults-file=liquibase.properties --contexts="" update
 
 ---RĘCZNY IMPORT dump.sql (legacy, opcjonalnie)---
 (Linux/Mac):
-docker exec -i courser-postgres psql -U courseruser -d courserdb < dump.sql
+docker exec -i courser-postgres psql -U courseruser -d courserdb < postgre/dump.sql
 
 (Windows PowerShell):
-Get-Content .\dump.sql | docker exec -i courser-postgres psql -U courseruser -d courserdb
+Get-Content .\postgre\dump.sql | docker exec -i courser-postgres psql -U courseruser -d courserdb
 
 Jeżeli chcesz wyczyścić schemat przed importem:
 docker exec -it courser-postgres psql -U courseruser -d courserdb -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
 ---EXPORT (zrzut istniejącej bazy)---
 (Linux/Mac):
-docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d courserdb > dump.sql
+docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d courserdb > postgre/dump.sql
 
 (Windows cmd):
-cmd /c "docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d courserdb > dump.sql"
+cmd /c "docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d courserdb > postgre\dump.sql"
 
 ---UWAGI DLA USŁUG (quiz-service i user-service)---
+- Schemat bazy jest zarządzany przez Liquibase (katalog `postgre/liquibase/changelog/`).
 - Obie usługi korzystają z tej samej bazy `courserdb` (użytkownik `courseruser`).
 - Hibernate `ddl-auto` jest ustawione na `validate` — zmiany schematu wprowadzaj wyłącznie przez Liquibase.
-- Nowe migracje dodawaj jako pliki w `liquibase/changelog/changes/` i dołącz je w `db.changelog-master.yaml`.
+- Nowe migracje dodawaj jako pliki w `postgre/liquibase/changelog/changes/` i dołącz je w `db.changelog-master.yaml`.
