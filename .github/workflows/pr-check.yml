@@ -1,0 +1,37 @@
+name: PR Build Check
+
+on:
+  pull_request:
+    branches:
+      - devel
+
+jobs:
+  build-and-verify:
+    name: Build and Verify Project
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build all services
+        # This triggers the Dockerfile contexts for your frontend and backend Spring Boot microservices
+        run: docker compose build
+
+      - name: Start services in background
+        # Brings up postgres, liquibase, quiz-service, user-service, gateway, and frontend
+        run: docker compose up -d
+
+      - name: Wait for Liquibase migrations and Spring Boot initialization
+        run: sleep 25
+
+      - name: Verify container health
+        # Fails the pipeline if any container failed to start or exited with an error
+        run: |
+          if [ "$(docker compose ps -q | xargs docker inspect -f '{{ .State.Status }}' | grep -v -e 'running' -e 'exited')" ]; then
+            echo "One or more containers failed to start properly."
+            docker compose logs
+            exit 1
+          else
+            echo "All containers built and started successfully."
+          fi

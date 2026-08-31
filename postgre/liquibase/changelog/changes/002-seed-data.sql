@@ -1,0 +1,162 @@
+--liquibase formatted sql
+
+--changeset courser:010-seed-users context:seed
+INSERT INTO users (id, created_at, email, last_login, password, quizzes_completed, role, total_score, username)
+VALUES (
+    1,
+    '2026-06-18 00:34:06.614824',
+    'szymon@gmail.com',
+    '2026-06-29 17:25:31.736203',
+    '$2a$10$HVDtX5PP2s4jBsdD0sIDFO9Nm6tB8EXq0xesijV3p.F5f/0AIMS0O',
+    0,
+    'STUDENT',
+    0,
+    'szymon'
+);
+
+--changeset courser:011-seed-quizzes context:seed
+INSERT INTO quizzes (id, title, owner_user_id) VALUES
+    (1, 'Geografia', 1),
+    (2, 'Informatyka', 1),
+    (23, 'Historia', 1);
+
+--changeset courser:012-seed-questions context:seed
+INSERT INTO questions (id, content, quiz_id, question_order, image_data, image_filename) VALUES
+    (1, 'Jaka jest stolica Polski?', 1, 0, NULL, NULL),
+    (2, 'Który kontynent jest największy?', 1, 1, NULL, NULL),
+    (3, 'Jak nazywa się najdłuższa rzeka świata?', 1, 2, NULL, NULL),
+    (4, 'Które państwo ma kształt buta?', 1, 3, NULL, NULL),
+    (5, 'Jakie morze leży nad Polską?', 1, 4, NULL, NULL),
+    (6, 'Która planeta jest nazywana Czerwoną Planetą?', 1, 5, NULL, NULL),
+    (7, 'Który ocean jest największy?', 1, 6, NULL, NULL),
+    (8, 'Jak nazywa się najwyższy szczyt świata?', 1, 7, NULL, NULL),
+    (9, 'W jakim kraju znajdują się piramidy w Gizie?', 1, 8, NULL, NULL),
+    (10, 'Które państwo słynie z miasta Tokio?', 1, 9, NULL, NULL),
+    (11, 'Które urządzenie służy do wyświetlania obrazu?', 2, 0, NULL, NULL),
+    (12, 'Który system operacyjny stworzyła firma Microsoft?', 2, 1, NULL, NULL),
+    (13, 'Jak nazywa się podstawowa część komputera odpowiedzialna za obliczenia?', 2, 2, NULL, NULL),
+    (14, 'Który program służy do przeglądania internetu?', 2, 3, NULL, NULL),
+    (15, 'Jak nazywa się urządzenie używane do wpisywania tekstu?', 2, 4, NULL, NULL),
+    (16, 'Który język programowania jest często używany do stron internetowych?', 2, 5, NULL, NULL),
+    (17, 'Jak nazywa się pamięć używana do przechowywania plików?', 2, 6, NULL, NULL),
+    (18, 'Które urządzenie pozwala połączyć się z internetem bezprzewodowo?', 2, 7, NULL, NULL),
+    (19, 'Jak nazywa się małe przenośne urządzenie do przechowywania danych USB?', 2, 8, NULL, NULL),
+    (20, 'Która firma stworzyła iPhone''a?', 2, 9, NULL, NULL),
+    (53, 'Które wydarzenia są związane z II wojną światową?', 23, 0, NULL, NULL),
+    (54, 'Które wydarzenia miały miejsce w starożytności?', 23, 1, NULL, NULL),
+    (55, 'Które wydarzenia są związane z okresem średniowiecza?', 23, 2, NULL, NULL),
+    (56, 'W którym roku Polska odzyskała niepodległość?', 23, 3, NULL, NULL),
+    (57, 'Kto był pierwszym koronowanym królem Polski?', 23, 4, NULL, NULL);
+
+--changeset courser:013-seed-answers context:seed
+INSERT INTO answers (id, content, correct, question_id, answer_order) VALUES
+    (1, 'Kraków', false, 1, 0),
+    (2, 'Warszawa', true, 1, 1),
+    (3, 'Gdańsk', false, 1, 2),
+    (4, 'Wrocław', false, 1, 3),
+    (5, 'Afryka', false, 2, 0),
+    (6, 'Europa', false, 2, 1),
+    (7, 'Azja', true, 2, 2),
+    (8, 'Australia', false, 2, 3),
+    (9, 'Amazonka', true, 3, 0),
+    (10, 'Wisła', false, 3, 1),
+    (11, 'Nil', false, 3, 2),
+    (12, 'Odra', false, 3, 3),
+    (13, 'Hiszpania', false, 4, 0),
+    (14, 'Włochy', true, 4, 1),
+    (15, 'Francja', false, 4, 2),
+    (16, 'Norwegia', false, 4, 3),
+    (17, 'Morze Czarne', false, 5, 0),
+    (18, 'Morze Śródziemne', false, 5, 1),
+    (19, 'Morze Bałtyckie', true, 5, 2),
+    (20, 'Morze Północne', false, 5, 3),
+    (21, 'Mars', true, 6, 0),
+    (22, 'Wenus', false, 6, 1),
+    (23, 'Jowisz', false, 6, 2),
+    (24, 'Saturn', false, 6, 3),
+    (25, 'Ocean Atlantycki', false, 7, 0),
+    (26, 'Ocean Indyjski', false, 7, 1),
+    (27, 'Ocean Arktyczny', false, 7, 2),
+    (28, 'Ocean Spokojny', true, 7, 3),
+    (29, 'K2', false, 8, 0),
+    (30, 'Mount Everest', true, 8, 1),
+    (31, 'Rysy', false, 8, 2),
+    (32, 'Mont Blanc', false, 8, 3),
+    (33, 'Grecja', false, 9, 0),
+    (34, 'Turcja', false, 9, 1),
+    (35, 'Egipt', true, 9, 2),
+    (36, 'Indie', false, 9, 3),
+    (37, 'Chiny', false, 10, 0),
+    (38, 'Korea Południowa', false, 10, 1),
+    (39, 'Japonia', true, 10, 2),
+    (40, 'Tajlandia', false, 10, 3),
+    (41, 'Klawiatura', false, 11, 0),
+    (42, 'Monitor', true, 11, 1),
+    (43, 'Myszka', false, 11, 2),
+    (44, 'Drukarka', false, 11, 3),
+    (45, 'Linux', false, 12, 0),
+    (46, 'Windows', true, 12, 1),
+    (47, 'macOS', false, 12, 2),
+    (48, 'Android', false, 12, 3),
+    (49, 'Procesor', true, 13, 0),
+    (50, 'Monitor', false, 13, 1),
+    (51, 'Głośnik', false, 13, 2),
+    (52, 'Pendrive', false, 13, 3),
+    (53, 'Excel', false, 14, 0),
+    (54, 'Word', false, 14, 1),
+    (55, 'Chrome', true, 14, 2),
+    (56, 'Paint', false, 14, 3),
+    (57, 'Myszka', false, 15, 0),
+    (58, 'Klawiatura', true, 15, 1),
+    (59, 'Skaner', false, 15, 2),
+    (60, 'Router', false, 15, 3),
+    (61, 'HTML', false, 16, 0),
+    (62, 'Java', false, 16, 1),
+    (63, 'Python', false, 16, 2),
+    (64, 'JavaScript', true, 16, 3),
+    (65, 'Dysk twardy', true, 17, 0),
+    (66, 'Procesor', false, 17, 1),
+    (67, 'Karta graficzna', false, 17, 2),
+    (68, 'Wentylator', false, 17, 3),
+    (69, 'Router', true, 18, 0),
+    (70, 'Drukarka', false, 18, 1),
+    (71, 'Monitor', false, 18, 2),
+    (72, 'Projektor', false, 18, 3),
+    (73, 'Tablet', false, 19, 0),
+    (74, 'Pendrive', true, 19, 1),
+    (75, 'Laptop', false, 19, 2),
+    (76, 'Mikrofon', false, 19, 3),
+    (77, 'Samsung', false, 20, 0),
+    (78, 'Google', false, 20, 1),
+    (79, 'Apple', true, 20, 2),
+    (80, 'Intel', false, 20, 3),
+    (125, 'Atak Niemiec na Polskę w 1939 roku', true, 53, 0),
+    (126, 'Bitwa pod Grunwaldem', false, 53, 1),
+    (127, 'Lądowanie aliantów w Normandii', true, 53, 2),
+    (128, 'Zrzucenie bomb atomowych na Hiroszimę i Nagasaki', true, 53, 3),
+    (129, 'Powstanie Cesarstwa Rzymskiego', true, 54, 0),
+    (130, 'Budowa piramid w Egipcie', true, 54, 1),
+    (131, 'Odkrycie Ameryki przez Kolumba', false, 54, 2),
+    (132, 'Rewolucja francuska', false, 54, 3),
+    (133, 'Chrzest Polski', true, 55, 0),
+    (134, 'Bitwa pod Grunwaldem', true, 55, 1),
+    (135, 'Wybuch I wojny światowej', false, 55, 2),
+    (136, 'Lądowanie człowieka na Księżycu', false, 55, 3),
+    (137, '1918', true, 56, 0),
+    (138, '1795', false, 56, 1),
+    (139, '1945', false, 56, 2),
+    (140, 'Bolesław Chrobry', true, 57, 0),
+    (141, 'Kazimierz Wielki', false, 57, 1),
+    (142, 'Władysław Jagiełło', false, 57, 2);
+
+--changeset courser:014-seed-quiz-results context:seed
+INSERT INTO quiz_results (id, completed_at, max_score, quiz_id, score, user_id)
+VALUES (1, '2026-06-21 20:47:18.833618', 500, 23, 33, 1);
+
+--changeset courser:015-reset-sequences context:seed splitStatements:false
+SELECT setval('answers_id_seq', 143, true);
+SELECT setval('questions_id_seq', 58, true);
+SELECT setval('quiz_results_id_seq', 1, true);
+SELECT setval('quiz_share_codes_id_seq', 1, false);
+SELECT setval('quizzes_id_seq', 24, true);
+SELECT setval('users_id_seq', 1, true);
