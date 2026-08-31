@@ -19,10 +19,10 @@ jobs:
         run: docker compose build
 
       - name: Start services in background
-        # Brings up postgres, liquibase, quiz-service, user-service, gateway, and frontend
-        run: docker compose up -d
+        # --wait blocks until postgres is healthy and liquibase completes successfully
+        run: docker compose up -d --wait
 
-      - name: Wait for Liquibase migrations and Spring Boot initialization
+      - name: Wait for Spring Boot initialization
         run: sleep 25
 
       - name: Verify container health
@@ -30,16 +30,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Liquibase is expected to exit; it must exit successfully.
-          liquibase_id="$(docker compose ps -q liquibase)"
-          [ -n "$liquibase_id" ] || { echo "Liquibase container not found"; exit 1; }
+          # Liquibase is a one-shot service; ps -aq includes exited containers.
+          liquibase_id="$(docker compose ps -aq liquibase | head -n1)"
+          [ -n "$liquibase_id" ] || { echo "Liquibase container not found"; docker compose ps -a; exit 1; }
           [ "$(docker inspect -f '{{ .State.Status }}' "$liquibase_id")" = "exited" ] || { echo "Liquibase has not finished"; docker compose logs liquibase; exit 1; }
           [ "$(docker inspect -f '{{ .State.ExitCode }}' "$liquibase_id")" = "0" ] || { echo "Liquibase failed"; docker compose logs liquibase; exit 1; }
 
           # All long-running services must be running.
           for svc in postgres quiz-service user-service gateway frontend; do
             id="$(docker compose ps -q "$svc")"
-            [ -n "$id" ] || { echo "Service $svc container not found"; exit 1; }
+            [ -n "$id" ] || { echo "Service $svc container not found"; docker compose ps -a; exit 1; }
             status="$(docker inspect -f '{{ .State.Status }}' "$id")"
             [ "$status" = "running" ] || { echo "Service $svc not running (status=$status)"; docker compose logs "$svc"; exit 1; }
           done
