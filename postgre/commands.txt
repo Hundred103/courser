@@ -26,7 +26,7 @@ cd postgre/liquibase
 liquibase --defaults-file=liquibase.properties update
 
 Tylko schemat (bez danych startowych):
-liquibase --defaults-file=liquibase.properties --contexts="" update
+liquibase --defaults-file=liquibase.properties --contexts="!seed" update
 
 ---RĘCZNY IMPORT dump.sql (legacy, opcjonalnie)---
 (Linux/Mac):
