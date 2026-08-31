@@ -11,7 +11,7 @@ docker compose up -d
 Usługi quiz-service i user-service startują dopiero po pomyślnym zakończeniu Liquibase
 (`depends_on: service_completed_successfully`). `docker compose up -d --wait` czeka wyłącznie
 na serwisy ze zdefiniowanym healthcheckiem (obecnie PostgreSQL) — nie polegaj na nim jako
-gwarantii zakończenia migracji Liquibase.
+gwarancji zakończenia migracji Liquibase.
 
 Sprawdzenie statusu migracji:
 docker compose ps -a liquibase
