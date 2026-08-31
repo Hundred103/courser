@@ -153,10 +153,10 @@ INSERT INTO answers (id, content, correct, question_id, answer_order) VALUES
 INSERT INTO quiz_results (id, completed_at, max_score, quiz_id, score, user_id)
 VALUES (1, '2026-06-21 20:47:18.833618', 500, 23, 33, 1);
 
---changeset courser:015-reset-sequences context:seed splitStatements:false
-SELECT setval('answers_id_seq', 143, true);
-SELECT setval('questions_id_seq', 58, true);
+--changeset courser:015-reset-sequences context:seed
+SELECT setval('answers_id_seq', 142, true);
+SELECT setval('questions_id_seq', 57, true);
 SELECT setval('quiz_results_id_seq', 1, true);
 SELECT setval('quiz_share_codes_id_seq', 1, false);
-SELECT setval('quizzes_id_seq', 24, true);
+SELECT setval('quizzes_id_seq', 23, true);
 SELECT setval('users_id_seq', 1, true);

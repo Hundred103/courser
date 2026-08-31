@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset courser:001-create-users splitStatements:false
+--changeset courser:001-create-users
 CREATE TABLE users (
     id BIGINT NOT NULL,
     created_at TIMESTAMP(6) WITHOUT TIME ZONE,
@@ -71,7 +71,7 @@ CREATE TABLE answers (
     answer_order INTEGER
 );
 
---changeset courser:005-create-quiz-results splitStatements:false
+--changeset courser:005-create-quiz-results
 CREATE TABLE quiz_results (
     id BIGINT NOT NULL,
     completed_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
@@ -109,7 +109,7 @@ CREATE TABLE quiz_share_codes (
     quiz_id BIGINT NOT NULL
 );
 
---changeset courser:007-add-primary-keys splitStatements:false
+--changeset courser:007-add-primary-keys
 ALTER TABLE ONLY answers ADD CONSTRAINT answers_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY questions ADD CONSTRAINT questions_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY quiz_results ADD CONSTRAINT quiz_results_pkey PRIMARY KEY (id);
@@ -117,12 +117,12 @@ ALTER TABLE ONLY quiz_share_codes ADD CONSTRAINT quiz_share_codes_pkey PRIMARY K
 ALTER TABLE ONLY quizzes ADD CONSTRAINT quizzes_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY users ADD CONSTRAINT users_pkey PRIMARY KEY (id);
 
---changeset courser:008-add-unique-constraints splitStatements:false
+--changeset courser:008-add-unique-constraints
 ALTER TABLE ONLY users ADD CONSTRAINT uk_6dotkott2kjsp8vw4d0m25fb7 UNIQUE (email);
 ALTER TABLE ONLY users ADD CONSTRAINT uk_r43af9ap4edm43mmtq01oddj6 UNIQUE (username);
 ALTER TABLE ONLY quiz_share_codes ADD CONSTRAINT uk_quiz_share_codes_code UNIQUE (code);
 
---changeset courser:009-add-foreign-keys splitStatements:false
+--changeset courser:009-add-foreign-keys
 ALTER TABLE ONLY answers
     ADD CONSTRAINT fk3erw1a3t0r78st8ty27x6v3g1 FOREIGN KEY (question_id) REFERENCES questions (id);
 
@@ -131,3 +131,15 @@ ALTER TABLE ONLY questions
 
 ALTER TABLE ONLY quiz_share_codes
     ADD CONSTRAINT fkma9ee5ntjs2yiohoytg9qvk6c FOREIGN KEY (quiz_id) REFERENCES quizzes (id);
+
+ALTER TABLE ONLY quizzes
+    ADD CONSTRAINT fk_quizzes_owner_user_id FOREIGN KEY (owner_user_id) REFERENCES users (id);
+
+ALTER TABLE ONLY quiz_share_codes
+    ADD CONSTRAINT fk_quiz_share_codes_created_by_user_id FOREIGN KEY (created_by_user_id) REFERENCES users (id);
+
+ALTER TABLE ONLY quiz_results
+    ADD CONSTRAINT fk_quiz_results_user_id FOREIGN KEY (user_id) REFERENCES users (id);
+
+ALTER TABLE ONLY quiz_results
+    ADD CONSTRAINT fk_quiz_results_quiz_id FOREIGN KEY (quiz_id) REFERENCES quizzes (id);

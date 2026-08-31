@@ -28,10 +28,20 @@ jobs:
       - name: Verify container health
         # Fails the pipeline if any container failed to start or exited with an error
         run: |
-          if [ "$(docker compose ps -q | xargs docker inspect -f '{{ .State.Status }}' | grep -v -e 'running' -e 'exited')" ]; then
-            echo "One or more containers failed to start properly."
-            docker compose logs
-            exit 1
-          else
-            echo "All containers built and started successfully."
-          fi
+          set -euo pipefail
+
+          # Liquibase is expected to exit; it must exit successfully.
+          liquibase_id="$(docker compose ps -q liquibase)"
+          [ -n "$liquibase_id" ] || { echo "Liquibase container not found"; exit 1; }
+          [ "$(docker inspect -f '{{ .State.Status }}' "$liquibase_id")" = "exited" ] || { echo "Liquibase has not finished"; docker compose logs liquibase; exit 1; }
+          [ "$(docker inspect -f '{{ .State.ExitCode }}' "$liquibase_id")" = "0" ] || { echo "Liquibase failed"; docker compose logs liquibase; exit 1; }
+
+          # All long-running services must be running.
+          for svc in postgres quiz-service user-service gateway frontend; do
+            id="$(docker compose ps -q "$svc")"
+            [ -n "$id" ] || { echo "Service $svc container not found"; exit 1; }
+            status="$(docker inspect -f '{{ .State.Status }}' "$id")"
+            [ "$status" = "running" ] || { echo "Service $svc not running (status=$status)"; docker compose logs "$svc"; exit 1; }
+          done
+
+          echo "All containers built and started successfully."
