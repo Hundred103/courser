@@ -1,6 +1,5 @@
 
 !!!!!!!!!!!!!!!KONTENERY MUSZA CHODZIC!!!!!!!!!!!!!!!
----------------komendy wykonywac w folderze postgre---------------
 
 Wymagania: Docker z wtyczką Compose v2 (`docker compose`, nie `docker-compose`).
 
