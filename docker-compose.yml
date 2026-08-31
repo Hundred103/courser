@@ -10,7 +10,27 @@ services:
       - "5433:5432"
     volumes:
       - courser-postgres-data:/var/lib/postgresql/data
-      - ./postgre/dump.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U courseruser -d courserdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  liquibase:
+    image: liquibase/liquibase:4.33
+    container_name: courser-liquibase
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./postgre/liquibase/changelog:/liquibase/changelog
+    command: >
+      --changelog-file=changelog/db.changelog-master.yaml
+      --url=jdbc:postgresql://postgres:5432/courserdb
+      --username=courseruser
+      --password=courserpassword
+      --contexts=seed
+      update
 
   quiz-service:
     build:
@@ -18,14 +38,15 @@ services:
       dockerfile: Dockerfile
     container_name: courser-quiz
     depends_on:
-      - postgres
+      liquibase:
+        condition: service_completed_successfully
     expose:
       - "8081"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
       SPRING_DATASOURCE_USERNAME: courseruser
       SPRING_DATASOURCE_PASSWORD: courserpassword
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SERVER_PORT: 8081
 
   user-service:
@@ -34,7 +55,8 @@ services:
       dockerfile: Dockerfile
     container_name: courser-user-service
     depends_on:
-      - postgres
+      liquibase:
+        condition: service_completed_successfully
     expose:
       - "8082"
     environment:
