@@ -25,7 +25,7 @@ services:
     volumes:
       - ./postgre/liquibase/changelog:/liquibase/changelog
     command: >
-      --changelog-file=changelog/db.changelog-master.yaml
+      --changelog-file=changelog/db.changelog-master.xml
       --url=jdbc:postgresql://postgres:5432/courserdb
       --username=courseruser
       --password=courserpassword

@@ -49,4 +49,4 @@ cmd /c "docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d c
 - Schemat bazy jest zarządzany przez Liquibase (katalog `postgre/liquibase/changelog/`).
 - Obie usługi korzystają z tej samej bazy `courserdb` (użytkownik `courseruser`).
 - Hibernate `ddl-auto` jest ustawione na `validate` — zmiany schematu wprowadzaj wyłącznie przez Liquibase.
-- Nowe migracje dodawaj jako pliki w `postgre/liquibase/changelog/changes/` i dołącz je w `db.changelog-master.yaml`.
+- Nowe migracje dodawaj jako pliki `.sql` w `postgre/liquibase/changelog/changes/` (prefiks numeryczny dla kolejności alfabetycznej); `includeAll` w `db.changelog-master.xml` załaduje je automatycznie.
