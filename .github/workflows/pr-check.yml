@@ -22,8 +22,28 @@ jobs:
         # --wait blocks until postgres is healthy and liquibase completes successfully
         run: docker compose up -d --wait
 
-      - name: Wait for Spring Boot initialization
-        run: sleep 25
+      - name: Wait for application readiness
+        run: |
+          set -euo pipefail
+
+          wait_for_url() {
+            local url="$1"
+            local name="$2"
+            for i in $(seq 1 60); do
+              if curl -fsS "$url" > /dev/null; then
+                echo "$name is ready"
+                return 0
+              fi
+              echo "Waiting for $name ($i/60)..."
+              sleep 2
+            done
+            echo "$name failed to become ready"
+            docker compose logs "$name"
+            exit 1
+          }
+
+          wait_for_url "http://localhost:8080/actuator/health" "gateway"
+          wait_for_url "http://localhost:4200/" "frontend"
 
       - name: Verify container health
         # Fails the pipeline if any container failed to start or exited with an error
