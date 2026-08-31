@@ -17,7 +17,7 @@ services:
       retries: 10
 
   liquibase:
-    image: liquibase/liquibase:4.33
+    image: liquibase/liquibase:4.33.0
     container_name: courser-liquibase
     depends_on:
       postgres:

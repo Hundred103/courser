@@ -19,8 +19,49 @@ jobs:
         run: docker compose build
 
       - name: Start services in background
-        # --wait blocks until postgres is healthy and liquibase completes successfully
-        run: docker compose up -d --wait
+        run: docker compose up -d
+
+      - name: Wait for Liquibase migrations
+        run: |
+          set -euo pipefail
+
+          for i in $(seq 1 60); do
+            liquibase_id="$(docker compose ps -aq liquibase | head -n1)"
+            if [ -n "$liquibase_id" ]; then
+              status="$(docker inspect -f '{{ .State.Status }}' "$liquibase_id")"
+              if [ "$status" = "exited" ]; then
+                exit_code="$(docker inspect -f '{{ .State.ExitCode }}' "$liquibase_id")"
+                if [ "$exit_code" = "0" ]; then
+                  echo "Liquibase migrations completed successfully"
+                  exit 0
+                fi
+                echo "Liquibase failed with exit code $exit_code"
+                docker compose logs liquibase
+                exit 1
+              fi
+            fi
+            echo "Waiting for Liquibase ($i/60)..."
+            sleep 2
+          done
+
+          echo "Liquibase did not finish in time"
+          docker compose logs liquibase
+          exit 1
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run quiz-service unit tests
+        working-directory: backend/quiz-service
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/courserdb
+          SPRING_DATASOURCE_USERNAME: courseruser
+          SPRING_DATASOURCE_PASSWORD: courserpassword
+        run: mvn test
 
       - name: Wait for application readiness
         run: |
@@ -46,7 +87,6 @@ jobs:
           wait_for_url "http://localhost:4200/" "frontend"
 
       - name: Verify container health
-        # Fails the pipeline if any container failed to start or exited with an error
         run: |
           set -euo pipefail
 

@@ -6,9 +6,17 @@ Wymagania: Docker z wtyczką Compose v2 (`docker compose`, nie `docker-compose`)
 ---URUCHOMIENIE / RESET BAZY (z katalogu głównego repo)---
 docker compose down
 docker volume rm courser-postgres-data
-docker compose up -d --wait
+docker compose up -d
 
-`--wait` czeka, aż PostgreSQL będzie healthy i Liquibase zakończy migracje.
+Usługi quiz-service i user-service startują dopiero po pomyślnym zakończeniu Liquibase
+(`depends_on: service_completed_successfully`). `docker compose up -d --wait` czeka wyłącznie
+na serwisy ze zdefiniowanym healthcheckiem (obecnie PostgreSQL) — nie polegaj na nim jako
+gwarantii zakończenia migracji Liquibase.
+
+Sprawdzenie statusu migracji:
+docker compose ps -a liquibase
+docker inspect -f '{{ .State.ExitCode }}' courser-liquibase
+
 Liquibase utworzy schemat i dane startowe (kontekst `seed`).
 
 ---RĘCZNE URUCHOMIENIE LIQUIBASE (lokalnie, bez Dockera)---
