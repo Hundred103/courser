@@ -1,0 +1,107 @@
+name: PR Build Check
+
+on:
+  pull_request:
+    branches:
+      - devel
+
+jobs:
+  build-and-verify:
+    name: Build and Verify Project
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build all services
+        # This triggers the Dockerfile contexts for your frontend and backend Spring Boot microservices
+        run: docker compose build
+
+      - name: Start services in background
+        run: docker compose up -d
+
+      - name: Wait for Liquibase migrations
+        run: |
+          set -euo pipefail
+
+          for i in $(seq 1 60); do
+            liquibase_id="$(docker compose ps -aq liquibase | head -n1)"
+            if [ -n "$liquibase_id" ]; then
+              status="$(docker inspect -f '{{ .State.Status }}' "$liquibase_id")"
+              if [ "$status" = "exited" ]; then
+                exit_code="$(docker inspect -f '{{ .State.ExitCode }}' "$liquibase_id")"
+                if [ "$exit_code" = "0" ]; then
+                  echo "Liquibase migrations completed successfully"
+                  exit 0
+                fi
+                echo "Liquibase failed with exit code $exit_code"
+                docker compose logs liquibase
+                exit 1
+              fi
+            fi
+            echo "Waiting for Liquibase ($i/60)..."
+            sleep 2
+          done
+
+          echo "Liquibase did not finish in time"
+          docker compose logs liquibase
+          exit 1
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run quiz-service unit tests
+        working-directory: backend/quiz-service
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/courserdb
+          SPRING_DATASOURCE_USERNAME: courseruser
+          SPRING_DATASOURCE_PASSWORD: courserpassword
+        run: mvn test
+
+      - name: Wait for application readiness
+        run: |
+          set -euo pipefail
+
+          wait_for_url() {
+            local url="$1"
+            local name="$2"
+            for i in $(seq 1 60); do
+              if curl -fsS "$url" > /dev/null; then
+                echo "$name is ready"
+                return 0
+              fi
+              echo "Waiting for $name ($i/60)..."
+              sleep 2
+            done
+            echo "$name failed to become ready"
+            docker compose logs "$name"
+            exit 1
+          }
+
+          wait_for_url "http://localhost:8080/actuator/health" "gateway"
+          wait_for_url "http://localhost:4200/" "frontend"
+
+      - name: Verify container health
+        run: |
+          set -euo pipefail
+
+          # Liquibase is a one-shot service; ps -aq includes exited containers.
+          liquibase_id="$(docker compose ps -aq liquibase | head -n1)"
+          [ -n "$liquibase_id" ] || { echo "Liquibase container not found"; docker compose ps -a; exit 1; }
+          [ "$(docker inspect -f '{{ .State.Status }}' "$liquibase_id")" = "exited" ] || { echo "Liquibase has not finished"; docker compose logs liquibase; exit 1; }
+          [ "$(docker inspect -f '{{ .State.ExitCode }}' "$liquibase_id")" = "0" ] || { echo "Liquibase failed"; docker compose logs liquibase; exit 1; }
+
+          # All long-running services must be running.
+          for svc in postgres quiz-service user-service gateway frontend; do
+            id="$(docker compose ps -q "$svc")"
+            [ -n "$id" ] || { echo "Service $svc container not found"; docker compose ps -a; exit 1; }
+            status="$(docker inspect -f '{{ .State.Status }}' "$id")"
+            [ "$status" = "running" ] || { echo "Service $svc not running (status=$status)"; docker compose logs "$svc"; exit 1; }
+          done
+
+          echo "All containers built and started successfully."
