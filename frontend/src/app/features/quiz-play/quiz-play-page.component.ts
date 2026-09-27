@@ -9,6 +9,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { QuizScoreService } from '../../core/services/quiz-score.service';
 import { toImageSrc } from '../../core/utils/image-compression.util';
+import { awardedQuestionScore, normalizeQuizScoring, questionMaxScore } from '../../core/utils/quiz-scoring.util';
 
 type QuizState =
   | { status: 'loading'; quiz: null; errorMessage: '' }
@@ -119,18 +120,25 @@ export class QuizPlayPageComponent {
       !this.currentQuestionChecked()
     );
   });
+  readonly scoring = computed(() => normalizeQuizScoring(this.quiz()?.scoring));
   readonly score = computed(() => {
     const submittedAnswers = this.submittedAnswers();
+    const scoring = this.scoring();
 
     return this.questions().reduce(
-      (totalScore, question) => totalScore + this.calculateQuestionScore(question, submittedAnswers[question.id] ?? []),
+      (totalScore, question) =>
+        totalScore + awardedQuestionScore(question.answers, submittedAnswers[question.id] ?? [], scoring),
       0,
     );
   });
+  readonly maxScore = computed(() =>
+    this.questions().reduce((total, question) => total + questionMaxScore(question.answers, this.scoring()), 0),
+  );
   readonly formattedScore = computed(() => this.formatScore(this.score()));
+  readonly formattedMaxScore = computed(() => this.formatScore(this.maxScore()));
   readonly scorePercent = computed(() => {
-    const total = this.totalQuestions();
-    return total === 0 ? 0 : Math.round((this.score() / total) * 100);
+    const maxScore = this.maxScore();
+    return maxScore === 0 ? 0 : Math.round((this.score() / maxScore) * 100);
   });
 
   constructor() {
@@ -173,12 +181,18 @@ export class QuizPlayPageComponent {
 
       this.resultSaved.set(true);
       this.resultSaveError.set(null);
+      const scaledMax = Math.max(0, this.quizScoreService.toScaledScore(this.maxScore()));
+      let scaledScore = this.quizScoreService.toScaledScore(this.score());
+
+      if (scaledScore > scaledMax) {
+        scaledScore = scaledMax;
+      }
 
       this.quizScoreService
         .saveQuizResult({
           quizId: quiz.id,
-          score: this.quizScoreService.toScaledScore(this.score()),
-          maxScore: totalQuestions * 100,
+          score: scaledScore,
+          maxScore: scaledMax,
         })
         .subscribe({
           error: () => {
@@ -393,7 +407,18 @@ export class QuizPlayPageComponent {
   }
 
   questionScoreText(question: QuestionPlayDTO): string {
-    return `${this.formatScore(this.calculateQuestionScore(question, this.submittedAnswers()[question.id] ?? []))}/1`;
+    const selectedIds = this.submittedAnswers()[question.id] ?? [];
+    const awarded = awardedQuestionScore(question.answers, selectedIds, this.scoring());
+    const maxScore = questionMaxScore(question.answers, this.scoring());
+    return `${this.formatScore(awarded)}/${this.formatScore(maxScore)}`;
+  }
+
+  answerPointsLabel(question: QuestionPlayDTO, answer: AnswerPlayDTO): string | null {
+    if (this.scoring().mode !== 'custom' || (!this.isQuestionChecked(question) && !this.resultReady())) {
+      return null;
+    }
+
+    return this.formatScore(answer.points ?? 0);
   }
 
   questionImageSrc(question: QuestionPlayDTO): string | null {
@@ -412,17 +437,6 @@ export class QuizPlayPageComponent {
       delete next[question.id];
       return next;
     });
-  }
-
-  private calculateQuestionScore(question: QuestionPlayDTO, selectedAnswerIds: number[]): number {
-    const correctAnswers = question.answers.filter((answer) => answer.correct);
-    const wrongAnswers = question.answers.filter((answer) => !answer.correct);
-    const correctSelected = correctAnswers.filter((answer) => selectedAnswerIds.includes(answer.id)).length;
-    const wrongSelected = wrongAnswers.filter((answer) => selectedAnswerIds.includes(answer.id)).length;
-    const correctScore = correctAnswers.length === 0 ? 0 : correctSelected / correctAnswers.length;
-    const wrongPenalty = wrongAnswers.length === 0 ? 0 : wrongSelected / wrongAnswers.length;
-
-    return Math.max(0, Math.min(1, correctScore - wrongPenalty));
   }
 
   private formatScore(score: number): string {

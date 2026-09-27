@@ -227,23 +227,13 @@ export class SidebarComponent {
   }
 
   private async exportGuestQuiz(quiz: QuizRawDTO): Promise<void> {
-    const fullQuiz = this.guestQuizStorage.getById(quiz.id);
+    const dto = this.guestQuizStorage.toCreateDtoById(quiz.id);
 
-    if (!fullQuiz) {
+    if (!dto) {
       return;
     }
 
-    const blob = await buildQuizZip({
-      title: fullQuiz.title,
-      questions: fullQuiz.questions.map((question) => ({
-        content: question.content,
-        image: question.image ?? null,
-        answers: question.answers.map((answer) => ({
-          content: answer.content,
-          correct: answer.correct,
-        })),
-      })),
-    });
+    const blob = await buildQuizZip(dto);
 
     this.downloadQuizZip(blob, quiz.title);
   }

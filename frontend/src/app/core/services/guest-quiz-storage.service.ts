@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { QuizCreateDTO, QuizPlayDTO, QuizRawDTO } from '../models/quiz.model';
+import { normalizeQuizScoring } from '../utils/quiz-scoring.util';
 
 const STORAGE_KEY = 'guestQuizzes';
 
@@ -37,6 +38,11 @@ export class GuestQuizStorageService {
     return this.loadQuizzes().map((quiz) => this.toCreateDto(quiz));
   }
 
+  toCreateDtoById(id: number): QuizCreateDTO | null {
+    const quiz = this.getById(id);
+    return quiz ? this.toCreateDto(quiz) : null;
+  }
+
   clear(): void {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -49,6 +55,7 @@ export class GuestQuizStorageService {
     return {
       id: quizId,
       title: dto.title,
+      scoring: normalizeQuizScoring(dto.scoring),
       questions: dto.questions.map((question) => ({
         id: nextQuestionId--,
         content: question.content,
@@ -57,6 +64,7 @@ export class GuestQuizStorageService {
           id: nextAnswerId--,
           content: answer.content,
           correct: answer.correct,
+          points: typeof answer.points === 'number' && Number.isFinite(answer.points) ? answer.points : null,
         })),
       })),
     };
@@ -65,12 +73,14 @@ export class GuestQuizStorageService {
   private toCreateDto(quiz: QuizPlayDTO): QuizCreateDTO {
     return {
       title: quiz.title,
+      scoring: normalizeQuizScoring(quiz.scoring),
       questions: quiz.questions.map((question) => ({
         content: question.content,
         image: question.image ?? null,
         answers: question.answers.map((answer) => ({
           content: answer.content,
           correct: answer.correct,
+          points: typeof answer.points === 'number' && Number.isFinite(answer.points) ? answer.points : null,
         })),
       })),
     };

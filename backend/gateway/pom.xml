@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>pl.edu.pg.roadsign</groupId>
+    <groupId>net.edu.courser</groupId>
     <artifactId>gateway</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <name>API Gateway</name>

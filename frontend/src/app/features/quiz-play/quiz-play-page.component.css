@@ -73,8 +73,19 @@
   gap: 0.65rem;
 }
 
+.answer-hint {
+  margin: 0.35rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
 .answer-row {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   width: 100%;
   cursor: pointer;
   padding: 0.75rem 0.9rem 0.75rem 3rem;
@@ -84,6 +95,24 @@
   font-weight: 700;
   text-align: left;
   background: rgba(255, 255, 255, 0.02);
+}
+
+.answer-copy {
+  min-width: 0;
+}
+
+.answer-points {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+}
+
+.answer-points.positive {
+  color: var(--success-text);
+}
+
+.answer-points.negative {
+  color: var(--danger-text);
 }
 
 .answer-row::before {

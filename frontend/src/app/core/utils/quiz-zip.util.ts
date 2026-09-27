@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { QuizCreateDTO } from '../models/quiz.model';
+import { DEFAULT_QUIZ_SCORING, parseAnswerPoints, parseQuizScoring } from './quiz-scoring.util';
 
 const QUIZ_JSON = 'quiz.json';
 
@@ -49,10 +50,11 @@ export async function buildQuizZip(quiz: QuizCreateDTO): Promise<Blob> {
   const zip = new JSZip();
   const exportQuiz = {
     title: quiz.title,
+    scoring: quiz.scoring ?? { ...DEFAULT_QUIZ_SCORING },
     questions: quiz.questions.map((question, index) => ({
       content: question.content,
       image: question.image ? `image${index + 1}.jpg` : null,
-      answers: question.answers,
+      answers: question.answers.map((answer) => exportAnswer(answer)),
     })),
   };
 
@@ -70,7 +72,7 @@ export async function buildQuizZip(quiz: QuizCreateDTO): Promise<Blob> {
   return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 9 } });
 }
 
-function normalizeQuiz(value: unknown): QuizCreateDTO {
+export function normalizeQuiz(value: unknown): QuizCreateDTO {
   if (!isRecord(value)) {
     throw new Error('Główny obiekt musi zawierać pola title oraz questions.');
   }
@@ -85,6 +87,7 @@ function normalizeQuiz(value: unknown): QuizCreateDTO {
 
   return {
     title: value['title'].trim(),
+    scoring: parseQuizScoring(value['scoring']),
     questions: value['questions'].map((question, questionIndex) => normalizeQuestion(question, questionIndex)),
   };
 }
@@ -105,7 +108,7 @@ function normalizeQuestion(value: unknown, questionIndex: number): QuizCreateDTO
   const imageValue = value['image'];
   let image: string | null = null;
 
-  if (imageValue !== null && imageValue !== undefined) {
+  if (imageValue !== null && imageValue !== undefined && imageValue !== '') {
     if (typeof imageValue !== 'string' || imageValue.trim().length === 0) {
       throw new Error(`Pole image w pytaniu ${questionIndex + 1} musi być null albo nazwą pliku.`);
     }
@@ -140,7 +143,28 @@ function normalizeAnswer(
   return {
     content: value['content'].trim(),
     correct: value['correct'],
+    points: parseAnswerPoints(
+      value['points'],
+      `Odpowiedź ${answerIndex + 1} w pytaniu ${questionIndex + 1}: pole points`,
+    ),
   };
+}
+
+function exportAnswer(answer: QuizCreateDTO['questions'][number]['answers'][number]): {
+  content: string;
+  correct: boolean;
+  points?: number;
+} {
+  const exported: { content: string; correct: boolean; points?: number } = {
+    content: answer.content,
+    correct: answer.correct,
+  };
+
+  if (typeof answer.points === 'number' && Number.isFinite(answer.points)) {
+    exported.points = answer.points;
+  }
+
+  return exported;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

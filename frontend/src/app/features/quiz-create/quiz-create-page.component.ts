@@ -6,11 +6,21 @@ import { QuizCreateDTO, QuizPlayDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { compressImageFile, toImageSrc } from '../../core/utils/image-compression.util';
+import { normalizeQuizScoring, QuizScoring } from '../../core/utils/quiz-scoring.util';
+
+const NEW_QUIZ_SCORING: QuizScoring = {
+  mode: 'default',
+  allowNegativeScore: false,
+  pointsPerCorrect: 1,
+  incorrectPenalty: 1,
+  penaltyMode: 'points',
+};
 
 interface DraftAnswer {
   id: number;
   content: string;
   correct: boolean;
+  points: number | null;
 }
 
 interface DraftQuestion {
@@ -23,6 +33,7 @@ interface DraftQuestion {
 interface DraftSnapshot {
   title: string;
   questions: DraftQuestion[];
+  scoring: QuizScoring;
 }
 
 @Component({
@@ -47,12 +58,14 @@ export class QuizCreatePageComponent implements OnDestroy {
   private initialDraft: DraftSnapshot | null = null;
 
   readonly title = signal('');
+  readonly scoring = signal<QuizScoring>({ ...NEW_QUIZ_SCORING });
+  readonly useDefaultPointsLook = signal(true);
   readonly questions = signal<DraftQuestion[]>([
     {
       id: 1,
       content: '',
       image: null,
-      answers: [{ id: 1, content: '', correct: false }],
+      answers: [{ id: 1, content: '', correct: false, points: null }],
     },
   ]);
   readonly currentIndex = signal(0);
@@ -65,6 +78,9 @@ export class QuizCreatePageComponent implements OnDestroy {
   readonly editingQuizId = signal<number | null>(null);
 
   readonly isEditMode = computed(() => this.editingQuizId() !== null);
+  readonly usesCustomPoints = computed(() => this.scoring().mode === 'custom');
+  readonly showPointControls = computed(() => !this.useDefaultPointsLook());
+  readonly wrongAnswerPoints = computed(() => -this.scoring().incorrectPenalty);
   readonly canUndoChanges = computed(
     () => this.isEditMode() && this.hasUnsavedChanges() && !this.isSaving() && !this.isLoadingQuiz(),
   );
@@ -78,9 +94,20 @@ export class QuizCreatePageComponent implements OnDestroy {
 
     return hasTitle && hasValidQuestions && !this.isSaving() && !this.isLoadingQuiz();
   });
-  readonly saveButtonTitle = computed(() =>
-    this.canSave() ? '' : 'Pola tytuł, pytanie i odpowiedź muszą być wypełnione',
-  );
+  readonly saveButtonTitle = computed(() => {
+    if (this.canSave()) {
+      return '';
+    }
+
+    if (
+      this.usesCustomPoints() &&
+      this.questions().some((question) => question.answers.some((answer) => !Number.isFinite(answer.points)))
+    ) {
+      return 'Każda odpowiedź musi mieć własne punkty';
+    }
+
+    return 'Pola tytuł, pytanie i odpowiedź muszą być wypełnione';
+  });
 
   constructor() {
     this.routeSubscription = this.route.paramMap.subscribe((params) => {
@@ -101,6 +128,66 @@ export class QuizCreatePageComponent implements OnDestroy {
 
   updateTitle(event: Event): void {
     this.title.set((event.target as HTMLInputElement).value);
+    this.saveError.set('');
+  }
+
+  toggleDefaultPointsLook(event: Event): void {
+    this.useDefaultPointsLook.set((event.target as HTMLInputElement).checked);
+  }
+
+  togglePerAnswerPoints(event: Event): void {
+    const usePerAnswerPoints = (event.target as HTMLInputElement).checked;
+
+    if (!usePerAnswerPoints) {
+      this.scoring.update((scoring) => ({ ...scoring, mode: 'default', penaltyMode: 'points' }));
+      this.saveError.set('');
+      return;
+    }
+
+    const current = { ...this.scoring(), penaltyMode: 'points' as const };
+    this.questions.update((questions) =>
+      questions.map((question) => ({
+        ...question,
+        answers: question.answers.map((answer) => ({
+          ...answer,
+          points: this.suggestedPoints(answer, current),
+        })),
+      })),
+    );
+    this.scoring.set({ ...current, mode: 'custom' });
+    this.saveError.set('');
+  }
+
+  toggleAllowNegative(event: Event): void {
+    const allowNegativeScore = (event.target as HTMLInputElement).checked;
+    this.scoring.update((scoring) => ({ ...scoring, allowNegativeScore }));
+    this.saveError.set('');
+  }
+
+  updateCorrectAnswerPoints(event: Event): void {
+    const parsed = this.readInputNumber((event.target as HTMLInputElement).value);
+
+    if (parsed === null) {
+      return;
+    }
+
+    const pointsPerCorrect = Math.max(0, parsed);
+    this.scoring.update((scoring) => ({ ...scoring, penaltyMode: 'points', pointsPerCorrect }));
+    this.applySharedPoints((answer) => (answer.correct ? pointsPerCorrect : answer.points));
+    this.saveError.set('');
+  }
+
+  updateWrongAnswerPoints(event: Event): void {
+    const parsed = this.readInputNumber((event.target as HTMLInputElement).value);
+
+    if (parsed === null) {
+      return;
+    }
+
+    const wrongPoints = Math.min(0, parsed);
+    const incorrectPenalty = -wrongPoints;
+    this.scoring.update((scoring) => ({ ...scoring, penaltyMode: 'points', incorrectPenalty }));
+    this.applySharedPoints((answer) => (answer.correct ? answer.points : wrongPoints));
     this.saveError.set('');
   }
 
@@ -171,17 +258,45 @@ export class QuizCreatePageComponent implements OnDestroy {
 
   toggleCorrectAnswer(answerId: number, event: Event): void {
     const correct = (event.target as HTMLInputElement).checked;
+    const scoring = this.scoring();
+    const rightPoints = scoring.pointsPerCorrect;
+    const wrongPoints = -scoring.incorrectPenalty;
+
     this.updateCurrentQuestionAnswers((answers) =>
-      answers.map((answer) => (answer.id === answerId ? { ...answer, correct } : answer)),
+      answers.map((answer) => {
+        if (answer.id !== answerId) {
+          return answer;
+        }
+
+        if (scoring.mode !== 'custom') {
+          return { ...answer, correct };
+        }
+
+        const stillShared = answer.points === null || answer.points === rightPoints || answer.points === wrongPoints;
+
+        return {
+          ...answer,
+          correct,
+          points: stillShared ? (correct ? rightPoints : wrongPoints) : answer.points,
+        };
+      }),
+    );
+  }
+
+  updateAnswerPoints(answerId: number, event: Event): void {
+    const parsed = this.readInputNumber((event.target as HTMLInputElement).value);
+
+    if (parsed === null) {
+      return;
+    }
+
+    this.updateCurrentQuestionAnswers((answers) =>
+      answers.map((answer) => (answer.id === answerId ? { ...answer, points: parsed } : answer)),
     );
   }
 
   addAnswer(): void {
-    const answer: DraftAnswer = {
-      id: this.nextAnswerId,
-      content: '',
-      correct: false,
-    };
+    const answer = this.blankAnswer();
 
     this.nextAnswerId += 1;
     this.updateCurrentQuestionAnswers((answers) => [...answers, answer]);
@@ -239,6 +354,7 @@ export class QuizCreatePageComponent implements OnDestroy {
     }
 
     this.title.set(this.initialDraft.title);
+    this.scoring.set({ ...this.initialDraft.scoring });
     this.questions.set(this.cloneQuestions(this.initialDraft.questions));
     this.currentIndex.set(this.questions().length - 1);
     this.recalculateNextIds();
@@ -269,7 +385,7 @@ export class QuizCreatePageComponent implements OnDestroy {
           id: this.nextQuestionId,
           content: '',
           image: null,
-          answers: [{ id: this.nextAnswerId, content: '', correct: false }],
+          answers: [this.blankAnswer()],
         },
       ]);
       this.nextQuestionId += 1;
@@ -326,12 +442,14 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.loadError.set('');
     this.saveError.set('');
     this.title.set('');
+    this.scoring.set({ ...NEW_QUIZ_SCORING });
+    this.useDefaultPointsLook.set(true);
     this.questions.set([
       {
         id: 1,
         content: '',
         image: null,
-        answers: [{ id: 1, content: '', correct: false }],
+        answers: [{ id: 1, content: '', correct: false, points: null }],
       },
     ]);
     this.currentIndex.set(0);
@@ -365,10 +483,15 @@ export class QuizCreatePageComponent implements OnDestroy {
         id: answer.id || answerIndex + 1,
         content: answer.content,
         correct: answer.correct,
+        points: typeof answer.points === 'number' && Number.isFinite(answer.points) ? answer.points : null,
       })),
     }));
 
+    const scoring = normalizeQuizScoring(quiz.scoring);
+
     this.title.set(quiz.title);
+    this.scoring.set(scoring);
+    this.useDefaultPointsLook.set(this.isPlainDefaultPoints(scoring));
     this.questions.set(
       questions.length > 0
         ? questions
@@ -377,7 +500,7 @@ export class QuizCreatePageComponent implements OnDestroy {
               id: 1,
               content: '',
               image: null,
-              answers: [{ id: 1, content: '', correct: false }],
+              answers: [{ id: 1, content: '', correct: false, points: null }],
             },
           ],
     );
@@ -387,6 +510,7 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.initialDraft = {
       title: this.title(),
       questions: this.cloneQuestions(this.questions()),
+      scoring: { ...this.scoring() },
     };
   }
 
@@ -443,13 +567,16 @@ export class QuizCreatePageComponent implements OnDestroy {
       return this.getDraftSignature() !== this.initialDraftSignature;
     }
 
+    const scoringChanged = JSON.stringify(this.scoring()) !== JSON.stringify(NEW_QUIZ_SCORING);
+
     return (
+      scoringChanged ||
       this.title().trim().length > 0 ||
       this.questions().some(
         (question) =>
           question.content.trim().length > 0 ||
           question.image ||
-          question.answers.some((answer) => answer.content.trim().length > 0),
+          question.answers.some((answer) => answer.content.trim().length > 0 || answer.points !== null),
       )
     );
   }
@@ -458,22 +585,80 @@ export class QuizCreatePageComponent implements OnDestroy {
     return (
       question.content.trim().length > 0 &&
       question.answers.length > 0 &&
-      question.answers.every((answer) => answer.content.trim().length > 0)
+      question.answers.every(
+        (answer) =>
+          answer.content.trim().length > 0 &&
+          (!this.usesCustomPoints() || (typeof answer.points === 'number' && Number.isFinite(answer.points))),
+      )
     );
   }
 
   private buildCreateDto(): QuizCreateDTO {
+    const scoring = this.scoring();
+
     return {
       title: this.title().trim(),
+      scoring,
       questions: this.questions().map((question) => ({
         content: question.content.trim(),
         image: question.image,
         answers: question.answers.map((answer) => ({
           content: answer.content.trim(),
           correct: answer.correct,
+          points: typeof answer.points === 'number' && Number.isFinite(answer.points) ? answer.points : null,
         })),
       })),
     };
+  }
+
+  private isPlainDefaultPoints(scoring: QuizScoring): boolean {
+    return (
+      scoring.mode === 'default' &&
+      scoring.penaltyMode === 'points' &&
+      scoring.pointsPerCorrect === NEW_QUIZ_SCORING.pointsPerCorrect &&
+      scoring.incorrectPenalty === NEW_QUIZ_SCORING.incorrectPenalty
+    );
+  }
+
+  private blankAnswer(): DraftAnswer {
+    const scoring = this.scoring();
+
+    return {
+      id: this.nextAnswerId,
+      content: '',
+      correct: false,
+      points: scoring.mode === 'custom' ? -scoring.incorrectPenalty : null,
+    };
+  }
+
+  private applySharedPoints(nextPoints: (answer: DraftAnswer) => number | null): void {
+    if (this.scoring().mode !== 'custom') {
+      return;
+    }
+
+    this.questions.update((questions) =>
+      questions.map((question) => ({
+        ...question,
+        answers: question.answers.map((answer) => ({ ...answer, points: nextPoints(answer) })),
+      })),
+    );
+  }
+
+  private suggestedPoints(answer: DraftAnswer, scoring: QuizScoring): number {
+    if (typeof answer.points === 'number' && Number.isFinite(answer.points)) {
+      return answer.points;
+    }
+
+    if (answer.correct) {
+      return scoring.pointsPerCorrect;
+    }
+
+    return -scoring.incorrectPenalty;
+  }
+
+  private readInputNumber(value: string): number | null {
+    const parsed = Number(value.trim().replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   private getDraftSignature(): string {
