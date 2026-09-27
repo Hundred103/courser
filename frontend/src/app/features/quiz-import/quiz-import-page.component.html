@@ -118,7 +118,10 @@
               <p class="template-note">
                 Spakuj folder z plikiem <code>quiz.json</code> w katalogu głównym oraz opcjonalnym folderem
                 <code>images/</code>. W JSON każde pytanie może mieć pole <code>image</code> (np.
-                <code>"image1.jpg"</code>) albo <code>null</code>.
+                <code>"image1.jpg"</code>) albo <code>null</code>. Pole <code>scoring</code> opisuje punktację:
+                tryb <code>default</code> albo <code>custom</code>, karę <code>fraction</code>, <code>points</code> albo
+                <code>percent</code> oraz <code>allowNegativeScore</code>. W trybie custom każda odpowiedź ma własne
+                <code>points</code>.
               </p>
             </div>
             <button class="secondary-button squircle" type="button" (click)="downloadTemplate()">

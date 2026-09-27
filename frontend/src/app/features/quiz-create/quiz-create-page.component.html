@@ -107,7 +107,7 @@
 
           <div class="answers-list">
             @for (answer of question.answers; track answer.id; let answerIndex = $index) {
-              <div class="answer-editor squircle">
+              <div class="answer-editor squircle" [class.with-points]="showPointControls() && usesCustomPoints()">
                 <span class="answer-number">{{ answerIndex + 1 }}</span>
                 <input
                   class="answer-input"
@@ -116,6 +116,18 @@
                   (input)="updateAnswerContent(answer.id, $event)"
                   placeholder="Wpisz odpowiedź"
                 />
+                @if (showPointControls() && usesCustomPoints()) {
+                  <label class="points-field">
+                    <span>Pkt</span>
+                    <input
+                      class="points-input"
+                      type="number"
+                      step="any"
+                      [value]="answer.points ?? 0"
+                      (change)="updateAnswerPoints(answer.id, $event)"
+                    />
+                  </label>
+                }
                 <label class="correct-toggle">
                   <input
                     type="checkbox"
@@ -159,6 +171,71 @@
         </div>
       </section>
     }
+
+    <section class="options-panel squircle">
+      <div class="section-heading">
+        <span>OPCJE</span>
+      </div>
+
+      <label class="option-row">
+        <span>Domyślne punkty</span>
+        <span class="scoring-toggle-control">
+          <input type="checkbox" [checked]="useDefaultPointsLook()" (change)="toggleDefaultPointsLook($event)" />
+          <span class="toggle-track" aria-hidden="true">
+            <span class="toggle-thumb"></span>
+          </span>
+        </span>
+      </label>
+
+      @if (showPointControls()) {
+        @if (!usesCustomPoints()) {
+          <div class="options-points">
+            <label class="scoring-field">
+              <span>Poprawna odpowiedź</span>
+              <input
+                class="scoring-number"
+                type="number"
+                min="0"
+                step="any"
+                [value]="scoring().pointsPerCorrect"
+                (change)="updateCorrectAnswerPoints($event)"
+              />
+            </label>
+            <label class="scoring-field">
+              <span>Błędna odpowiedź</span>
+              <input
+                class="scoring-number"
+                type="number"
+                max="0"
+                step="any"
+                [value]="wrongAnswerPoints()"
+                (change)="updateWrongAnswerPoints($event)"
+              />
+            </label>
+          </div>
+        }
+
+        <label class="option-row">
+          <span>Osobne punkty przy każdej odpowiedzi</span>
+          <span class="scoring-toggle-control">
+            <input type="checkbox" [checked]="usesCustomPoints()" (change)="togglePerAnswerPoints($event)" />
+            <span class="toggle-track" aria-hidden="true">
+              <span class="toggle-thumb"></span>
+            </span>
+          </span>
+        </label>
+      }
+
+      <label class="option-row">
+        <span>Ujemny wynik obniża sumę quizu</span>
+        <span class="scoring-toggle-control">
+          <input type="checkbox" [checked]="scoring().allowNegativeScore" (change)="toggleAllowNegative($event)" />
+          <span class="toggle-track" aria-hidden="true">
+            <span class="toggle-thumb"></span>
+          </span>
+        </span>
+      </label>
+    </section>
 
     @if (saveError()) {
       <p class="status-text error">{{ saveError() }}</p>

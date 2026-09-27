@@ -19,6 +19,7 @@
       @if (currentQuestion(); as question) {
         <div class="question-card squircle">
           <h3>{{ question.content }}</h3>
+          <p class="answer-hint">Możesz zaznaczyć więcej niż jedną odpowiedź.</p>
 
           @if (questionImageSrc(question); as imageSrc) {
             <figure class="question-image squircle">
@@ -38,7 +39,12 @@
                 [class.submitted-answer]="isWrongSubmittedAnswer(question, answer)"
                 [disabled]="currentQuestionChecked() || resultReady()"
                 (click)="selectAnswer(question, answer)">
-                {{ answer.content }}
+                <span class="answer-copy">{{ answer.content }}</span>
+                @if (answerPointsLabel(question, answer); as pointsLabel) {
+                  <span class="answer-points" [class.negative]="(answer.points ?? 0) < 0" [class.positive]="(answer.points ?? 0) > 0">
+                    {{ pointsLabel }}
+                  </span>
+                }
               </button>
             }
           </div>
@@ -128,7 +134,7 @@
 
       @if (resultReady()) {
         <div class="result-box squircle">
-          <p>Wynik: {{ formattedScore() }} / {{ totalQuestions() }}</p>
+          <p>Wynik: {{ formattedScore() }} / {{ formattedMaxScore() }}</p>
           <p>Skuteczność: {{ scorePercent() }}%</p>
 
           @if (isLoggedIn()) {
