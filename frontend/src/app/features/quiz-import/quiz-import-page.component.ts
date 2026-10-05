@@ -2,14 +2,21 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
+import { UNLIMITED_QUIZ_LIMITS } from '../../core/models/quiz-limits.model';
 import { QuizCreateDTO } from '../../core/models/quiz.model';
 import { QuizApiService } from '../../core/services/quiz-api.service';
-import { DEFAULT_QUIZ_SCORING } from '../../core/utils/quiz-scoring.util';
 import { buildQuizZip, normalizeQuiz, parseQuizZip } from '../../core/utils/quiz-zip.util';
 
 const QUIZ_TEMPLATE: QuizCreateDTO = {
   title: 'Przykładowy quiz',
-  scoring: { ...DEFAULT_QUIZ_SCORING },
+  scoring: {
+    mode: 'default',
+    allowNegativeScore: false,
+    pointsPerCorrect: 1,
+    incorrectPenalty: 1,
+    penaltyMode: 'points',
+  },
+  limits: { ...UNLIMITED_QUIZ_LIMITS },
   questions: [
     {
       content: 'Która odpowiedź jest poprawna?',
@@ -40,7 +47,7 @@ export class QuizImportPageComponent {
   private readonly router = inject(Router);
 
   readonly selectedFileName = signal('');
-  readonly activeTab = signal<'file' | 'code'>('file');
+  readonly activeTab = signal<'file' | 'code'>('code');
   readonly importedQuiz = signal<QuizCreateDTO | null>(null);
   readonly validationError = signal('');
   readonly importError = signal('');
@@ -54,6 +61,7 @@ export class QuizImportPageComponent {
     {
       title: QUIZ_TEMPLATE.title,
       scoring: QUIZ_TEMPLATE.scoring,
+      limits: QUIZ_TEMPLATE.limits,
       questions: QUIZ_TEMPLATE.questions.map((question) => ({
         content: question.content,
         image: question.image,
