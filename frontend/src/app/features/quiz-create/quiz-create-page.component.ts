@@ -58,6 +58,8 @@ export class QuizCreatePageComponent implements OnDestroy {
   private quizSaved = false;
   private initialDraftSignature = '';
   private initialDraft: DraftSnapshot | null = null;
+  private rememberedPointPenalty = NEW_QUIZ_SCORING.incorrectPenalty;
+  private rememberedPercentPenalty = 50;
 
   readonly title = signal('');
   readonly scoring = signal<QuizScoring>({ ...NEW_QUIZ_SCORING });
@@ -82,6 +84,7 @@ export class QuizCreatePageComponent implements OnDestroy {
 
   readonly isEditMode = computed(() => this.editingQuizId() !== null);
   readonly usesCustomPoints = computed(() => this.scoring().mode === 'custom');
+  readonly usesPercentPenalty = computed(() => this.scoring().penaltyMode === 'percent');
   readonly showPointControls = computed(() => !this.useDefaultPointsLook());
   readonly wrongAnswerPoints = computed(() => -this.scoring().incorrectPenalty);
   readonly limitsError = computed(() => quizLimitsError(this.limits(), this.questions().length));
@@ -147,12 +150,12 @@ export class QuizCreatePageComponent implements OnDestroy {
     const usePerAnswerPoints = (event.target as HTMLInputElement).checked;
 
     if (!usePerAnswerPoints) {
-      this.scoring.update((scoring) => ({ ...scoring, mode: 'default', penaltyMode: 'points' }));
+      this.scoring.update((scoring) => ({ ...scoring, mode: 'default' }));
       this.saveError.set('');
       return;
     }
 
-    const current = { ...this.scoring(), penaltyMode: 'points' as const };
+    const current = { ...this.scoring() };
     this.questions.update((questions) =>
       questions.map((question) => ({
         ...question,
@@ -210,6 +213,37 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.saveError.set('');
   }
 
+  togglePercentPenalty(event: Event): void {
+    const usePercent = (event.target as HTMLInputElement).checked;
+    const scoring = this.scoring();
+
+    if (usePercent) {
+      if (scoring.penaltyMode !== 'percent') {
+        this.rememberedPointPenalty = scoring.incorrectPenalty;
+      }
+
+      this.scoring.set({
+        ...scoring,
+        mode: 'default',
+        penaltyMode: 'percent',
+        incorrectPenalty: this.rememberedPercentPenalty,
+      });
+    } else {
+      if (scoring.penaltyMode === 'percent') {
+        this.rememberedPercentPenalty = scoring.incorrectPenalty;
+      }
+
+      this.scoring.set({
+        ...scoring,
+        mode: 'default',
+        penaltyMode: 'points',
+        incorrectPenalty: this.rememberedPointPenalty,
+      });
+    }
+
+    this.saveError.set('');
+  }
+
   updateCorrectAnswerPoints(event: Event): void {
     const parsed = this.readInputNumber((event.target as HTMLInputElement).value);
 
@@ -218,7 +252,7 @@ export class QuizCreatePageComponent implements OnDestroy {
     }
 
     const pointsPerCorrect = Math.max(0, parsed);
-    this.scoring.update((scoring) => ({ ...scoring, penaltyMode: 'points', pointsPerCorrect }));
+    this.scoring.update((scoring) => ({ ...scoring, pointsPerCorrect }));
     this.applySharedPoints((answer) => (answer.correct ? pointsPerCorrect : answer.points));
     this.saveError.set('');
   }
@@ -232,8 +266,22 @@ export class QuizCreatePageComponent implements OnDestroy {
 
     const wrongPoints = Math.min(0, parsed);
     const incorrectPenalty = -wrongPoints;
+    this.rememberedPointPenalty = incorrectPenalty;
     this.scoring.update((scoring) => ({ ...scoring, penaltyMode: 'points', incorrectPenalty }));
     this.applySharedPoints((answer) => (answer.correct ? answer.points : wrongPoints));
+    this.saveError.set('');
+  }
+
+  updatePercentPenalty(event: Event): void {
+    const parsed = this.readInputNumber((event.target as HTMLInputElement).value);
+
+    if (parsed === null) {
+      return;
+    }
+
+    const incorrectPenalty = Math.max(0, parsed);
+    this.rememberedPercentPenalty = incorrectPenalty;
+    this.scoring.update((scoring) => ({ ...scoring, mode: 'default', penaltyMode: 'percent', incorrectPenalty }));
     this.saveError.set('');
   }
 
@@ -306,7 +354,7 @@ export class QuizCreatePageComponent implements OnDestroy {
     const correct = (event.target as HTMLInputElement).checked;
     const scoring = this.scoring();
     const rightPoints = scoring.pointsPerCorrect;
-    const wrongPoints = -scoring.incorrectPenalty;
+    const wrongPoints = this.fixedWrongPoints(scoring);
 
     this.updateCurrentQuestionAnswers((answers) =>
       answers.map((answer) => {
@@ -401,6 +449,7 @@ export class QuizCreatePageComponent implements OnDestroy {
 
     this.title.set(this.initialDraft.title);
     this.scoring.set({ ...this.initialDraft.scoring });
+    this.syncRememberedPenalties(this.initialDraft.scoring);
     this.limits.set({ ...this.initialDraft.limits });
     this.questions.set(this.cloneQuestions(this.initialDraft.questions));
     this.currentIndex.set(this.questions().length - 1);
@@ -490,6 +539,8 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.saveError.set('');
     this.title.set('');
     this.scoring.set({ ...NEW_QUIZ_SCORING });
+    this.rememberedPointPenalty = NEW_QUIZ_SCORING.incorrectPenalty;
+    this.rememberedPercentPenalty = 50;
     this.limits.set({ ...UNLIMITED_QUIZ_LIMITS });
     this.useDefaultPointsLook.set(true);
     this.questions.set([
@@ -539,6 +590,7 @@ export class QuizCreatePageComponent implements OnDestroy {
 
     this.title.set(quiz.title);
     this.scoring.set(scoring);
+    this.syncRememberedPenalties(scoring);
     this.limits.set(normalizeQuizLimits(quiz.limits));
     this.useDefaultPointsLook.set(this.isPlainDefaultPoints(scoring));
     this.questions.set(
@@ -680,8 +732,24 @@ export class QuizCreatePageComponent implements OnDestroy {
       id: this.nextAnswerId,
       content: '',
       correct: false,
-      points: scoring.mode === 'custom' ? -scoring.incorrectPenalty : null,
+      points: scoring.mode === 'custom' ? this.fixedWrongPoints(scoring) : null,
     };
+  }
+
+  private fixedWrongPoints(scoring: QuizScoring): number {
+    const magnitude = scoring.penaltyMode === 'percent' ? this.rememberedPointPenalty : scoring.incorrectPenalty;
+    return -Math.max(0, magnitude);
+  }
+
+  private syncRememberedPenalties(scoring: QuizScoring): void {
+    if (scoring.penaltyMode === 'percent') {
+      this.rememberedPercentPenalty = scoring.incorrectPenalty;
+      return;
+    }
+
+    if (scoring.penaltyMode === 'points') {
+      this.rememberedPointPenalty = scoring.incorrectPenalty;
+    }
   }
 
   private applySharedPoints(nextPoints: (answer: DraftAnswer) => number | null): void {
@@ -706,7 +774,7 @@ export class QuizCreatePageComponent implements OnDestroy {
       return scoring.pointsPerCorrect;
     }
 
-    return -scoring.incorrectPenalty;
+    return this.fixedWrongPoints(scoring);
   }
 
   private readInputNumber(value: string): number | null {

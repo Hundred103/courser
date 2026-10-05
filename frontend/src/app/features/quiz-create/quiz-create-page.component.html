@@ -209,7 +209,17 @@
 
       @if (showPointControls()) {
         @if (!usesCustomPoints()) {
-          <div class="options-points">
+          <label class="option-row">
+            <span>Kara procentowa</span>
+            <span class="scoring-toggle-control">
+              <input type="checkbox" [checked]="usesPercentPenalty()" (change)="togglePercentPenalty($event)" />
+              <span class="toggle-track" aria-hidden="true">
+                <span class="toggle-thumb"></span>
+              </span>
+            </span>
+          </label>
+
+          <div class="options-points" [class.with-note]="usesPercentPenalty()">
             <label class="scoring-field">
               <span>Poprawna odpowiedź</span>
               <input
@@ -221,18 +231,39 @@
                 (change)="updateCorrectAnswerPoints($event)"
               />
             </label>
-            <label class="scoring-field">
-              <span>Błędna odpowiedź</span>
-              <input
-                class="scoring-number"
-                type="number"
-                max="0"
-                step="any"
-                [value]="wrongAnswerPoints()"
-                (change)="updateWrongAnswerPoints($event)"
-              />
-            </label>
+            @if (usesPercentPenalty()) {
+              <label class="scoring-field">
+                <span>Procent kary</span>
+                <span class="scoring-number-wrap">
+                  <input
+                    class="scoring-number"
+                    type="number"
+                    min="0"
+                    step="any"
+                    [value]="scoring().incorrectPenalty"
+                    (change)="updatePercentPenalty($event)"
+                  />
+                  <span class="scoring-suffix" aria-hidden="true">%</span>
+                </span>
+              </label>
+            } @else {
+              <label class="scoring-field">
+                <span>Błędna odpowiedź</span>
+                <input
+                  class="scoring-number"
+                  type="number"
+                  max="0"
+                  step="any"
+                  [value]="wrongAnswerPoints()"
+                  (change)="updateWrongAnswerPoints($event)"
+                />
+              </label>
+            }
           </div>
+
+          @if (usesPercentPenalty()) {
+            <p class="penalty-note">Każda błędna odpowiedź odejmuje ten procent punktów zdobytych za poprawne.</p>
+          }
         }
 
         <label class="option-row">

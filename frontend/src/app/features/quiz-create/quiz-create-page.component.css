@@ -53,6 +53,38 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+  padding: 0.15rem 0 1.05rem;
+}
+
+.options-points.with-note {
+  padding-bottom: 0.45rem;
+}
+
+.penalty-note {
+  margin: 0;
+  padding: 0 0 1.05rem;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.scoring-number-wrap {
+  position: relative;
+}
+
+.scoring-number-wrap .scoring-number {
+  padding-right: 2rem;
+}
+
+.scoring-suffix {
+  position: absolute;
+  top: 50%;
+  right: 0.85rem;
+  color: var(--text-soft);
+  font-weight: 800;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .option-row {
