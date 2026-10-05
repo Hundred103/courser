@@ -246,44 +246,42 @@
         </label>
       }
 
-      <div class="options-limits">
-        <label class="scoring-field">
-          <span>Liczba podejść</span>
-          <input
-            class="scoring-number"
-            type="number"
-            min="1"
-            step="1"
-            placeholder="bez limitu"
-            [value]="limits().maxAttempts ?? ''"
-            (change)="updateLimit('maxAttempts', $event)"
-          />
-        </label>
-        <label class="scoring-field">
-          <span>Czas quizu (s)</span>
-          <input
-            class="scoring-number"
-            type="number"
-            min="1"
-            step="1"
-            placeholder="bez limitu"
-            [value]="limits().quizTimeSeconds ?? ''"
-            (change)="updateLimit('quizTimeSeconds', $event)"
-          />
-        </label>
-        <label class="scoring-field">
-          <span>Czas pytania (s)</span>
-          <input
-            class="scoring-number"
-            type="number"
-            min="1"
-            step="1"
-            placeholder="bez limitu"
-            [value]="limits().questionTimeSeconds ?? ''"
-            (change)="updateLimit('questionTimeSeconds', $event)"
-          />
-        </label>
-      </div>
+      <label class="option-row">
+        <span>Liczba podejść</span>
+        <input
+          class="option-limit-input"
+          type="text"
+          inputmode="numeric"
+          placeholder="bez limitu"
+          [value]="limits().maxAttempts ?? ''"
+          (keydown)="blockDecimalKey($event)"
+          (input)="updateLimit('maxAttempts', $event)"
+        />
+      </label>
+      <label class="option-row">
+        <span>Czas quizu (s)</span>
+        <input
+          class="option-limit-input"
+          type="text"
+          inputmode="numeric"
+          placeholder="bez limitu"
+          [value]="limits().quizTimeSeconds ?? ''"
+          (keydown)="blockDecimalKey($event)"
+          (input)="updateLimit('quizTimeSeconds', $event)"
+        />
+      </label>
+      <label class="option-row">
+        <span>Czas pytania (s)</span>
+        <input
+          class="option-limit-input"
+          type="text"
+          inputmode="numeric"
+          placeholder="bez limitu"
+          [value]="limits().questionTimeSeconds ?? ''"
+          (keydown)="blockDecimalKey($event)"
+          (input)="updateLimit('questionTimeSeconds', $event)"
+        />
+      </label>
 
       @if (limitsError()) {
         <p class="status-text error">{{ limitsError() }}</p>

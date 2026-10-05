@@ -172,17 +172,31 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.saveError.set('');
   }
 
-  updateLimit(field: 'maxAttempts' | 'quizTimeSeconds' | 'questionTimeSeconds', event: Event): void {
-    const raw = (event.target as HTMLInputElement).value.trim();
+  blockDecimalKey(event: KeyboardEvent): void {
+    if (['.', ',', 'e', 'E', '+', '-'].includes(event.key)) {
+      event.preventDefault();
+    }
+  }
 
-    if (raw === '') {
+  updateLimit(field: 'maxAttempts' | 'quizTimeSeconds' | 'questionTimeSeconds', event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const digits = input.value.replace(/\D/g, '');
+
+    if (input.value !== digits) {
+      input.value = digits;
+    }
+
+    if (digits === '') {
       this.limits.update((limits) => ({ ...limits, [field]: null }));
       this.saveError.set('');
       return;
     }
 
-    const parsed = Number(raw);
+    const parsed = Number(digits);
+
     if (!Number.isInteger(parsed) || parsed <= 0) {
+      input.value = '';
+      this.limits.update((limits) => ({ ...limits, [field]: null }));
       return;
     }
 
