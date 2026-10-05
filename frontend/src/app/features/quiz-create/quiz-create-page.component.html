@@ -107,7 +107,7 @@
 
           <div class="answers-list">
             @for (answer of question.answers; track answer.id; let answerIndex = $index) {
-              <div class="answer-editor squircle">
+              <div class="answer-editor squircle" [class.with-points]="showPointControls() && usesCustomPoints()">
                 <span class="answer-number">{{ answerIndex + 1 }}</span>
                 <input
                   class="answer-input"
@@ -116,6 +116,18 @@
                   (input)="updateAnswerContent(answer.id, $event)"
                   placeholder="Wpisz odpowiedź"
                 />
+                @if (showPointControls() && usesCustomPoints()) {
+                  <label class="points-field">
+                    <span>Pkt</span>
+                    <input
+                      class="points-input"
+                      type="number"
+                      step="any"
+                      [value]="answer.points ?? 0"
+                      (change)="updateAnswerPoints(answer.id, $event)"
+                    />
+                  </label>
+                }
                 <label class="correct-toggle">
                   <input
                     type="checkbox"
@@ -159,6 +171,163 @@
         </div>
       </section>
     }
+
+    <section class="options-panel squircle">
+      <div class="section-heading">
+        <span>OPCJE</span>
+      </div>
+
+      <label class="option-row">
+        <span>Losowa kolejność pytań</span>
+        <span class="scoring-toggle-control">
+          <input type="checkbox" [checked]="limits().randomQuestionOrder" (change)="updateLimitFlag('randomQuestionOrder', $event)" />
+          <span class="toggle-track" aria-hidden="true">
+            <span class="toggle-thumb"></span>
+          </span>
+        </span>
+      </label>
+
+      <label class="option-row">
+        <span>Pokaż poprawne odpowiedzi</span>
+        <span class="scoring-toggle-control">
+          <input type="checkbox" [checked]="limits().showCorrectAnswers" (change)="updateLimitFlag('showCorrectAnswers', $event)" />
+          <span class="toggle-track" aria-hidden="true">
+            <span class="toggle-thumb"></span>
+          </span>
+        </span>
+      </label>
+
+      <label class="option-row">
+        <span>Domyślne punkty</span>
+        <span class="scoring-toggle-control">
+          <input type="checkbox" [checked]="useDefaultPointsLook()" (change)="toggleDefaultPointsLook($event)" />
+          <span class="toggle-track" aria-hidden="true">
+            <span class="toggle-thumb"></span>
+          </span>
+        </span>
+      </label>
+
+      @if (showPointControls()) {
+        @if (!usesCustomPoints()) {
+          <label class="option-row">
+            <span>Kara procentowa</span>
+            <span class="scoring-toggle-control">
+              <input type="checkbox" [checked]="usesPercentPenalty()" (change)="togglePercentPenalty($event)" />
+              <span class="toggle-track" aria-hidden="true">
+                <span class="toggle-thumb"></span>
+              </span>
+            </span>
+          </label>
+
+          <div class="options-points" [class.with-note]="usesPercentPenalty()">
+            <label class="scoring-field">
+              <span>Poprawna odpowiedź</span>
+              <input
+                class="scoring-number"
+                type="number"
+                min="0"
+                step="any"
+                [value]="scoring().pointsPerCorrect"
+                (change)="updateCorrectAnswerPoints($event)"
+              />
+            </label>
+            @if (usesPercentPenalty()) {
+              <label class="scoring-field">
+                <span>Procent kary</span>
+                <span class="scoring-number-wrap">
+                  <input
+                    class="scoring-number"
+                    type="number"
+                    min="0"
+                    step="any"
+                    [value]="scoring().incorrectPenalty"
+                    (change)="updatePercentPenalty($event)"
+                  />
+                  <span class="scoring-suffix" aria-hidden="true">%</span>
+                </span>
+              </label>
+            } @else {
+              <label class="scoring-field">
+                <span>Błędna odpowiedź</span>
+                <input
+                  class="scoring-number"
+                  type="number"
+                  max="0"
+                  step="any"
+                  [value]="wrongAnswerPoints()"
+                  (change)="updateWrongAnswerPoints($event)"
+                />
+              </label>
+            }
+          </div>
+
+          @if (usesPercentPenalty()) {
+            <p class="penalty-note">Każda błędna odpowiedź odejmuje ten procent punktów zdobytych za poprawne.</p>
+          }
+        }
+
+        <label class="option-row">
+          <span>Osobne punkty przy każdej odpowiedzi</span>
+          <span class="scoring-toggle-control">
+            <input type="checkbox" [checked]="usesCustomPoints()" (change)="togglePerAnswerPoints($event)" />
+            <span class="toggle-track" aria-hidden="true">
+              <span class="toggle-thumb"></span>
+            </span>
+          </span>
+        </label>
+      }
+
+      <label class="option-row">
+        <span>Liczba podejść</span>
+        <input
+          class="option-limit-input"
+          type="text"
+          inputmode="numeric"
+          placeholder="bez limitu"
+          [value]="limits().maxAttempts ?? ''"
+          (keydown)="blockDecimalKey($event)"
+          (input)="updateLimit('maxAttempts', $event)"
+        />
+      </label>
+      <label class="option-row">
+        <span>Czas quizu (s)</span>
+        <input
+          class="option-limit-input"
+          type="text"
+          inputmode="numeric"
+          placeholder="bez limitu"
+          [value]="limits().quizTimeSeconds ?? ''"
+          (keydown)="blockDecimalKey($event)"
+          (input)="updateLimit('quizTimeSeconds', $event)"
+        />
+      </label>
+      <label class="option-row">
+        <span>Czas pytania (s)</span>
+        <input
+          class="option-limit-input"
+          type="text"
+          inputmode="numeric"
+          placeholder="bez limitu"
+          [value]="limits().questionTimeSeconds ?? ''"
+          (keydown)="blockDecimalKey($event)"
+          (input)="updateLimit('questionTimeSeconds', $event)"
+        />
+      </label>
+
+      @if (limitsError()) {
+        <p class="status-text error">{{ limitsError() }}</p>
+      }
+
+      <label class="option-row">
+        <span>Ujemny wynik obniża sumę quizu</span>
+        <span class="scoring-toggle-control">
+          <input type="checkbox" [checked]="scoring().allowNegativeScore" (change)="toggleAllowNegative($event)" />
+          <span class="toggle-track" aria-hidden="true">
+            <span class="toggle-thumb"></span>
+          </span>
+        </span>
+      </label>
+    </section>
 
     @if (saveError()) {
       <p class="status-text error">{{ saveError() }}</p>

@@ -8,20 +8,20 @@
       <button
         type="button"
         role="tab"
-        [attr.aria-selected]="activeTab() === 'file'"
-        [class.active]="activeTab() === 'file'"
-        (click)="showFileTab()"
-      >
-        Dodaj quiz z pliku
-      </button>
-      <button
-        type="button"
-        role="tab"
         [attr.aria-selected]="activeTab() === 'code'"
         [class.active]="activeTab() === 'code'"
         (click)="showCodeTab()"
       >
         Dodaj quiz przez kod
+      </button>
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'file'"
+        [class.active]="activeTab() === 'file'"
+        (click)="showFileTab()"
+      >
+        Dodaj quiz z pliku
       </button>
     </div>
 
@@ -118,7 +118,9 @@
               <p class="template-note">
                 Spakuj folder z plikiem <code>quiz.json</code> w katalogu głównym oraz opcjonalnym folderem
                 <code>images/</code>. W JSON każde pytanie może mieć pole <code>image</code> (np.
-                <code>"image1.jpg"</code>) albo <code>null</code>.
+                <code>"image1.jpg"</code>) albo <code>null</code>. Pole <code>scoring</code> opisuje punktację, a
+                <code>limits</code> ustawienia: liczbę podejść, czas quizu, czas pytania,
+                <code>randomQuestionOrder</code> i <code>showCorrectAnswers</code>. Puste limity czasu i podejść oznaczają brak limitu.
               </p>
             </div>
             <button class="secondary-button squircle" type="button" (click)="downloadTemplate()">

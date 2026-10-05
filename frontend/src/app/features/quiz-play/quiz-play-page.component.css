@@ -73,8 +73,19 @@
   gap: 0.65rem;
 }
 
+.answer-hint {
+  margin: 0.35rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
 .answer-row {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   width: 100%;
   cursor: pointer;
   padding: 0.75rem 0.9rem 0.75rem 3rem;
@@ -84,6 +95,24 @@
   font-weight: 700;
   text-align: left;
   background: rgba(255, 255, 255, 0.02);
+}
+
+.answer-copy {
+  min-width: 0;
+}
+
+.answer-points {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+}
+
+.answer-points.positive {
+  color: var(--success-text);
+}
+
+.answer-points.negative {
+  color: var(--danger-text);
 }
 
 .answer-row::before {
@@ -151,6 +180,23 @@
   box-shadow:
     0 0 14px rgba(248, 113, 113, 0.28),
     0 0 28px rgba(239, 68, 68, 0.18);
+}
+
+.quiz-timer,
+.question-timer {
+  margin: 0.2rem 0 0;
+  font-weight: 900;
+}
+
+.quiz-timer.ending,
+.question-timer.ending,
+.timer-warning {
+  color: var(--danger-text);
+}
+
+.timer-warning {
+  margin: 0.35rem 0 0;
+  font-weight: 800;
 }
 
 .question-score-slot {

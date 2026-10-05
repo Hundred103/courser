@@ -277,27 +277,31 @@
         <h3 id="quiz-settings-title">{{ quizToStart.title }}</h3>
       </header>
 
-      <section class="settings-section" aria-label="Opcje quizu">
-        <label class="setting-row">
-          <input
-            type="checkbox"
-            [checked]="randomQuestionsEnabled()"
-            (change)="updateRandomQuestions($event)"
-          />
-          <span class="toggle-track" aria-hidden="true">
-            <span class="toggle-thumb"></span>
-          </span>
-          <span class="setting-copy">
-            <strong>Losowa kolejność pytań</strong>
-          </span>
-        </label>
-      </section>
+      @if (startInfo(); as info) {
+        <section class="start-facts" aria-label="Informacje o quizie">
+          <p>Liczba pytań: {{ info.questionCount }}</p>
+          @if (info.quizTimeSeconds != null) {
+            <p>Czas quizu: {{ formatLimitSeconds(info.quizTimeSeconds) }}</p>
+          }
+          @if (info.questionTimeSeconds != null) {
+            <p>Czas pytania: {{ formatLimitSeconds(info.questionTimeSeconds) }}</p>
+          }
+          <p>Podejścia: {{ attemptsLabel(info) }}</p>
+          @if (!canStartQuiz(info)) {
+            <p class="start-limit">Limit podejść został wykorzystany.</p>
+          }
+        </section>
+      } @else if (startInfoError()) {
+        <p class="start-limit">{{ startInfoError() }}</p>
+      } @else {
+        <p>Ładowanie...</p>
+      }
 
       <div class="confirm-actions settings-actions">
         <button class="secondary-button squircle" type="button" (click)="cancelStartQuiz()">
           Anuluj
         </button>
-        <button class="primary-button squircle" type="button" (click)="startQuiz()">
+        <button class="primary-button squircle" type="button" [disabled]="!canStartQuiz(startInfo())" (click)="startQuiz()">
           Rozwiąż
         </button>
       </div>

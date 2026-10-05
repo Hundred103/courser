@@ -1,14 +1,17 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnDestroy, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, map, of, startWith, switchMap } from 'rxjs';
 import { AnswerPlayDTO } from '../../core/models/answer.model';
+import { limitsAreActive, normalizeQuizLimits } from '../../core/models/quiz-limits.model';
 import { QuestionPlayDTO } from '../../core/models/question.model';
 import { QuizPlayDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
-import { QuizApiService } from '../../core/services/quiz-api.service';
+import { AttemptStateResponse, QuizApiService } from '../../core/services/quiz-api.service';
 import { QuizScoreService } from '../../core/services/quiz-score.service';
 import { toImageSrc } from '../../core/utils/image-compression.util';
+import { awardedQuestionScore, normalizeQuizScoring, questionMaxScore } from '../../core/utils/quiz-scoring.util';
 
 type QuizState =
   | { status: 'loading'; quiz: null; errorMessage: '' }
@@ -21,7 +24,7 @@ type QuizState =
   templateUrl: './quiz-play-page.component.html',
   styleUrl: './quiz-play-page.component.css',
 })
-export class QuizPlayPageComponent {
+export class QuizPlayPageComponent implements OnDestroy {
   private readonly quizApiService = inject(QuizApiService);
   private readonly authService = inject(AuthService);
   private readonly quizScoreService = inject(QuizScoreService);
@@ -31,6 +34,14 @@ export class QuizPlayPageComponent {
   private currentRandomQuestions: boolean | null = null;
   private exitDecision: ((canLeave: boolean) => void) | null = null;
   private exitDecisionPromise: Promise<boolean> | null = null;
+  private tickHandle: number | null = null;
+  private pollHandle: number | null = null;
+  private quizDeadlineLocal: number | null = null;
+  private questionDeadlineLocal: number | null = null;
+  private endingWarningMs = 10_000;
+  private openingQuestionId: number | null = null;
+  private submittingQuestionIds = new Set<number>();
+  private quizAutoFinished = false;
 
   private readonly quizState = toSignal(
     this.route.paramMap.pipe(
@@ -81,13 +92,20 @@ export class QuizPlayPageComponent {
   readonly resultReady = signal(false);
   readonly resultSaved = signal(false);
   readonly resultSaveError = signal<string | null>(null);
+  readonly attemptId = signal<number | null>(null);
+  readonly playBlockMessage = signal<string | null>(null);
+  readonly cheatingMessage = signal<string | null>(null);
+  readonly quizRemainingMs = signal<number | null>(null);
+  readonly questionRemainingMs = signal<number | null>(null);
+  readonly quizEndingSoon = signal(false);
+  readonly questionEndingSoon = signal(false);
   readonly showIncompleteConfirm = signal(false);
   readonly showExitConfirm = signal(false);
   readonly activeSelectedQuestionId = signal<number | null>(null);
-  readonly randomQuestions = toSignal(
-    this.route.queryParamMap.pipe(map((params) => params.get('randomQuestions') === 'true')),
-    { initialValue: false },
-  );
+  readonly showAnswerFeedback = computed(() => {
+    const showCorrect = normalizeQuizLimits(this.quiz()?.limits).showCorrectAnswers;
+    return showCorrect || this.resultReady();
+  });
 
   readonly quiz = computed(() => this.quizState().quiz);
   readonly isLoading = computed(() => this.quizState().status === 'loading');
@@ -119,24 +137,32 @@ export class QuizPlayPageComponent {
       !this.currentQuestionChecked()
     );
   });
+  readonly scoring = computed(() => normalizeQuizScoring(this.quiz()?.scoring));
   readonly score = computed(() => {
     const submittedAnswers = this.submittedAnswers();
+    const scoring = this.scoring();
 
     return this.questions().reduce(
-      (totalScore, question) => totalScore + this.calculateQuestionScore(question, submittedAnswers[question.id] ?? []),
+      (totalScore, question) =>
+        totalScore + awardedQuestionScore(question.answers, submittedAnswers[question.id] ?? [], scoring),
       0,
     );
   });
+  readonly maxScore = computed(() =>
+    this.questions().reduce((total, question) => total + questionMaxScore(question.answers, this.scoring()), 0),
+  );
   readonly formattedScore = computed(() => this.formatScore(this.score()));
+  readonly formattedMaxScore = computed(() => this.formatScore(this.maxScore()));
+  readonly formattedQuizTime = computed(() => this.formatDuration(this.quizRemainingMs()));
+  readonly formattedQuestionTime = computed(() => this.formatDuration(this.questionRemainingMs()));
   readonly scorePercent = computed(() => {
-    const total = this.totalQuestions();
-    return total === 0 ? 0 : Math.round((this.score() / total) * 100);
+    const maxScore = this.maxScore();
+    return maxScore === 0 ? 0 : Math.round((this.score() / maxScore) * 100);
   });
 
   constructor() {
     effect(() => {
       const quiz = this.quiz();
-      const randomQuestions = this.randomQuestions();
 
       if (!quiz) {
         this.questions.set([]);
@@ -145,12 +171,33 @@ export class QuizPlayPageComponent {
         return;
       }
 
-      if (quiz.id !== this.currentQuizId || randomQuestions !== this.currentRandomQuestions) {
+      if (quiz.id !== this.currentQuizId) {
         this.currentQuizId = quiz.id;
-        this.currentRandomQuestions = randomQuestions;
-        this.questions.set(this.prepareQuestions(quiz.questions, randomQuestions));
+        this.currentRandomQuestions = null;
+        this.questions.set(this.prepareQuestions(quiz.questions, normalizeQuizLimits(quiz.limits).randomQuestionOrder));
         this.resetQuizProgress();
+        this.beginTimedAttempt(quiz);
       }
+    });
+
+    effect(() => {
+      const attemptId = this.attemptId();
+      const question = this.currentQuestion();
+      const quiz = this.quiz();
+
+      if (!attemptId || !question || !quiz || this.playBlockMessage() || this.cheatingMessage() || this.resultReady()) {
+        return;
+      }
+
+      if (this.openingQuestionId === question.id || this.checkedQuestions().has(question.id)) {
+        return;
+      }
+
+      this.openingQuestionId = question.id;
+      this.quizApiService.openAttemptQuestion(quiz.id, attemptId, question.id).subscribe({
+        next: (state) => this.applyServerClock(state),
+        error: (error) => this.handleAttemptError(error),
+      });
     });
 
     effect(() => {
@@ -171,22 +218,43 @@ export class QuizPlayPageComponent {
         return;
       }
 
+      if (this.cheatingMessage()) {
+        this.resultSaved.set(true);
+        this.resultSaveError.set(this.cheatingMessage());
+        return;
+      }
+
+      const limits = normalizeQuizLimits(quiz.limits);
+      const attemptId = this.attemptId();
+
+      if (limitsAreActive(limits) && !attemptId) {
+        return;
+      }
+
       this.resultSaved.set(true);
       this.resultSaveError.set(null);
+      const scaledMax = Math.max(0, this.quizScoreService.toScaledScore(this.maxScore()));
+      let scaledScore = this.quizScoreService.toScaledScore(this.score());
 
-      this.quizScoreService
-        .saveQuizResult({
-          quizId: quiz.id,
-          score: this.quizScoreService.toScaledScore(this.score()),
-          maxScore: totalQuestions * 100,
-        })
-        .subscribe({
-          error: () => {
-            this.resultSaved.set(false);
-            this.resultSaveError.set('Nie udało się zapisać wyniku.');
-          },
+      if (scaledScore > scaledMax) {
+        scaledScore = scaledMax;
+      }
+
+      if (limitsAreActive(limits) && attemptId) {
+
+        this.quizApiService.finishAttempt(quiz.id, attemptId).subscribe({
+          next: () => this.persistScore(quiz.id, scaledScore, scaledMax, attemptId),
+          error: (error) => this.handleSaveError(error),
         });
+        return;
+      }
+
+      this.persistScore(quiz.id, scaledScore, scaledMax, null);
     });
+  }
+
+  ngOnDestroy(): void {
+    this.stopTimers();
   }
 
   selectAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): void {
@@ -285,6 +353,19 @@ export class QuizPlayPageComponent {
     this.showIncompleteConfirm.set(false);
     this.showExitConfirm.set(false);
     this.activeSelectedQuestionId.set(null);
+    this.attemptId.set(null);
+    this.playBlockMessage.set(null);
+    this.cheatingMessage.set(null);
+    this.quizRemainingMs.set(null);
+    this.questionRemainingMs.set(null);
+    this.quizEndingSoon.set(false);
+    this.questionEndingSoon.set(false);
+    this.quizDeadlineLocal = null;
+    this.questionDeadlineLocal = null;
+    this.openingQuestionId = null;
+    this.submittingQuestionIds.clear();
+    this.quizAutoFinished = false;
+    this.stopTimers();
   }
 
   private prepareQuestions(questions: QuestionPlayDTO[], randomQuestions: boolean): QuestionPlayDTO[] {
@@ -307,13 +388,40 @@ export class QuizPlayPageComponent {
     return shuffled;
   }
 
-  private finishCurrentQuestionCheck(question: QuestionPlayDTO): void {
+  private finishCurrentQuestionCheck(question: QuestionPlayDTO, allowEmpty = false): void {
     const selectedAnswerIds = this.selectedAnswers()[question.id] ?? [];
 
-    if (selectedAnswerIds.length === 0) {
+    if ((selectedAnswerIds.length === 0 && !allowEmpty) || this.checkedQuestions().has(question.id)) {
       return;
     }
 
+    const attemptId = this.attemptId();
+    const quiz = this.quiz();
+
+    if (attemptId && quiz && limitsAreActive(normalizeQuizLimits(quiz.limits))) {
+      if (this.submittingQuestionIds.has(question.id)) {
+        return;
+      }
+
+      this.submittingQuestionIds.add(question.id);
+      // QUIZ_ANSWERS_IN: send the player's selected answer ids
+      this.quizApiService.submitAttemptAnswers(quiz.id, attemptId, question.id, selectedAnswerIds).subscribe({
+        next: () => {
+          this.submittingQuestionIds.delete(question.id);
+          this.applyLocalCheck(question, selectedAnswerIds);
+        },
+        error: (error) => {
+          this.submittingQuestionIds.delete(question.id);
+          this.handleAttemptError(error);
+        },
+      });
+      return;
+    }
+
+    this.applyLocalCheck(question, selectedAnswerIds);
+  }
+
+  private applyLocalCheck(question: QuestionPlayDTO, selectedAnswerIds: number[]): void {
     this.submittedAnswers.update((answers) => ({
       ...answers,
       [question.id]: selectedAnswerIds,
@@ -325,9 +433,217 @@ export class QuizPlayPageComponent {
       return next;
     });
 
-    if (!this.canGoNext()) {
+    if (this.quizAutoFinished || !this.canGoNext()) {
       this.resultReady.set(true);
+      this.stopTimers();
     }
+  }
+
+  private beginTimedAttempt(quiz: QuizPlayDTO): void {
+    const limits = normalizeQuizLimits(quiz.limits);
+
+    if (!limitsAreActive(limits)) {
+      return;
+    }
+
+    if (!this.authService.user() || quiz.id < 0) {
+      this.playBlockMessage.set('Żeby rozwiązać quiz z limitem czasu lub podejść, zaloguj się.');
+      return;
+    }
+
+    this.quizApiService.startAttempt(quiz.id).subscribe({
+      next: (state) => {
+        this.attemptId.set(state.attemptId);
+        this.applyServerClock(state);
+        this.startTimerLoops(quiz.id);
+      },
+      error: (error) => {
+        this.playBlockMessage.set(this.readErrorMessage(error));
+      },
+    });
+  }
+
+  private startTimerLoops(quizId: number): void {
+    this.stopTimers();
+    this.tickHandle = window.setInterval(() => this.tickTimers(), 200);
+    this.pollHandle = window.setInterval(() => this.pollAttempt(quizId), 1000);
+  }
+
+  private stopTimers(): void {
+    if (this.tickHandle != null) {
+      window.clearInterval(this.tickHandle);
+      this.tickHandle = null;
+    }
+
+    if (this.pollHandle != null) {
+      window.clearInterval(this.pollHandle);
+      this.pollHandle = null;
+    }
+  }
+
+  private pollAttempt(quizId: number): void {
+    const attemptId = this.attemptId();
+
+    if (!attemptId || this.resultReady() || this.cheatingMessage()) {
+      return;
+    }
+
+    this.quizApiService.attemptState(quizId, attemptId, this.currentQuestion()?.id).subscribe({
+      next: (state) => {
+        this.applyServerClock(state);
+        if (state.quizExpired) {
+          this.expireQuiz();
+        } else if (state.questionExpired) {
+          this.expireQuestion();
+        }
+      },
+    });
+  }
+
+  private applyServerClock(state: AttemptStateResponse): void {
+    this.endingWarningMs = state.endingWarningSeconds * 1000;
+    this.quizDeadlineLocal = state.quizRemainingMillis == null ? null : Date.now() + state.quizRemainingMillis;
+    this.questionDeadlineLocal = state.questionRemainingMillis == null ? null : Date.now() + state.questionRemainingMillis;
+    this.tickTimers();
+  }
+
+  private tickTimers(): void {
+    if (this.resultReady() || this.cheatingMessage()) {
+      return;
+    }
+
+    const now = Date.now();
+
+    if (this.quizDeadlineLocal != null) {
+      const left = this.quizDeadlineLocal - now;
+      this.quizRemainingMs.set(Math.max(0, left));
+      this.quizEndingSoon.set(left > 0 && left <= this.endingWarningMs);
+      if (left <= 0) {
+        this.expireQuiz();
+      }
+    } else {
+      this.quizRemainingMs.set(null);
+      this.quizEndingSoon.set(false);
+    }
+
+    if (this.questionDeadlineLocal != null) {
+      const left = this.questionDeadlineLocal - now;
+      this.questionRemainingMs.set(Math.max(0, left));
+      this.questionEndingSoon.set(left > 0 && left <= this.endingWarningMs);
+      if (left <= 0) {
+        this.expireQuestion();
+      }
+    } else {
+      this.questionRemainingMs.set(null);
+      this.questionEndingSoon.set(false);
+    }
+  }
+
+  private expireQuestion(): void {
+    if (this.quizAutoFinished || this.cheatingMessage()) {
+      return;
+    }
+
+    const question = this.currentQuestion();
+
+    if (!question || this.checkedQuestions().has(question.id)) {
+      return;
+    }
+
+    this.finishCurrentQuestionCheck(question, true);
+  }
+
+  private expireQuiz(): void {
+    if (this.quizAutoFinished || this.resultReady() || this.cheatingMessage()) {
+      return;
+    }
+
+    this.quizAutoFinished = true;
+    const question = this.currentQuestion();
+
+    if (question && !this.checkedQuestions().has(question.id)) {
+      this.finishCurrentQuestionCheck(question, true);
+      return;
+    }
+
+    this.resultReady.set(true);
+    this.stopTimers();
+  }
+
+  private persistScore(quizId: number, score: number, maxScore: number, attemptId: number | null): void {
+    this.quizScoreService
+      .saveQuizResult({
+        quizId,
+        score,
+        maxScore,
+        attemptId,
+      })
+      .subscribe({
+        error: (error) => this.handleSaveError(error),
+      });
+  }
+
+  private handleSaveError(error: unknown): void {
+    const message = this.readErrorMessage(error);
+
+    if (message.startsWith('Oszustwo')) {
+      this.cheatingMessage.set(message);
+      this.resultSaveError.set(message);
+      this.stopTimers();
+      return;
+    }
+
+    this.resultSaved.set(false);
+    this.resultSaveError.set(message);
+  }
+
+  private handleAttemptError(error: unknown): void {
+    const message = this.readErrorMessage(error);
+
+    if (message.startsWith('Oszustwo') || message.startsWith('Wykorzystano')) {
+      this.cheatingMessage.set(message.startsWith('Oszustwo') ? message : null);
+      this.playBlockMessage.set(message.startsWith('Wykorzystano') ? message : this.playBlockMessage());
+      if (message.startsWith('Oszustwo')) {
+        this.resultReady.set(true);
+        this.resultSaveError.set(message);
+        this.resultSaved.set(true);
+      }
+      this.stopTimers();
+      return;
+    }
+
+    if (this.quizAutoFinished) {
+      this.resultReady.set(true);
+      this.stopTimers();
+    }
+  }
+
+  private readErrorMessage(error: unknown): string {
+    if (error instanceof HttpErrorResponse) {
+      if (typeof error.error === 'string' && error.error.trim()) {
+        return error.error;
+      }
+
+      if (error.error && typeof error.error === 'object' && 'error' in error.error) {
+        const nested = (error.error as { error?: unknown }).error;
+        if (typeof nested === 'string' && nested.trim()) {
+          return nested;
+        }
+      }
+    }
+
+    return 'Nie udało się zapisać rozwiązania.';
+  }
+
+  private formatDuration(milliseconds: number | null): string | null {
+    if (milliseconds == null) {
+      return null;
+    }
+
+    const totalSeconds = Math.ceil(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
   private resolveExitDecision(canLeave: boolean): void {
@@ -369,7 +685,7 @@ export class QuizPlayPageComponent {
   }
 
   isCorrectAnswerVisible(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
-    return answer.correct && (this.resultReady() || this.checkedQuestions().has(question.id));
+    return this.showAnswerFeedback() && answer.correct && (this.resultReady() || this.checkedQuestions().has(question.id));
   }
 
   isSubmittedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
@@ -377,11 +693,11 @@ export class QuizPlayPageComponent {
   }
 
   isWrongSubmittedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
-    return this.isSubmittedAnswer(question, answer) && !answer.correct;
+    return this.showAnswerFeedback() && this.isSubmittedAnswer(question, answer) && !answer.correct;
   }
 
   isCorrectSubmittedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
-    return this.isSubmittedAnswer(question, answer) && answer.correct;
+    return this.showAnswerFeedback() && this.isSubmittedAnswer(question, answer) && answer.correct;
   }
 
   goBack(): void {
@@ -393,7 +709,18 @@ export class QuizPlayPageComponent {
   }
 
   questionScoreText(question: QuestionPlayDTO): string {
-    return `${this.formatScore(this.calculateQuestionScore(question, this.submittedAnswers()[question.id] ?? []))}/1`;
+    const selectedIds = this.submittedAnswers()[question.id] ?? [];
+    const awarded = awardedQuestionScore(question.answers, selectedIds, this.scoring());
+    const maxScore = questionMaxScore(question.answers, this.scoring());
+    return `${this.formatScore(awarded)}/${this.formatScore(maxScore)}`;
+  }
+
+  answerPointsLabel(question: QuestionPlayDTO, answer: AnswerPlayDTO): string | null {
+    if (!this.showAnswerFeedback() || this.scoring().mode !== 'custom' || (!this.isQuestionChecked(question) && !this.resultReady())) {
+      return null;
+    }
+
+    return this.formatScore(answer.points ?? 0);
   }
 
   questionImageSrc(question: QuestionPlayDTO): string | null {
@@ -412,17 +739,6 @@ export class QuizPlayPageComponent {
       delete next[question.id];
       return next;
     });
-  }
-
-  private calculateQuestionScore(question: QuestionPlayDTO, selectedAnswerIds: number[]): number {
-    const correctAnswers = question.answers.filter((answer) => answer.correct);
-    const wrongAnswers = question.answers.filter((answer) => !answer.correct);
-    const correctSelected = correctAnswers.filter((answer) => selectedAnswerIds.includes(answer.id)).length;
-    const wrongSelected = wrongAnswers.filter((answer) => selectedAnswerIds.includes(answer.id)).length;
-    const correctScore = correctAnswers.length === 0 ? 0 : correctSelected / correctAnswers.length;
-    const wrongPenalty = wrongAnswers.length === 0 ? 0 : wrongSelected / wrongAnswers.length;
-
-    return Math.max(0, Math.min(1, correctScore - wrongPenalty));
   }
 
   private formatScore(score: number): string {

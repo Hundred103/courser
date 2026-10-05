@@ -2,12 +2,21 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
+import { UNLIMITED_QUIZ_LIMITS } from '../../core/models/quiz-limits.model';
 import { QuizCreateDTO } from '../../core/models/quiz.model';
 import { QuizApiService } from '../../core/services/quiz-api.service';
-import { buildQuizZip, parseQuizZip } from '../../core/utils/quiz-zip.util';
+import { buildQuizZip, normalizeQuiz, parseQuizZip } from '../../core/utils/quiz-zip.util';
 
 const QUIZ_TEMPLATE: QuizCreateDTO = {
   title: 'Przykładowy quiz',
+  scoring: {
+    mode: 'default',
+    allowNegativeScore: false,
+    pointsPerCorrect: 1,
+    incorrectPenalty: 1,
+    penaltyMode: 'points',
+  },
+  limits: { ...UNLIMITED_QUIZ_LIMITS },
   questions: [
     {
       content: 'Która odpowiedź jest poprawna?',
@@ -38,7 +47,7 @@ export class QuizImportPageComponent {
   private readonly router = inject(Router);
 
   readonly selectedFileName = signal('');
-  readonly activeTab = signal<'file' | 'code'>('file');
+  readonly activeTab = signal<'file' | 'code'>('code');
   readonly importedQuiz = signal<QuizCreateDTO | null>(null);
   readonly validationError = signal('');
   readonly importError = signal('');
@@ -51,6 +60,8 @@ export class QuizImportPageComponent {
   readonly templateJson = JSON.stringify(
     {
       title: QUIZ_TEMPLATE.title,
+      scoring: QUIZ_TEMPLATE.scoring,
+      limits: QUIZ_TEMPLATE.limits,
       questions: QUIZ_TEMPLATE.questions.map((question) => ({
         content: question.content,
         image: question.image,
@@ -219,87 +230,7 @@ export class QuizImportPageComponent {
   }
 
   private parseJsonQuiz(rawJson: string): QuizCreateDTO {
-    const parsed = JSON.parse(rawJson) as unknown;
-    return this.normalizeQuiz(parsed);
-  }
-
-  private normalizeQuiz(value: unknown): QuizCreateDTO {
-    if (!this.isRecord(value)) {
-      throw new Error('Główny obiekt musi zawierać pola title oraz questions.');
-    }
-
-    if (typeof value['title'] !== 'string' || value['title'].trim().length === 0) {
-      throw new Error('Pole title musi być niepustym tekstem.');
-    }
-
-    if (!Array.isArray(value['questions']) || value['questions'].length === 0) {
-      throw new Error('Pole questions musi być niepustą tablicą.');
-    }
-
-    return {
-      title: value['title'].trim(),
-      questions: value['questions'].map((question, questionIndex) => this.normalizeQuestion(question, questionIndex)),
-    };
-  }
-
-  private normalizeQuestion(value: unknown, questionIndex: number): QuizCreateDTO['questions'][number] {
-    if (!this.isRecord(value)) {
-      throw new Error(`Pytanie ${questionIndex + 1} musi być obiektem.`);
-    }
-
-    if (typeof value['content'] !== 'string' || value['content'].trim().length === 0) {
-      throw new Error(`Pytanie ${questionIndex + 1} musi mieć niepuste pole content.`);
-    }
-
-    if (!Array.isArray(value['answers']) || value['answers'].length === 0) {
-      throw new Error(`Pytanie ${questionIndex + 1} musi mieć co najmniej jedną odpowiedź.`);
-    }
-
-    const imageValue = value['image'];
-    let image: string | null = null;
-
-    if (imageValue !== null && imageValue !== undefined && imageValue !== '') {
-      if (typeof imageValue !== 'string') {
-        throw new Error(`Pole image w pytaniu ${questionIndex + 1} musi być null albo nazwą pliku.`);
-      }
-
-      image = imageValue.trim();
-    }
-
-    return {
-      content: value['content'].trim(),
-      image,
-      answers: value['answers'].map((answer, answerIndex) =>
-        this.normalizeAnswer(answer, questionIndex, answerIndex),
-      ),
-    };
-  }
-
-  private normalizeAnswer(
-    value: unknown,
-    questionIndex: number,
-    answerIndex: number,
-  ): QuizCreateDTO['questions'][number]['answers'][number] {
-    if (!this.isRecord(value)) {
-      throw new Error(`Odpowiedź ${answerIndex + 1} w pytaniu ${questionIndex + 1} musi być obiektem.`);
-    }
-
-    if (typeof value['content'] !== 'string' || value['content'].trim().length === 0) {
-      throw new Error(`Odpowiedź ${answerIndex + 1} w pytaniu ${questionIndex + 1} musi mieć niepuste pole content.`);
-    }
-
-    if (typeof value['correct'] !== 'boolean') {
-      throw new Error(`Odpowiedź ${answerIndex + 1} w pytaniu ${questionIndex + 1} musi mieć pole correct typu boolean.`);
-    }
-
-    return {
-      content: value['content'].trim(),
-      correct: value['correct'],
-    };
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
+    return normalizeQuiz(JSON.parse(rawJson) as unknown);
   }
 
   private normalizeShareCode(code: string): string {
