@@ -21,6 +21,7 @@ public class QuizResultService {
 
     private final QuizResultRepository quizResultRepository;
     private final UserRepository userRepository;
+    private final QuizAttemptClient quizAttemptClient;
 
     @Transactional
     public QuizResult saveResult(Long userId, SaveQuizResultRequest request) {
@@ -43,6 +44,8 @@ public class QuizResultService {
         if (request.getScore() > request.getMaxScore()) {
             throw new RuntimeException("Wynik nie może być wyższy od maksimum");
         }
+
+        verifyAttempt(userId, request);
 
         QuizResult result = QuizResult.builder()
                 .userId(userId)
@@ -83,6 +86,30 @@ public class QuizResultService {
         }
 
         return response;
+    }
+
+    private void verifyAttempt(Long userId, SaveQuizResultRequest request) {
+        QuizAttemptClient.QuizLimitsView limits = quizAttemptClient.limits(request.getQuizId());
+        if (!limits.isActive()) {
+            return;
+        }
+
+        if (request.getAttemptId() == null) {
+            throw new RuntimeException(QuizAttemptClient.QuizCheating.MESSAGE);
+        }
+
+        QuizAttemptClient.AttemptVerdictView verdict = quizAttemptClient.verdict(request.getAttemptId(), userId);
+        if (!request.getQuizId().equals(verdict.quizId()) || !userId.equals(verdict.userId())) {
+            throw new RuntimeException(QuizAttemptClient.QuizCheating.MESSAGE);
+        }
+
+        if ("CHEATING".equals(verdict.status())) {
+            throw new RuntimeException(QuizAttemptClient.QuizCheating.MESSAGE);
+        }
+
+        if (!"COMPLETED".equals(verdict.status())) {
+            throw new RuntimeException("Wynik odrzucony: quiz nie został zakończony w czasie.");
+        }
     }
 
     private double scoreRatio(QuizResult result) {

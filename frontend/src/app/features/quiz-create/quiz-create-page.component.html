@@ -178,6 +178,26 @@
       </div>
 
       <label class="option-row">
+        <span>Losowa kolejność pytań</span>
+        <span class="scoring-toggle-control">
+          <input type="checkbox" [checked]="limits().randomQuestionOrder" (change)="updateLimitFlag('randomQuestionOrder', $event)" />
+          <span class="toggle-track" aria-hidden="true">
+            <span class="toggle-thumb"></span>
+          </span>
+        </span>
+      </label>
+
+      <label class="option-row">
+        <span>Pokaż poprawne odpowiedzi</span>
+        <span class="scoring-toggle-control">
+          <input type="checkbox" [checked]="limits().showCorrectAnswers" (change)="updateLimitFlag('showCorrectAnswers', $event)" />
+          <span class="toggle-track" aria-hidden="true">
+            <span class="toggle-thumb"></span>
+          </span>
+        </span>
+      </label>
+
+      <label class="option-row">
         <span>Domyślne punkty</span>
         <span class="scoring-toggle-control">
           <input type="checkbox" [checked]="useDefaultPointsLook()" (change)="toggleDefaultPointsLook($event)" />
@@ -224,6 +244,49 @@
             </span>
           </span>
         </label>
+      }
+
+      <div class="options-limits">
+        <label class="scoring-field">
+          <span>Liczba podejść</span>
+          <input
+            class="scoring-number"
+            type="number"
+            min="1"
+            step="1"
+            placeholder="bez limitu"
+            [value]="limits().maxAttempts ?? ''"
+            (change)="updateLimit('maxAttempts', $event)"
+          />
+        </label>
+        <label class="scoring-field">
+          <span>Czas quizu (s)</span>
+          <input
+            class="scoring-number"
+            type="number"
+            min="1"
+            step="1"
+            placeholder="bez limitu"
+            [value]="limits().quizTimeSeconds ?? ''"
+            (change)="updateLimit('quizTimeSeconds', $event)"
+          />
+        </label>
+        <label class="scoring-field">
+          <span>Czas pytania (s)</span>
+          <input
+            class="scoring-number"
+            type="number"
+            min="1"
+            step="1"
+            placeholder="bez limitu"
+            [value]="limits().questionTimeSeconds ?? ''"
+            (change)="updateLimit('questionTimeSeconds', $event)"
+          />
+        </label>
+      </div>
+
+      @if (limitsError()) {
+        <p class="status-text error">{{ limitsError() }}</p>
       }
 
       <label class="option-row">

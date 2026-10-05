@@ -9,11 +9,25 @@
     <p class="status-text">Ładowanie quizu...</p>
   } @else if (errorMessage()) {
     <p class="status-text error">{{ errorMessage() }}</p>
+  } @else if (playBlockMessage(); as blocked) {
+    <p class="status-text error">{{ blocked }}</p>
   } @else if (quiz(); as quizData) {
     <article class="quiz-play squircle fade-in">
       <header class="quiz-header">
         <p>Pytanie {{ currentQuestionNumber() }} / {{ totalQuestions() }}</p>
         <h2 class="neon-title">{{ quizData.title }}</h2>
+        @if (formattedQuizTime(); as quizTime) {
+          <p class="quiz-timer" [class.ending]="quizEndingSoon()">Czas quizu: {{ quizTime }}</p>
+        }
+        @if (formattedQuestionTime(); as questionTime) {
+          <p class="question-timer" [class.ending]="questionEndingSoon()">Czas pytania: {{ questionTime }}</p>
+        }
+        @if (quizEndingSoon() || questionEndingSoon()) {
+          <p class="timer-warning">Czas się kończy. Zaznaczona odpowiedź zostanie wysłana automatycznie.</p>
+        }
+        @if (cheatingMessage(); as cheating) {
+          <p class="status-text error">{{ cheating }}</p>
+        }
       </header>
 
       @if (currentQuestion(); as question) {
@@ -50,7 +64,7 @@
           </div>
 
           <div class="question-score-slot" aria-live="polite">
-            @if (isQuestionChecked(question)) {
+            @if (isQuestionChecked(question) && showAnswerFeedback()) {
               <p>{{ questionScoreText(question) }}</p>
             }
           </div>

@@ -2,6 +2,7 @@ import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription, finalize } from 'rxjs';
+import { UNLIMITED_QUIZ_LIMITS, QuizLimits, normalizeQuizLimits, quizLimitsError } from '../../core/models/quiz-limits.model';
 import { QuizCreateDTO, QuizPlayDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
@@ -34,6 +35,7 @@ interface DraftSnapshot {
   title: string;
   questions: DraftQuestion[];
   scoring: QuizScoring;
+  limits: QuizLimits;
 }
 
 @Component({
@@ -59,6 +61,7 @@ export class QuizCreatePageComponent implements OnDestroy {
 
   readonly title = signal('');
   readonly scoring = signal<QuizScoring>({ ...NEW_QUIZ_SCORING });
+  readonly limits = signal<QuizLimits>({ ...UNLIMITED_QUIZ_LIMITS });
   readonly useDefaultPointsLook = signal(true);
   readonly questions = signal<DraftQuestion[]>([
     {
@@ -81,6 +84,7 @@ export class QuizCreatePageComponent implements OnDestroy {
   readonly usesCustomPoints = computed(() => this.scoring().mode === 'custom');
   readonly showPointControls = computed(() => !this.useDefaultPointsLook());
   readonly wrongAnswerPoints = computed(() => -this.scoring().incorrectPenalty);
+  readonly limitsError = computed(() => quizLimitsError(this.limits(), this.questions().length));
   readonly canUndoChanges = computed(
     () => this.isEditMode() && this.hasUnsavedChanges() && !this.isSaving() && !this.isLoadingQuiz(),
   );
@@ -92,9 +96,13 @@ export class QuizCreatePageComponent implements OnDestroy {
     const hasTitle = this.title().trim().length > 0;
     const hasValidQuestions = this.questions().every((question) => this.isQuestionReady(question));
 
-    return hasTitle && hasValidQuestions && !this.isSaving() && !this.isLoadingQuiz();
+    return hasTitle && hasValidQuestions && !this.limitsError() && !this.isSaving() && !this.isLoadingQuiz();
   });
   readonly saveButtonTitle = computed(() => {
+    if (this.limitsError()) {
+      return this.limitsError();
+    }
+
     if (this.canSave()) {
       return '';
     }
@@ -155,6 +163,30 @@ export class QuizCreatePageComponent implements OnDestroy {
       })),
     );
     this.scoring.set({ ...current, mode: 'custom' });
+    this.saveError.set('');
+  }
+
+  updateLimitFlag(field: 'randomQuestionOrder' | 'showCorrectAnswers', event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    this.limits.update((limits) => ({ ...limits, [field]: checked }));
+    this.saveError.set('');
+  }
+
+  updateLimit(field: 'maxAttempts' | 'quizTimeSeconds' | 'questionTimeSeconds', event: Event): void {
+    const raw = (event.target as HTMLInputElement).value.trim();
+
+    if (raw === '') {
+      this.limits.update((limits) => ({ ...limits, [field]: null }));
+      this.saveError.set('');
+      return;
+    }
+
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return;
+    }
+
+    this.limits.update((limits) => ({ ...limits, [field]: parsed }));
     this.saveError.set('');
   }
 
@@ -355,6 +387,7 @@ export class QuizCreatePageComponent implements OnDestroy {
 
     this.title.set(this.initialDraft.title);
     this.scoring.set({ ...this.initialDraft.scoring });
+    this.limits.set({ ...this.initialDraft.limits });
     this.questions.set(this.cloneQuestions(this.initialDraft.questions));
     this.currentIndex.set(this.questions().length - 1);
     this.recalculateNextIds();
@@ -443,6 +476,7 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.saveError.set('');
     this.title.set('');
     this.scoring.set({ ...NEW_QUIZ_SCORING });
+    this.limits.set({ ...UNLIMITED_QUIZ_LIMITS });
     this.useDefaultPointsLook.set(true);
     this.questions.set([
       {
@@ -491,6 +525,7 @@ export class QuizCreatePageComponent implements OnDestroy {
 
     this.title.set(quiz.title);
     this.scoring.set(scoring);
+    this.limits.set(normalizeQuizLimits(quiz.limits));
     this.useDefaultPointsLook.set(this.isPlainDefaultPoints(scoring));
     this.questions.set(
       questions.length > 0
@@ -511,6 +546,7 @@ export class QuizCreatePageComponent implements OnDestroy {
       title: this.title(),
       questions: this.cloneQuestions(this.questions()),
       scoring: { ...this.scoring() },
+      limits: { ...this.limits() },
     };
   }
 
@@ -568,9 +604,11 @@ export class QuizCreatePageComponent implements OnDestroy {
     }
 
     const scoringChanged = JSON.stringify(this.scoring()) !== JSON.stringify(NEW_QUIZ_SCORING);
+    const limitsChanged = JSON.stringify(this.limits()) !== JSON.stringify(UNLIMITED_QUIZ_LIMITS);
 
     return (
       scoringChanged ||
+      limitsChanged ||
       this.title().trim().length > 0 ||
       this.questions().some(
         (question) =>
@@ -599,6 +637,7 @@ export class QuizCreatePageComponent implements OnDestroy {
     return {
       title: this.title().trim(),
       scoring,
+      limits: this.limits(),
       questions: this.questions().map((question) => ({
         content: question.content.trim(),
         image: question.image,

@@ -2,6 +2,7 @@ package net.edu.courser.quizservice.dto;
 import net.edu.courser.quizservice.entity.Answer;
 import net.edu.courser.quizservice.entity.*;
 import net.edu.courser.quizservice.service.ImageCompressor;
+import net.edu.courser.quizservice.service.QuizLimitsRules;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -29,7 +30,8 @@ public class MapperDTO {
                         .stream()
                         .map(this::toQuestionPlayDTO)
                         .toList(),
-                toScoringDto(quiz)
+                toScoringDto(quiz),
+                toLimitsDto(quiz)
         );
     }
     private QuestionPlayDTO toQuestionPlayDTO(Question question) {
@@ -85,12 +87,49 @@ public class MapperDTO {
                 .incorrectPenalty(scoring.incorrectPenalty())
                 .penaltyMode(PenaltyMode.valueOf(scoring.penaltyMode().toUpperCase()))
                 .build();
+        applyLimits(quiz, dto.limits());
         List<QuestionCreateDTO> questions = dto.questions();
         boolean customScoring = quiz.getScoringMode() == ScoringMode.CUSTOM;
         for (int index = 0; index < questions.size(); index++) {
             quiz.addQuestion(toQuestionEntity(questions.get(index), index, customScoring));
         }
+        QuizLimitsRules.validate(quiz.getQuizTimeSeconds(), quiz.getQuestionTimeSeconds(), questions.size());
         return quiz;
+    }
+
+    public QuizLimitsDTO toLimitsDto(Quiz quiz) {
+        return new QuizLimitsDTO(
+                quiz.getMaxAttempts(),
+                quiz.getQuizTimeSeconds(),
+                quiz.getQuestionTimeSeconds(),
+                quiz.isRandomQuestionOrder(),
+                quiz.isShowCorrectAnswers()
+        );
+    }
+
+    public void applyLimits(Quiz quiz, QuizLimitsDTO limits) {
+        if (limits == null) {
+            quiz.setMaxAttempts(null);
+            quiz.setQuizTimeSeconds(null);
+            quiz.setQuestionTimeSeconds(null);
+            quiz.setRandomQuestionOrder(false);
+            quiz.setShowCorrectAnswers(true);
+            return;
+        }
+
+        quiz.setMaxAttempts(positiveOrNull(limits.maxAttempts()));
+        quiz.setQuizTimeSeconds(positiveOrNull(limits.quizTimeSeconds()));
+        quiz.setQuestionTimeSeconds(positiveOrNull(limits.questionTimeSeconds()));
+        quiz.setRandomQuestionOrder(Boolean.TRUE.equals(limits.randomQuestionOrder()));
+        quiz.setShowCorrectAnswers(limits.showCorrectAnswers() == null || limits.showCorrectAnswers());
+    }
+
+    private Integer positiveOrNull(Integer value) {
+        if (value == null || value <= 0) {
+            return null;
+        }
+
+        return value;
     }
 
     public Question toQuestionEntity(QuestionCreateDTO qDto, int index, boolean customScoring) {

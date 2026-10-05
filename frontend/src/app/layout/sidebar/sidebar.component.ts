@@ -6,7 +6,8 @@ import { catchError, combineLatest, finalize, map, of, startWith, switchMap } fr
 import { BestQuizScore } from '../../core/models/quiz-score.model';
 import { QuizRawDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
-import { QuizApiService } from '../../core/services/quiz-api.service';
+import { normalizeQuizLimits } from '../../core/models/quiz-limits.model';
+import { QuizApiService, QuizStartInfo } from '../../core/services/quiz-api.service';
 import { GuestQuizStorageService } from '../../core/services/guest-quiz-storage.service';
 import { QuizScoreService } from '../../core/services/quiz-score.service';
 import { buildQuizZip } from '../../core/utils/quiz-zip.util';
@@ -108,7 +109,8 @@ export class SidebarComponent {
   readonly quizPendingDelete = signal<QuizRawDTO | null>(null);
   readonly quizPendingStart = signal<QuizRawDTO | null>(null);
   readonly quizPendingShare = signal<QuizRawDTO | null>(null);
-  readonly randomQuestionsEnabled = signal(false);
+  readonly startInfo = signal<QuizStartInfo | null>(null);
+  readonly startInfoError = signal('');
   readonly authPromptMessage = signal<string | null>(null);
   readonly shareExpiresInSeconds = signal<number | null>(604800);
   readonly shareCode = signal('');
@@ -410,30 +412,71 @@ export class SidebarComponent {
 
   requestStartQuiz(quiz: QuizRawDTO): void {
     this.openMenuQuizId.set(null);
-    this.randomQuestionsEnabled.set(false);
+    this.startInfo.set(null);
+    this.startInfoError.set('');
     this.quizPendingStart.set(quiz);
-  }
 
-  updateRandomQuestions(event: Event): void {
-    this.randomQuestionsEnabled.set((event.target as HTMLInputElement).checked);
+    if (quiz.id < 0) {
+      const stored = this.guestQuizStorage.getById(quiz.id);
+      const limits = normalizeQuizLimits(stored?.limits);
+      this.startInfo.set({
+        id: quiz.id,
+        title: quiz.title,
+        questionCount: stored?.questions.length ?? 0,
+        quizTimeSeconds: limits.quizTimeSeconds,
+        questionTimeSeconds: limits.questionTimeSeconds,
+        maxAttempts: limits.maxAttempts,
+        usedAttempts: 0,
+      });
+      return;
+    }
+
+    this.quizApiService.getStartInfo(quiz.id).subscribe({
+      next: (info) => this.startInfo.set(info),
+      error: () => this.startInfoError.set('Nie udało się pobrać informacji o quizie.'),
+    });
   }
 
   cancelStartQuiz(): void {
     this.quizPendingStart.set(null);
-    this.randomQuestionsEnabled.set(false);
+    this.startInfo.set(null);
+    this.startInfoError.set('');
+  }
+
+  attemptsLabel(info: QuizStartInfo): string {
+    return info.maxAttempts == null ? `${info.usedAttempts}` : `${info.usedAttempts}/${info.maxAttempts}`;
+  }
+
+  formatLimitSeconds(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const rest = seconds % 60;
+
+    if (minutes === 0) {
+      return `${rest} s`;
+    }
+
+    if (rest === 0) {
+      return `${minutes} min`;
+    }
+
+    return `${minutes} min ${rest} s`;
+  }
+
+  canStartQuiz(info: QuizStartInfo | null): boolean {
+    return !!info && (info.maxAttempts == null || info.usedAttempts < info.maxAttempts);
   }
 
   startQuiz(): void {
     const quiz = this.quizPendingStart();
+    const info = this.startInfo();
 
-    if (!quiz) {
+    if (!quiz || !this.canStartQuiz(info)) {
       return;
     }
 
-    const queryParams = this.randomQuestionsEnabled() ? { randomQuestions: true } : undefined;
     this.quizPendingStart.set(null);
-    this.randomQuestionsEnabled.set(false);
-    void this.router.navigate(['/quizzes', quiz.id, 'play'], { queryParams });
+    this.startInfo.set(null);
+    void this.router.navigate(['/quizzes', quiz.id, 'play']);
   }
 
   cancelDeleteQuiz(): void {

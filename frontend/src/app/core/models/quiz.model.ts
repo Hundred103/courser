@@ -1,4 +1,5 @@
 import { QuestionCreateDTO, QuestionPlayDTO } from './question.model';
+import { QuizLimits } from './quiz-limits.model';
 import { QuizScoring } from '../utils/quiz-scoring.util';
 
 export interface QuizRawDTO {
@@ -11,12 +12,14 @@ export interface QuizPlayDTO {
   title: string;
   questions: QuestionPlayDTO[];
   scoring?: QuizScoring | null;
+  limits?: QuizLimits | null;
 }
 
 export interface QuizCreateDTO {
   title: string;
   questions: QuestionCreateDTO[];
   scoring?: QuizScoring | null;
+  limits?: QuizLimits | null;
 }
 
 export interface QuizEditTitleDTO {

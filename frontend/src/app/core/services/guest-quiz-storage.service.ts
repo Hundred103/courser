@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { QuizCreateDTO, QuizPlayDTO, QuizRawDTO } from '../models/quiz.model';
+import { normalizeQuizLimits } from '../models/quiz-limits.model';
 import { normalizeQuizScoring } from '../utils/quiz-scoring.util';
 
 const STORAGE_KEY = 'guestQuizzes';
@@ -56,6 +57,7 @@ export class GuestQuizStorageService {
       id: quizId,
       title: dto.title,
       scoring: normalizeQuizScoring(dto.scoring),
+      limits: normalizeQuizLimits(dto.limits),
       questions: dto.questions.map((question) => ({
         id: nextQuestionId--,
         content: question.content,
@@ -74,6 +76,7 @@ export class GuestQuizStorageService {
     return {
       title: quiz.title,
       scoring: normalizeQuizScoring(quiz.scoring),
+      limits: normalizeQuizLimits(quiz.limits),
       questions: quiz.questions.map((question) => ({
         content: question.content,
         image: question.image ?? null,

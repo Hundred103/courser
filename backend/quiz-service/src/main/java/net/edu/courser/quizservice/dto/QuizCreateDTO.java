@@ -3,4 +3,4 @@ import java.util.List;
 
 
 
-public record QuizCreateDTO(String title, List<QuestionCreateDTO> questions, QuizScoringDTO scoring) {}
+public record QuizCreateDTO(String title, List<QuestionCreateDTO> questions, QuizScoringDTO scoring, QuizLimitsDTO limits) {}

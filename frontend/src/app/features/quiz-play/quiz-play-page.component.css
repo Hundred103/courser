@@ -182,6 +182,23 @@
     0 0 28px rgba(239, 68, 68, 0.18);
 }
 
+.quiz-timer,
+.question-timer {
+  margin: 0.2rem 0 0;
+  font-weight: 900;
+}
+
+.quiz-timer.ending,
+.question-timer.ending,
+.timer-warning {
+  color: var(--danger-text);
+}
+
+.timer-warning {
+  margin: 0.35rem 0 0;
+  font-weight: 800;
+}
+
 .question-score-slot {
   display: grid;
   min-height: 2.4rem;

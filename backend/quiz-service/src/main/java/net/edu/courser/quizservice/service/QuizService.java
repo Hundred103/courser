@@ -76,8 +76,19 @@ public class QuizService {
         return questionRepository.findWholeByQuizId(quizId);
     }
 
+    public QuizLimitsDTO limitsForQuiz(Long quizId) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
+        return mapperDTO.toLimitsDto(quiz);
+    }
+
     public Quiz save(Quiz quiz) {
-        return quizRepository.save(quiz);
+        Quiz saved = quizRepository.save(quiz);
+        if (saved.getOriginQuizId() == null) {
+            saved.setOriginQuizId(saved.getId());
+            saved = quizRepository.save(saved);
+        }
+        return saved;
     }
 
     public void delete(Quiz quiz) {
@@ -118,7 +129,8 @@ public class QuizService {
                 sourceQuestions.stream()
                         .map(this::toQuestionCreateDTO)
                         .toList(),
-                mapperDTO.toScoringDto(sourceQuiz)
+                mapperDTO.toScoringDto(sourceQuiz),
+                mapperDTO.toLimitsDto(sourceQuiz)
         );
     }
 
@@ -128,11 +140,13 @@ public class QuizService {
                 .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
         quiz.setTitle(dto.title());
         mapperDTO.applyScoring(quiz, dto.scoring());
+        mapperDTO.applyLimits(quiz, dto.limits());
         boolean customScoring = quiz.getScoringMode() == ScoringMode.CUSTOM;
         quiz.getQuestions().clear();
         for (int index = 0; index < dto.questions().size(); index++) {
             quiz.addQuestion(mapperDTO.toQuestionEntity(dto.questions().get(index), index, customScoring));
         }
+        QuizLimitsRules.validate(quiz.getQuizTimeSeconds(), quiz.getQuestionTimeSeconds(), dto.questions().size());
         return quiz;
     }
 
@@ -163,6 +177,12 @@ public class QuizService {
                 .pointsPerCorrect(sourceQuiz.getPointsPerCorrect())
                 .incorrectPenalty(sourceQuiz.getIncorrectPenalty())
                 .penaltyMode(sourceQuiz.getPenaltyMode() == null ? PenaltyMode.FRACTION : sourceQuiz.getPenaltyMode())
+                .maxAttempts(sourceQuiz.getMaxAttempts())
+                .quizTimeSeconds(sourceQuiz.getQuizTimeSeconds())
+                .questionTimeSeconds(sourceQuiz.getQuestionTimeSeconds())
+                .originQuizId(sourceQuiz.getOriginQuizId() != null ? sourceQuiz.getOriginQuizId() : sourceQuiz.getId())
+                .randomQuestionOrder(sourceQuiz.isRandomQuestionOrder())
+                .showCorrectAnswers(sourceQuiz.isShowCorrectAnswers())
                 .build();
 
         sourceQuestions.forEach(sourceQuestion -> {

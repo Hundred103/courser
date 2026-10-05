@@ -1,8 +1,6 @@
 # A global TODO 
 
 Urgent:
-- think if we want to add percentages to point deduction per question
-- think if we want the points to show after answering or end of quiz
 - fix the .zip adding (code shown is wrong)
 
 Non urgent:

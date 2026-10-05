@@ -149,6 +149,67 @@ export class QuizApiService {
 
     return this.http.get(`${this.apiUrl}/${id}/export`, { responseType: 'blob' });
   }
+
+  getStartInfo(quizId: number): Observable<QuizStartInfo> {
+    return this.http.get<QuizStartInfo>(`${this.apiUrl}/${quizId}/start-info`);
+  }
+
+  startAttempt(quizId: number): Observable<AttemptStateResponse> {
+    return this.http.post<AttemptStateResponse>(`${this.apiUrl}/${quizId}/attempts`, {});
+  }
+
+  attemptState(quizId: number, attemptId: number, questionId?: number | null): Observable<AttemptStateResponse> {
+    return this.http.get<AttemptStateResponse>(`${this.apiUrl}/${quizId}/attempts/${attemptId}`, {
+      params: questionId == null ? {} : { questionId },
+    });
+  }
+
+  openAttemptQuestion(quizId: number, attemptId: number, questionId: number): Observable<AttemptStateResponse> {
+    return this.http.post<AttemptStateResponse>(
+      `${this.apiUrl}/${quizId}/attempts/${attemptId}/questions/${questionId}/open`,
+      {},
+    );
+  }
+
+  // QUIZ_ANSWERS_IN: POST the player's selected answer ids
+  submitAttemptAnswers(
+    quizId: number,
+    attemptId: number,
+    questionId: number,
+    answerIds: number[],
+  ): Observable<AttemptStateResponse> {
+    return this.http.post<AttemptStateResponse>(
+      `${this.apiUrl}/${quizId}/attempts/${attemptId}/questions/${questionId}/submit`,
+      { answerIds },
+    );
+  }
+
+  finishAttempt(quizId: number, attemptId: number): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${quizId}/attempts/${attemptId}/finish`, {});
+  }
+}
+
+export interface QuizStartInfo {
+  id: number;
+  title: string;
+  questionCount: number;
+  quizTimeSeconds: number | null;
+  questionTimeSeconds: number | null;
+  maxAttempts: number | null;
+  usedAttempts: number;
+}
+
+export interface AttemptStateResponse {
+  attemptId: number;
+  maxAttempts: number | null;
+  usedAttempts: number;
+  quizRemainingMillis: number | null;
+  questionRemainingMillis: number | null;
+  quizEndingSoon: boolean;
+  questionEndingSoon: boolean;
+  quizExpired: boolean;
+  questionExpired: boolean;
+  endingWarningSeconds: number;
 }
 
 export interface QuizShareCodeDTO {

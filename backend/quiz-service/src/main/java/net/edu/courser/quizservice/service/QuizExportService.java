@@ -37,10 +37,33 @@ public class QuizExportService {
         return scoring;
     }
 
+    private ObjectNode limitsNode(Quiz quiz) {
+        ObjectNode limits = objectMapper.createObjectNode();
+        if (quiz.getMaxAttempts() == null) {
+            limits.putNull("maxAttempts");
+        } else {
+            limits.put("maxAttempts", quiz.getMaxAttempts());
+        }
+        if (quiz.getQuizTimeSeconds() == null) {
+            limits.putNull("quizTimeSeconds");
+        } else {
+            limits.put("quizTimeSeconds", quiz.getQuizTimeSeconds());
+        }
+        if (quiz.getQuestionTimeSeconds() == null) {
+            limits.putNull("questionTimeSeconds");
+        } else {
+            limits.put("questionTimeSeconds", quiz.getQuestionTimeSeconds());
+        }
+        limits.put("randomQuestionOrder", quiz.isRandomQuestionOrder());
+        limits.put("showCorrectAnswers", quiz.isShowCorrectAnswers());
+        return limits;
+    }
+
     public byte[] exportAsZip(Quiz quiz, List<Question> questions) {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("title", quiz.getTitle());
         root.set("scoring", scoringNode(quiz));
+        root.set("limits", limitsNode(quiz));
 
         ArrayNode questionsNode = root.putArray("questions");
 

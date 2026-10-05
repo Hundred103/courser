@@ -44,6 +44,20 @@ public class Quiz {
     @Column(name = "penalty_mode", nullable = false)
     @Builder.Default
     private PenaltyMode penaltyMode = PenaltyMode.FRACTION;
+    @Column(name = "max_attempts")
+    private Integer maxAttempts;
+    @Column(name = "quiz_time_seconds")
+    private Integer quizTimeSeconds;
+    @Column(name = "question_time_seconds")
+    private Integer questionTimeSeconds;
+    @Column(name = "origin_quiz_id")
+    private Long originQuizId;
+    @Column(name = "random_question_order", nullable = false)
+    @Builder.Default
+    private boolean randomQuestionOrder = false;
+    @Column(name = "show_correct_answers", nullable = false)
+    @Builder.Default
+    private boolean showCorrectAnswers = true;
 
     public void addQuestion(Question question) {
         questions.add(question);
