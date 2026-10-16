@@ -96,7 +96,12 @@ public class MapperDTO {
         for (int index = 0; index < questions.size(); index++) {
             quiz.addQuestion(toQuestionEntity(questions.get(index), index, customScoring));
         }
-        QuizLimitsRules.validate(quiz.getQuizTimeSeconds(), quiz.getQuestionTimeSeconds(), questions.size());
+        QuizLimitsRules.validate(
+                quiz.getMaxAttempts(),
+                quiz.getQuizTimeSeconds(),
+                quiz.getQuestionTimeSeconds(),
+                questions.size()
+        );
         return quiz;
     }
 
@@ -120,19 +125,11 @@ public class MapperDTO {
             return;
         }
 
-        quiz.setMaxAttempts(positiveOrNull(limits.maxAttempts()));
-        quiz.setQuizTimeSeconds(positiveOrNull(limits.quizTimeSeconds()));
-        quiz.setQuestionTimeSeconds(positiveOrNull(limits.questionTimeSeconds()));
+        quiz.setMaxAttempts(limits.maxAttempts());
+        quiz.setQuizTimeSeconds(limits.quizTimeSeconds());
+        quiz.setQuestionTimeSeconds(limits.questionTimeSeconds());
         quiz.setRandomQuestionOrder(Boolean.TRUE.equals(limits.randomQuestionOrder()));
         quiz.setShowCorrectAnswers(limits.showCorrectAnswers() == null || limits.showCorrectAnswers());
-    }
-
-    private Integer positiveOrNull(Integer value) {
-        if (value == null || value <= 0) {
-            return null;
-        }
-
-        return value;
     }
 
     public Question toQuestionEntity(QuestionCreateDTO qDto, int index, boolean customScoring) {

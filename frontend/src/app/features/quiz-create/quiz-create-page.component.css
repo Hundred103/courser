@@ -430,10 +430,16 @@
 
 .create-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  justify-content: center;
+  margin-top: 3rem;
+}
+
+.question-navigation {
+  display: flex;
   gap: 0.8rem;
   align-items: center;
-  margin-top: 3rem;
+  justify-content: space-between;
+  margin: 1.25rem 0;
 }
 
 .control-side {
@@ -552,6 +558,11 @@
 
   .create-controls {
     grid-template-columns: 1fr;
+  }
+
+  .question-navigation {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .control-side,

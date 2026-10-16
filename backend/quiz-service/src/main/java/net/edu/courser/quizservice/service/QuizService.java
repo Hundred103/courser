@@ -146,7 +146,12 @@ public class QuizService {
         for (int index = 0; index < dto.questions().size(); index++) {
             quiz.addQuestion(mapperDTO.toQuestionEntity(dto.questions().get(index), index, customScoring));
         }
-        QuizLimitsRules.validate(quiz.getQuizTimeSeconds(), quiz.getQuestionTimeSeconds(), dto.questions().size());
+        QuizLimitsRules.validate(
+                quiz.getMaxAttempts(),
+                quiz.getQuizTimeSeconds(),
+                quiz.getQuestionTimeSeconds(),
+                dto.questions().size()
+        );
         return quiz;
     }
 

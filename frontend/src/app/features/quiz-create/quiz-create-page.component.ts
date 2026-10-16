@@ -18,6 +18,13 @@ const NEW_QUIZ_SCORING: QuizScoring = {
 };
 
 const MAX_SCORE_VALUE = 99.99;
+const LIMIT_MAXIMUMS = {
+  maxAttempts: 1000,
+  quizTimeSeconds: 43_200,
+  questionTimeSeconds: 3_600,
+} as const;
+
+type QuizLimitField = keyof typeof LIMIT_MAXIMUMS;
 
 interface DraftAnswer {
   id: number;
@@ -264,9 +271,9 @@ export class QuizCreatePageComponent implements OnDestroy {
     event.preventDefault();
   }
 
-  updateLimit(field: 'maxAttempts' | 'quizTimeSeconds' | 'questionTimeSeconds', event: Event): void {
+  updateLimit(field: QuizLimitField, event: Event): void {
     const input = event.target as HTMLInputElement;
-    const digits = input.value.replace(/\D/g, '');
+    const digits = input.value.replace(/\D/g, '').replace(/^0+/, '');
 
     if (input.value !== digits) {
       input.value = digits;
@@ -278,15 +285,16 @@ export class QuizCreatePageComponent implements OnDestroy {
       return;
     }
 
-    const parsed = Number(digits);
+    const maximum = LIMIT_MAXIMUMS[field];
+    const maximumText = maximum.toString();
+    const exceedsMaximum = digits.length > maximumText.length || (digits.length === maximumText.length && digits > maximumText);
+    const value = exceedsMaximum ? maximum : Number(digits);
 
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      input.value = '';
-      this.limits.update((limits) => ({ ...limits, [field]: null }));
-      return;
+    if (exceedsMaximum) {
+      input.value = maximumText;
     }
 
-    this.limits.update((limits) => ({ ...limits, [field]: parsed }));
+    this.limits.update((limits) => ({ ...limits, [field]: value }));
     this.saveError.set('');
   }
 

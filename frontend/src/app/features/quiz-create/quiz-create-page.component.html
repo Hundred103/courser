@@ -176,6 +176,24 @@
       </section>
     }
 
+    <div class="question-navigation" aria-label="Nawigacja między pytaniami">
+      <div class="control-side left">
+        @if (canGoPrevious()) {
+          <button class="question-nav-button secondary-button squircle" type="button" (click)="goPrevious()">
+            <span aria-hidden="true">&larr;</span>
+            Poprzednie pytanie
+          </button>
+        }
+      </div>
+
+      <div class="control-side right">
+        <button class="question-nav-button secondary-button squircle" type="button" (click)="goNext()">
+          Następne pytanie
+          <span aria-hidden="true">&rarr;</span>
+        </button>
+      </div>
+    </div>
+
     <section class="options-panel squircle">
       <div class="section-heading">
         <span>OPCJE</span>
@@ -349,15 +367,6 @@
     }
 
     <footer class="create-controls">
-      <div class="control-side left">
-        @if (canGoPrevious()) {
-          <button class="question-nav-button secondary-button squircle" type="button" (click)="goPrevious()">
-            <span aria-hidden="true">&larr;</span>
-            Poprzednie pytanie
-          </button>
-        }
-      </div>
-
       <button
         class="save-button primary-button squircle"
         type="button"
@@ -367,13 +376,6 @@
       >
         {{ isSaving() ? 'Zapisywanie...' : 'Zapisz quiz' }}
       </button>
-
-      <div class="control-side right">
-        <button class="question-nav-button secondary-button squircle" type="button" (click)="goNext()">
-          Następne pytanie
-          <span aria-hidden="true">&rarr;</span>
-        </button>
-      </div>
     </footer>
   </article>
 
