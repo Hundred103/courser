@@ -219,7 +219,7 @@
             </span>
           </label>
 
-          <div class="options-points" [class.with-note]="usesPercentPenalty()">
+          <div class="options-points with-note">
             <label class="scoring-field">
               <span>Poprawna odpowiedź</span>
               <input
@@ -263,6 +263,8 @@
 
           @if (usesPercentPenalty()) {
             <p class="penalty-note">Każda błędna odpowiedź odejmuje ten procent punktów zdobytych za poprawne.</p>
+          } @else {
+            <p class="penalty-note">Każda poprawna odpowiedź dodaje te punkty, a każda błędna odejmuje podaną karę.</p>
           }
         }
 

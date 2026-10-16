@@ -14,7 +14,7 @@ const NEW_QUIZ_SCORING: QuizScoring = {
   allowNegativeScore: false,
   pointsPerCorrect: 1,
   incorrectPenalty: 1,
-  penaltyMode: 'points',
+  penaltyMode: 'fraction',
 };
 
 interface DraftAnswer {
@@ -60,6 +60,7 @@ export class QuizCreatePageComponent implements OnDestroy {
   private initialDraft: DraftSnapshot | null = null;
   private rememberedPointPenalty = NEW_QUIZ_SCORING.incorrectPenalty;
   private rememberedPercentPenalty = 50;
+  private stashedScoring: QuizScoring | null = null;
 
   readonly title = signal('');
   readonly scoring = signal<QuizScoring>({ ...NEW_QUIZ_SCORING });
@@ -143,19 +144,56 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   toggleDefaultPointsLook(event: Event): void {
-    this.useDefaultPointsLook.set((event.target as HTMLInputElement).checked);
+    const useDefault = (event.target as HTMLInputElement).checked;
+
+    if (useDefault) {
+      const current = this.scoring();
+
+      this.stashedScoring = this.isPlainDefaultPoints(current) ? null : { ...current };
+      this.scoring.set({ ...NEW_QUIZ_SCORING, allowNegativeScore: current.allowNegativeScore });
+      this.useDefaultPointsLook.set(true);
+      this.saveError.set('');
+      return;
+    }
+
+    this.useDefaultPointsLook.set(false);
+
+    if (this.stashedScoring) {
+      const restored = this.scoringForOpenControls({
+        ...this.stashedScoring,
+        allowNegativeScore: this.scoring().allowNegativeScore,
+      });
+      this.stashedScoring = null;
+      this.scoring.set(restored);
+      this.syncRememberedPenalties(restored);
+      this.saveError.set('');
+      return;
+    }
+
+    const opened = this.scoringForOpenControls(this.scoring());
+    this.scoring.set(opened);
+    this.rememberedPointPenalty = opened.incorrectPenalty;
+
+    this.saveError.set('');
   }
 
   togglePerAnswerPoints(event: Event): void {
     const usePerAnswerPoints = (event.target as HTMLInputElement).checked;
 
     if (!usePerAnswerPoints) {
-      this.scoring.update((scoring) => ({ ...scoring, mode: 'default' }));
+      this.scoring.update((scoring) => ({
+        ...scoring,
+        mode: 'default',
+        penaltyMode: scoring.penaltyMode === 'percent' ? 'percent' : 'points',
+      }));
       this.saveError.set('');
       return;
     }
 
-    const current = { ...this.scoring() };
+    const current = {
+      ...this.scoring(),
+      penaltyMode: this.scoring().penaltyMode === 'percent' ? ('percent' as const) : ('points' as const),
+    };
     this.questions.update((questions) =>
       questions.map((question) => ({
         ...question,
@@ -252,7 +290,11 @@ export class QuizCreatePageComponent implements OnDestroy {
     }
 
     const pointsPerCorrect = Math.max(0, parsed);
-    this.scoring.update((scoring) => ({ ...scoring, pointsPerCorrect }));
+    this.scoring.update((scoring) => ({
+      ...scoring,
+      pointsPerCorrect,
+      penaltyMode: scoring.penaltyMode === 'percent' ? 'percent' : 'points',
+    }));
     this.applySharedPoints((answer) => (answer.correct ? pointsPerCorrect : answer.points));
     this.saveError.set('');
   }
@@ -450,6 +492,8 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.title.set(this.initialDraft.title);
     this.scoring.set({ ...this.initialDraft.scoring });
     this.syncRememberedPenalties(this.initialDraft.scoring);
+    this.stashedScoring = null;
+    this.useDefaultPointsLook.set(this.isPlainDefaultPoints(this.initialDraft.scoring));
     this.limits.set({ ...this.initialDraft.limits });
     this.questions.set(this.cloneQuestions(this.initialDraft.questions));
     this.currentIndex.set(this.questions().length - 1);
@@ -541,6 +585,7 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.scoring.set({ ...NEW_QUIZ_SCORING });
     this.rememberedPointPenalty = NEW_QUIZ_SCORING.incorrectPenalty;
     this.rememberedPercentPenalty = 50;
+    this.stashedScoring = null;
     this.limits.set({ ...UNLIMITED_QUIZ_LIMITS });
     this.useDefaultPointsLook.set(true);
     this.questions.set([
@@ -586,11 +631,16 @@ export class QuizCreatePageComponent implements OnDestroy {
       })),
     }));
 
-    const scoring = normalizeQuizScoring(quiz.scoring);
+    const loadedScoring = normalizeQuizScoring(quiz.scoring);
+    const scoring =
+      loadedScoring.mode === 'default' && loadedScoring.penaltyMode === 'fraction' && !this.isPlainDefaultPoints(loadedScoring)
+        ? { ...loadedScoring, penaltyMode: 'points' as const }
+        : loadedScoring;
 
     this.title.set(quiz.title);
     this.scoring.set(scoring);
     this.syncRememberedPenalties(scoring);
+    this.stashedScoring = null;
     this.limits.set(normalizeQuizLimits(quiz.limits));
     this.useDefaultPointsLook.set(this.isPlainDefaultPoints(scoring));
     this.questions.set(
@@ -716,10 +766,22 @@ export class QuizCreatePageComponent implements OnDestroy {
     };
   }
 
+  private scoringForOpenControls(scoring: QuizScoring): QuizScoring {
+    if (scoring.mode === 'custom') {
+      return { ...scoring, penaltyMode: scoring.penaltyMode === 'percent' ? 'percent' : 'points' };
+    }
+
+    if (scoring.penaltyMode === 'percent') {
+      return { ...scoring, mode: 'default', penaltyMode: 'percent' };
+    }
+
+    return { ...scoring, mode: 'default', penaltyMode: 'points' };
+  }
+
   private isPlainDefaultPoints(scoring: QuizScoring): boolean {
     return (
       scoring.mode === 'default' &&
-      scoring.penaltyMode === 'points' &&
+      scoring.penaltyMode === 'fraction' &&
       scoring.pointsPerCorrect === NEW_QUIZ_SCORING.pointsPerCorrect &&
       scoring.incorrectPenalty === NEW_QUIZ_SCORING.incorrectPenalty
     );
