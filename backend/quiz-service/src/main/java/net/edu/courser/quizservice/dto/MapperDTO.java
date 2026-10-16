@@ -5,12 +5,15 @@ import net.edu.courser.quizservice.service.ImageCompressor;
 import net.edu.courser.quizservice.service.QuizLimitsRules;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 
 
 @Component
 public class MapperDTO {
+    private static final double MAX_SCORE_VALUE = 99.99d;
+
     private final ImageCompressor imageCompressor;
 
     public MapperDTO(ImageCompressor imageCompressor) {
@@ -141,7 +144,7 @@ public class MapperDTO {
             Answer answer = Answer.builder()
                     .content(aDto.content())
                     .correct(aDto.correct())
-                    .points(normalizePoints(aDto.points(), customScoring))
+                    .points(normalizePoints(aDto.points(), customScoring, aDto.correct()))
                     .build();
             question.addAnswer(answer);
         });
@@ -162,8 +165,8 @@ public class MapperDTO {
         return new QuizScoringDTO(
                 mode,
                 Boolean.TRUE.equals(scoring.allowNegativeScore()),
-                nonNegative(scoring.pointsPerCorrect(), 1d),
-                nonNegative(scoring.incorrectPenalty(), 1d),
+                boundedScore(scoring.pointsPerCorrect(), 1d, "Punkty za poprawną odpowiedź", 0d, MAX_SCORE_VALUE),
+                boundedScore(scoring.incorrectPenalty(), 1d, "Kara za błędną odpowiedź", 0d, MAX_SCORE_VALUE),
                 penaltyMode
         );
     }
@@ -172,20 +175,48 @@ public class MapperDTO {
         return new QuizScoringDTO("default", false, 1d, 1d, "fraction");
     }
 
-    private double nonNegative(Double value, double fallback) {
-        if (value == null || !Double.isFinite(value) || value < 0) {
+    private double boundedScore(Double value, double fallback, String label, double min, double max) {
+        if (value == null) {
             return fallback;
         }
 
+        validateScore(value, label, min, max);
         return value;
     }
 
-    private Double normalizePoints(Double points, boolean customScoring) {
-        if (points == null || !Double.isFinite(points)) {
+    private Double normalizePoints(Double points, boolean customScoring, boolean correct) {
+        if (points == null) {
             return customScoring ? 0d : null;
         }
 
+        validateScore(
+                points,
+                "Punkty przy odpowiedzi",
+                correct ? 0d : -MAX_SCORE_VALUE,
+                correct ? MAX_SCORE_VALUE : 0d
+        );
         return points;
+    }
+
+    private void validateScore(Double value, String label, double min, double max) {
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException(label + " musi być liczbą skończoną.");
+        }
+
+        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();
+        if (decimal.scale() > 2) {
+            throw new IllegalArgumentException(label + " może mieć maksymalnie dwie cyfry po przecinku.");
+        }
+
+        if (value < min || value > max) {
+            throw new IllegalArgumentException(
+                    label + " musi mieścić się w zakresie " + formatScoreLimit(min) + "–" + formatScoreLimit(max) + "."
+            );
+        }
+    }
+
+    private String formatScoreLimit(double value) {
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString().replace('.', ',');
     }
 
     public void applyImage(Question question, String imageBase64, int index) {

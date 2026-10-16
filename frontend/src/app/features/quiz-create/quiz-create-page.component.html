@@ -121,10 +121,14 @@
                     <span>Pkt</span>
                     <input
                       class="points-input"
-                      type="number"
-                      step="any"
+                      type="text"
+                      [min]="answer.correct ? 0 : -99.99"
+                      [max]="answer.correct ? 99.99 : 0"
+                      step="0.01"
+                      inputmode="decimal"
                       [value]="answer.points ?? 0"
-                      (change)="updateAnswerPoints(answer.id, $event)"
+                      (keydown)="blockScoreKey($event, !answer.correct)"
+                      (input)="updateAnswerPoints(answer.id, $event)"
                     />
                   </label>
                 }
@@ -224,11 +228,14 @@
               <span>Poprawna odpowiedź</span>
               <input
                 class="scoring-number"
-                type="number"
+                type="text"
                 min="0"
-                step="any"
+                max="99.99"
+                step="0.01"
+                inputmode="decimal"
                 [value]="scoring().pointsPerCorrect"
-                (change)="updateCorrectAnswerPoints($event)"
+                (keydown)="blockScoreKey($event, false)"
+                (input)="updateCorrectAnswerPoints($event)"
               />
             </label>
             @if (usesPercentPenalty()) {
@@ -237,11 +244,14 @@
                 <span class="scoring-number-wrap">
                   <input
                     class="scoring-number"
-                    type="number"
+                    type="text"
                     min="0"
-                    step="any"
+                    max="99.99"
+                    step="0.01"
+                    inputmode="decimal"
                     [value]="scoring().incorrectPenalty"
-                    (change)="updatePercentPenalty($event)"
+                    (keydown)="blockScoreKey($event, false)"
+                    (input)="updatePercentPenalty($event)"
                   />
                   <span class="scoring-suffix" aria-hidden="true">%</span>
                 </span>
@@ -251,11 +261,14 @@
                 <span>Błędna odpowiedź</span>
                 <input
                   class="scoring-number"
-                  type="number"
+                  type="text"
+                  min="-99.99"
                   max="0"
-                  step="any"
+                  step="0.01"
+                  inputmode="decimal"
                   [value]="wrongAnswerPoints()"
-                  (change)="updateWrongAnswerPoints($event)"
+                  (keydown)="blockScoreKey($event, true)"
+                  (input)="updateWrongAnswerPoints($event)"
                 />
               </label>
             }

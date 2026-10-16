@@ -17,6 +17,8 @@ const NEW_QUIZ_SCORING: QuizScoring = {
   penaltyMode: 'fraction',
 };
 
+const MAX_SCORE_VALUE = 99.99;
+
 interface DraftAnswer {
   id: number;
   content: string;
@@ -53,6 +55,7 @@ export class QuizCreatePageComponent implements OnDestroy {
   private readonly routeSubscription: Subscription;
   private nextQuestionId = 2;
   private nextAnswerId = 2;
+  private readonly scoreInputRestoreTimers = new WeakMap<HTMLInputElement, ReturnType<typeof setTimeout>>();
   private exitDecision: ((canLeave: boolean) => void) | null = null;
   private exitDecisionPromise: Promise<boolean> | null = null;
   private quizSaved = false;
@@ -219,6 +222,48 @@ export class QuizCreatePageComponent implements OnDestroy {
     }
   }
 
+  blockScoreKey(event: KeyboardEvent, allowNegative: boolean): void {
+    if (event.ctrlKey || event.metaKey || ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+      return;
+    }
+
+    const input = event.target as HTMLInputElement;
+    const replacesAll = input.selectionStart === 0 && input.selectionEnd === input.value.length;
+    const currentValue = input.value;
+
+    if (event.key === '-' && allowNegative && (currentValue === '' || replacesAll)) {
+      return;
+    }
+
+    if (/^\d$/.test(event.key)) {
+      if (!replacesAll && (currentValue === '0' || currentValue === '-0')) {
+        event.preventDefault();
+      }
+
+      return;
+    }
+
+    if (event.key === '.' || event.key === ',') {
+      const selectionStart = input.selectionStart ?? currentValue.length;
+      const selectionEnd = input.selectionEnd ?? currentValue.length;
+      const selectedValue = currentValue.slice(selectionStart, selectionEnd);
+      const alreadyHasSeparator = /[.,]/.test(currentValue) && !/[.,]/.test(selectedValue);
+
+      if (alreadyHasSeparator || (allowNegative && currentValue === '0' && !replacesAll)) {
+        event.preventDefault();
+      }
+
+      return;
+    }
+
+    if (event.key === '-' && !allowNegative) {
+      event.preventDefault();
+      return;
+    }
+
+    event.preventDefault();
+  }
+
   updateLimit(field: 'maxAttempts' | 'quizTimeSeconds' | 'questionTimeSeconds', event: Event): void {
     const input = event.target as HTMLInputElement;
     const digits = input.value.replace(/\D/g, '');
@@ -283,7 +328,7 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   updateCorrectAnswerPoints(event: Event): void {
-    const parsed = this.readInputNumber((event.target as HTMLInputElement).value);
+    const parsed = this.readBoundedScoreInput(event, 0, MAX_SCORE_VALUE);
 
     if (parsed === null) {
       return;
@@ -300,7 +345,7 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   updateWrongAnswerPoints(event: Event): void {
-    const parsed = this.readInputNumber((event.target as HTMLInputElement).value);
+    const parsed = this.readBoundedScoreInput(event, -MAX_SCORE_VALUE, 0);
 
     if (parsed === null) {
       return;
@@ -315,7 +360,7 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   updatePercentPenalty(event: Event): void {
-    const parsed = this.readInputNumber((event.target as HTMLInputElement).value);
+    const parsed = this.readBoundedScoreInput(event, 0, MAX_SCORE_VALUE);
 
     if (parsed === null) {
       return;
@@ -409,18 +454,25 @@ export class QuizCreatePageComponent implements OnDestroy {
         }
 
         const stillShared = answer.points === null || answer.points === rightPoints || answer.points === wrongPoints;
+        const points = stillShared ? (correct ? rightPoints : wrongPoints) : answer.points;
 
         return {
           ...answer,
           correct,
-          points: stillShared ? (correct ? rightPoints : wrongPoints) : answer.points,
+          points: this.clampScoreValue(points ?? 0, correct ? 0 : -MAX_SCORE_VALUE, correct ? MAX_SCORE_VALUE : 0),
         };
       }),
     );
   }
 
   updateAnswerPoints(answerId: number, event: Event): void {
-    const parsed = this.readInputNumber((event.target as HTMLInputElement).value);
+    const answer = this.currentQuestion()?.answers.find((candidate) => candidate.id === answerId);
+
+    if (!answer) {
+      return;
+    }
+
+    const parsed = this.readBoundedScoreInput(event, answer.correct ? 0 : -MAX_SCORE_VALUE, answer.correct ? MAX_SCORE_VALUE : 0);
 
     if (parsed === null) {
       return;
@@ -839,9 +891,84 @@ export class QuizCreatePageComponent implements OnDestroy {
     return this.fixedWrongPoints(scoring);
   }
 
-  private readInputNumber(value: string): number | null {
-    const parsed = Number(value.trim().replace(',', '.'));
-    return Number.isFinite(parsed) ? parsed : null;
+  private readBoundedScoreInput(event: Event, min: number, max: number): number | null {
+    const input = event.target as HTMLInputElement;
+    const value = input.value.trim();
+    const allowNegative = min < 0;
+
+    if (value === '' || (allowNegative && (value === '-' || value === '-0' || value === '-0.' || value === '-0,'))) {
+      return null;
+    }
+
+    const match = value.match(/^(-?)(\d+)([.,]?)(\d*)$/);
+    if (!match || (!allowNegative && match[1] === '-')) {
+      input.value = '';
+      return null;
+    }
+
+    const [, sign, wholePart, separator, decimalPart] = match;
+    if (wholePart.length > 1 && wholePart.startsWith('0')) {
+      input.value = `${sign}0${separator}${decimalPart}`;
+      return this.readBoundedScoreInput(event, min, max);
+    }
+
+    if (allowNegative && sign === '' && wholePart === '0' && separator !== '') {
+      input.value = '0';
+      return 0;
+    }
+
+    if (separator !== '' && decimalPart.length === 0) {
+      return null;
+    }
+
+    const limitedDecimalPart = decimalPart.slice(0, 2);
+    if (decimalPart.length > 2) {
+      input.value = `${sign}${wholePart}${separator}${limitedDecimalPart}`;
+    }
+
+    const parsed = Number(`${sign}${wholePart}${separator === ',' ? '.' : separator}${limitedDecimalPart}`);
+
+    if (!Number.isFinite(parsed)) {
+      return null;
+    }
+
+    const bounded = this.clampScoreValue(parsed, min, max);
+
+    if (bounded !== parsed) {
+      input.value = separator === ',' ? bounded.toString().replace('.', ',') : bounded.toString();
+    }
+
+    this.restoreScoreInputText(input);
+    return bounded;
+  }
+
+  private restoreScoreInputText(input: HTMLInputElement): void {
+    const value = input.value;
+    const selectionStart = input.selectionStart;
+    const selectionEnd = input.selectionEnd;
+    const previousTimer = this.scoreInputRestoreTimers.get(input);
+
+    if (previousTimer !== undefined) {
+      clearTimeout(previousTimer);
+    }
+
+    const timer = setTimeout(() => {
+      if (!input.isConnected) {
+        return;
+      }
+
+      input.value = value;
+
+      if (selectionStart !== null && selectionEnd !== null) {
+        input.setSelectionRange(selectionStart, selectionEnd);
+      }
+    }, 0);
+
+    this.scoreInputRestoreTimers.set(input, timer);
+  }
+
+  private clampScoreValue(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, Math.trunc(value * 100) / 100));
   }
 
   private getDraftSignature(): string {
