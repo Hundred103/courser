@@ -85,6 +85,18 @@ public class QuizResultService {
         return response;
     }
 
+    public long getCompletedAttemptsCount(Long userId, Long quizId) {
+        if (!userRepository.existsById(userId)) {
+            throw new RuntimeException("Użytkownik nie istnieje");
+        }
+
+        if (quizId == null || quizId <= 0) {
+            throw new RuntimeException("Nieprawidłowy identyfikator quizu");
+        }
+
+        return quizResultRepository.countByUserIdAndQuizId(userId, quizId);
+    }
+
     private double scoreRatio(QuizResult result) {
         if (result.getMaxScore() == 0) {
             return result.getScore();

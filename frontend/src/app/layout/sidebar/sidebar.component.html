@@ -273,7 +273,29 @@
     <div class="confirm-banner settings-banner squircle" role="dialog" aria-modal="true" aria-labelledby="quiz-settings-title">
       <header class="settings-header">
         <h3 id="quiz-settings-title">{{ quizToStart.title }}</h3>
+        <div class="start-facts">
+          <p>Pytania: {{ quizToStart.questions.length }}</p>
+          @if (isLoggedIn() && completedAttemptsCount(); as attempts) {
+            <p>Ukończone podejścia: {{ attempts }}</p>
+          } @else if (isLoggedIn() && completedAttemptsCount() === 0) {
+            <p>Ukończone podejścia: 0</p>
+          }
+        </div>
       </header>
+
+      <section class="settings-section" aria-label="Ustawienia bieżącego rozwiązywania">
+        <label class="start-option-row">
+          <span>Losowa kolejność pytań</span>
+          <span class="start-toggle-control">
+            <input
+              type="checkbox"
+              [checked]="startRandomQuestionOrder()"
+              (change)="updateStartRandomQuestionOrder($event)"
+            />
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+          </span>
+        </label>
+      </section>
 
       <div class="confirm-actions settings-actions">
         <button class="secondary-button squircle" type="button" (click)="cancelStartQuiz()">

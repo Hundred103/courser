@@ -191,6 +191,19 @@ public class UserController {
         }
     }
 
+    @GetMapping("/me/quiz-results/count")
+    public ResponseEntity<?> getCurrentUserCompletedAttemptsCount(
+            @AuthenticationPrincipal JwtClaims claims,
+            @RequestParam Long quizId
+    ) {
+        try {
+            return ResponseEntity.ok(quizResultService.getCompletedAttemptsCount(claims.userId(), quizId));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(java.util.Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
     private void ensureCanAccessUser(Long userId, JwtClaims claims) {
         if (!userId.equals(claims.userId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Brak dostępu do danych tego użytkownika");

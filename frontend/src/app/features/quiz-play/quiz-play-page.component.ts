@@ -18,6 +18,10 @@ type QuizState =
   | { status: 'ready'; quiz: QuizPlayDTO; errorMessage: '' }
   | { status: 'error'; quiz: null; errorMessage: string };
 
+interface QuizRunOptions {
+  randomQuestionOrder: boolean | null;
+}
+
 @Component({
   selector: 'app-quiz-play-page',
   standalone: true,
@@ -76,6 +80,19 @@ export class QuizPlayPageComponent {
     },
   );
 
+  private readonly runOptions = toSignal(
+    this.route.queryParamMap.pipe(
+      map((params): QuizRunOptions => ({
+        randomQuestionOrder: this.readOptionalBoolean(params.get('randomQuestionOrder')),
+      })),
+    ),
+    {
+      initialValue: {
+        randomQuestionOrder: null,
+      } satisfies QuizRunOptions,
+    },
+  );
+
   readonly selectedAnswers = signal<Record<number, number[]>>({});
   readonly submittedAnswers = signal<Record<number, number[]>>({});
   readonly checkedQuestions = signal<ReadonlySet<number>>(new Set());
@@ -88,8 +105,7 @@ export class QuizPlayPageComponent {
   readonly showExitConfirm = signal(false);
   readonly activeSelectedQuestionId = signal<number | null>(null);
   readonly showAnswerFeedback = computed(() => {
-    const showCorrect = normalizeQuizLimits(this.quiz()?.limits).showCorrectAnswers;
-    return showCorrect || this.resultReady();
+    return normalizeQuizLimits(this.quiz()?.limits).showCorrectAnswers || this.resultReady();
   });
 
   readonly quiz = computed(() => this.quizState().quiz);
@@ -157,7 +173,9 @@ export class QuizPlayPageComponent {
       if (quiz.id !== this.currentQuizId) {
         this.currentQuizId = quiz.id;
         this.currentRandomQuestions = null;
-        this.questions.set(this.prepareQuestions(quiz.questions, normalizeQuizLimits(quiz.limits).randomQuestionOrder));
+        const configuredRandomQuestions = normalizeQuizLimits(quiz.limits).randomQuestionOrder;
+        const randomQuestions = this.runOptions().randomQuestionOrder ?? configuredRandomQuestions;
+        this.questions.set(this.prepareQuestions(quiz.questions, randomQuestions));
         this.resetQuizProgress();
       }
     });
@@ -472,5 +490,17 @@ export class QuizPlayPageComponent {
     }
 
     return roundedScore.toFixed(2).replace(/0+$/, '').replace('.', ',');
+  }
+
+  private readOptionalBoolean(value: string | null): boolean | null {
+    if (value === 'true') {
+      return true;
+    }
+
+    if (value === 'false') {
+      return false;
+    }
+
+    return null;
   }
 }

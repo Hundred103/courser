@@ -2,14 +2,15 @@ import { Component, ElementRef, HostListener, ViewChild, computed, effect, injec
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { catchError, combineLatest, finalize, map, of, startWith, switchMap } from 'rxjs';
+import { catchError, combineLatest, finalize, forkJoin, map, of, startWith, switchMap } from 'rxjs';
 import { BestQuizScore } from '../../core/models/quiz-score.model';
-import { QuizRawDTO } from '../../core/models/quiz.model';
+import { QuizPlayDTO, QuizRawDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { GuestQuizStorageService } from '../../core/services/guest-quiz-storage.service';
 import { QuizScoreService } from '../../core/services/quiz-score.service';
 import { buildQuizZip } from '../../core/utils/quiz-zip.util';
+import { normalizeQuizLimits } from '../../core/models/quiz-limits.model';
 
 type QuizSidebarState =
   | { status: 'loading'; quizzes: QuizRawDTO[]; errorMessage: '' }
@@ -106,7 +107,10 @@ export class SidebarComponent {
   readonly renameError = signal('');
   readonly busyQuizId = signal<number | null>(null);
   readonly quizPendingDelete = signal<QuizRawDTO | null>(null);
-  readonly quizPendingStart = signal<QuizRawDTO | null>(null);
+  readonly quizPendingStart = signal<QuizPlayDTO | null>(null);
+  readonly startQuizLoading = signal(false);
+  readonly startRandomQuestionOrder = signal(false);
+  readonly completedAttemptsCount = signal<number | null>(null);
   readonly quizPendingShare = signal<QuizRawDTO | null>(null);
   readonly authPromptMessage = signal<string | null>(null);
   readonly shareExpiresInSeconds = signal<number | null>(604800);
@@ -409,11 +413,38 @@ export class SidebarComponent {
 
   requestStartQuiz(quiz: QuizRawDTO): void {
     this.openMenuQuizId.set(null);
-    this.quizPendingStart.set(quiz);
+
+    if (this.startQuizLoading()) {
+      return;
+    }
+
+    this.startQuizLoading.set(true);
+
+    const completedAttemptsCount = this.isLoggedIn() && quiz.id > 0
+      ? this.quizScoreService.getCompletedAttemptsCount(quiz.id).pipe(catchError(() => of(null)))
+      : of(null);
+
+    forkJoin({
+      quiz: this.quizApiService.getQuizById(quiz.id),
+      completedAttemptsCount,
+    })
+      .pipe(finalize(() => this.startQuizLoading.set(false)))
+      .subscribe({
+        next: ({ quiz: quizToStart, completedAttemptsCount: attempts }) => {
+          const limits = normalizeQuizLimits(quizToStart.limits);
+          this.quizPendingStart.set(quizToStart);
+          this.startRandomQuestionOrder.set(limits.randomQuestionOrder);
+          this.completedAttemptsCount.set(attempts);
+        },
+        error: () => {
+          this.authPromptMessage.set('Nie udało się pobrać ustawień quizu. Spróbuj ponownie.');
+        },
+      });
   }
 
   cancelStartQuiz(): void {
     this.quizPendingStart.set(null);
+    this.completedAttemptsCount.set(null);
   }
 
   startQuiz(): void {
@@ -424,7 +455,16 @@ export class SidebarComponent {
     }
 
     this.quizPendingStart.set(null);
-    void this.router.navigate(['/quizzes', quiz.id, 'play']);
+    this.completedAttemptsCount.set(null);
+    void this.router.navigate(['/quizzes', quiz.id, 'play'], {
+      queryParams: {
+        randomQuestionOrder: this.startRandomQuestionOrder(),
+      },
+    });
+  }
+
+  updateStartRandomQuestionOrder(event: Event): void {
+    this.startRandomQuestionOrder.set((event.target as HTMLInputElement).checked);
   }
 
   cancelDeleteQuiz(): void {
