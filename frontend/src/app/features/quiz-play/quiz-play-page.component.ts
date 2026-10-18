@@ -676,12 +676,7 @@ export class QuizPlayPageComponent implements OnDestroy {
     const selectedAnswerIds = this.selectedAnswers()[question.id] ?? [];
     const isChecked = this.checkedQuestions().has(question.id);
 
-    return (
-      !this.resultReady() &&
-      !isChecked &&
-      this.activeSelectedQuestionId() === question.id &&
-      selectedAnswerIds.includes(answer.id)
-    );
+    return selectedAnswerIds.includes(answer.id) && (isChecked || this.activeSelectedQuestionId() === question.id);
   }
 
   isCorrectAnswerVisible(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {

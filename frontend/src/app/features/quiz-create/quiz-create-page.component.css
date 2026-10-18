@@ -6,9 +6,16 @@
 .top-actions {
   display: flex;
   gap: 0.65rem;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   margin-bottom: 1rem;
+}
+
+.top-actions-left {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
 }
 
 .undo-button:disabled {

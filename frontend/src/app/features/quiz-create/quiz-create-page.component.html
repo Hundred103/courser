@@ -1,18 +1,30 @@
 <section class="view-shell create-shell squircle">
   <div class="top-actions">
-    <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
-      Strona główna
-    </button>
-    @if (isEditMode()) {
-      <button
-        class="undo-button secondary-button squircle"
-        type="button"
-        [disabled]="!canUndoChanges()"
-        (click)="undoChanges()"
-      >
-        Cofnij zmiany
+    <div class="top-actions-left">
+      <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
+        Strona główna
       </button>
-    }
+      @if (isEditMode()) {
+        <button
+          class="undo-button secondary-button squircle"
+          type="button"
+          [disabled]="!canUndoChanges()"
+          (click)="undoChanges()"
+        >
+          Cofnij zmiany
+        </button>
+      }
+    </div>
+
+    <button
+      class="save-button primary-button squircle"
+      type="button"
+      [disabled]="!canSave()"
+      [title]="saveButtonTitle()"
+      (click)="saveQuiz()"
+    >
+      {{ isSaving() ? 'Zapisywanie...' : 'Zapisz quiz' }}
+    </button>
   </div>
 
   <article class="quiz-create squircle fade-in">

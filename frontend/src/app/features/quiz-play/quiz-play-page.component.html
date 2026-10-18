@@ -33,7 +33,6 @@
       @if (currentQuestion(); as question) {
         <div class="question-card squircle">
           <h3>{{ question.content }}</h3>
-          <p class="answer-hint">Możesz zaznaczyć więcej niż jedną odpowiedź.</p>
 
           @if (questionImageSrc(question); as imageSrc) {
             <figure class="question-image squircle">
