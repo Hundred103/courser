@@ -295,6 +295,18 @@
             <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
           </span>
         </label>
+
+        <label class="start-option-row">
+          <span>Tryb Anki</span>
+          <span class="start-toggle-control">
+            <input
+              type="checkbox"
+              [checked]="startAnkiMode()"
+              (change)="updateStartAnkiMode($event)"
+            />
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+          </span>
+        </label>
       </section>
 
       <div class="confirm-actions settings-actions">

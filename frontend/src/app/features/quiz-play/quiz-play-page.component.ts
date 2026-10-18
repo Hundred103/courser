@@ -20,6 +20,13 @@ type QuizState =
 
 interface QuizRunOptions {
   randomQuestionOrder: boolean | null;
+  anki: boolean | null;
+}
+
+type AnkiPlacement = 'soon' | 'middle' | 'nearEnd' | 'end';
+
+interface QuizQuestionInstance extends QuestionPlayDTO {
+  readonly runId: number;
 }
 
 @Component({
@@ -84,11 +91,13 @@ export class QuizPlayPageComponent {
     this.route.queryParamMap.pipe(
       map((params): QuizRunOptions => ({
         randomQuestionOrder: this.readOptionalBoolean(params.get('randomQuestionOrder')),
+        anki: this.readOptionalBoolean(params.get('anki')),
       })),
     ),
     {
       initialValue: {
         randomQuestionOrder: null,
+        anki: null,
       } satisfies QuizRunOptions,
     },
   );
@@ -96,7 +105,7 @@ export class QuizPlayPageComponent {
   readonly selectedAnswers = signal<Record<number, number[]>>({});
   readonly submittedAnswers = signal<Record<number, number[]>>({});
   readonly checkedQuestions = signal<ReadonlySet<number>>(new Set());
-  readonly questions = signal<QuestionPlayDTO[]>([]);
+  readonly questions = signal<QuizQuestionInstance[]>([]);
   readonly currentIndex = signal(0);
   readonly resultReady = signal(false);
   readonly resultSaved = signal(false);
@@ -104,6 +113,9 @@ export class QuizPlayPageComponent {
   readonly showIncompleteConfirm = signal(false);
   readonly showExitConfirm = signal(false);
   readonly activeSelectedQuestionId = signal<number | null>(null);
+  readonly ankiPlacements = signal<Record<number, AnkiPlacement>>({});
+  readonly lastCheckedQuestionRunId = signal<number | null>(null);
+  readonly ankiPlacementOptions: readonly AnkiPlacement[] = ['soon', 'middle', 'nearEnd', 'end'];
   readonly showAnswerFeedback = computed(() => {
     return normalizeQuizLimits(this.quiz()?.limits).showCorrectAnswers || this.resultReady();
   });
@@ -118,23 +130,24 @@ export class QuizPlayPageComponent {
   readonly canGoNext = computed(() => this.currentIndex() < this.totalQuestions() - 1);
   readonly isLastQuestion = computed(() => this.currentIndex() === this.totalQuestions() - 1);
   readonly checkButtonLabel = computed(() => (this.isLastQuestion() ? 'Sprawdź i zakończ' : 'Sprawdź'));
+  readonly isAnkiMode = computed(() => this.runOptions().anki === true);
   readonly isLoggedIn = this.authService.isLoggedIn;
   readonly canLeaveQuiz = computed(() => this.resultReady() || this.checkedQuestions().size === 0);
   readonly hasUnansweredQuestions = computed(() => {
-    const currentQuestionId = this.currentQuestion()?.id;
+    const currentQuestionId = this.currentQuestion()?.runId;
     const checkedQuestions = this.checkedQuestions();
-    return this.questions().some((question) => question.id !== currentQuestionId && !checkedQuestions.has(question.id));
+    return this.questions().some((question) => question.runId !== currentQuestionId && !checkedQuestions.has(question.runId));
   });
   readonly currentQuestionChecked = computed(() => {
     const question = this.currentQuestion();
-    return !!question && this.checkedQuestions().has(question.id);
+    return !!question && this.checkedQuestions().has(question.runId);
   });
   readonly canCheckCurrentQuestion = computed(() => {
     const question = this.currentQuestion();
     return (
       !!question &&
       !this.resultReady() &&
-      (this.selectedAnswers()[question.id]?.length ?? 0) > 0 &&
+      (this.selectedAnswers()[question.runId]?.length ?? 0) > 0 &&
       !this.currentQuestionChecked()
     );
   });
@@ -145,7 +158,7 @@ export class QuizPlayPageComponent {
 
     return this.questions().reduce(
       (totalScore, question) =>
-        totalScore + awardedQuestionScore(question.answers, submittedAnswers[question.id] ?? [], scoring),
+        totalScore + awardedQuestionScore(question.answers, submittedAnswers[question.runId] ?? [], scoring),
       0,
     );
   });
@@ -188,7 +201,7 @@ export class QuizPlayPageComponent {
       const user = this.authService.user();
       const quiz = this.quiz();
 
-      if (!user || !quiz || quiz.id < 0) {
+      if (this.isAnkiMode() || !user || !quiz || quiz.id < 0) {
         return;
       }
 
@@ -211,13 +224,13 @@ export class QuizPlayPageComponent {
     });
   }
 
-  selectAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): void {
-    if (this.checkedQuestions().has(question.id) || this.resultReady()) {
+  selectAnswer(question: QuizQuestionInstance, answer: AnswerPlayDTO): void {
+    if (this.checkedQuestions().has(question.runId) || this.resultReady()) {
       return;
     }
 
     this.selectedAnswers.update((answers) => {
-      const selectedAnswerIds = answers[question.id] ?? [];
+      const selectedAnswerIds = answers[question.runId] ?? [];
       const isSelected = selectedAnswerIds.includes(answer.id);
       const nextSelectedAnswerIds = isSelected
         ? selectedAnswerIds.filter((answerId) => answerId !== answer.id)
@@ -225,10 +238,10 @@ export class QuizPlayPageComponent {
 
       return {
         ...answers,
-        [question.id]: nextSelectedAnswerIds,
+        [question.runId]: nextSelectedAnswerIds,
       };
     });
-    this.activeSelectedQuestionId.set(question.id);
+    this.activeSelectedQuestionId.set(question.runId);
     this.showIncompleteConfirm.set(false);
     this.showExitConfirm.set(false);
   }
@@ -307,11 +320,16 @@ export class QuizPlayPageComponent {
     this.showIncompleteConfirm.set(false);
     this.showExitConfirm.set(false);
     this.activeSelectedQuestionId.set(null);
+    this.ankiPlacements.set({});
+    this.lastCheckedQuestionRunId.set(null);
   }
 
-  private prepareQuestions(questions: QuestionPlayDTO[], randomQuestions: boolean): QuestionPlayDTO[] {
+  private nextQuestionRunId = 1;
+
+  private prepareQuestions(questions: QuestionPlayDTO[], randomQuestions: boolean): QuizQuestionInstance[] {
     const questionsWithRandomAnswers = questions.map((question) => ({
       ...question,
+      runId: this.nextQuestionRunId++,
       answers: this.shuffle(question.answers),
     }));
 
@@ -329,31 +347,98 @@ export class QuizPlayPageComponent {
     return shuffled;
   }
 
-  private finishCurrentQuestionCheck(question: QuestionPlayDTO, allowEmpty = false): void {
-    const selectedAnswerIds = this.selectedAnswers()[question.id] ?? [];
+  private finishCurrentQuestionCheck(question: QuizQuestionInstance, allowEmpty = false): void {
+    const selectedAnswerIds = this.selectedAnswers()[question.runId] ?? [];
 
-    if ((selectedAnswerIds.length === 0 && !allowEmpty) || this.checkedQuestions().has(question.id)) {
+    if ((selectedAnswerIds.length === 0 && !allowEmpty) || this.checkedQuestions().has(question.runId)) {
       return;
     }
 
     this.applyLocalCheck(question, selectedAnswerIds);
   }
 
-  private applyLocalCheck(question: QuestionPlayDTO, selectedAnswerIds: number[]): void {
+  private applyLocalCheck(question: QuizQuestionInstance, selectedAnswerIds: number[]): void {
     this.submittedAnswers.update((answers) => ({
       ...answers,
-      [question.id]: selectedAnswerIds,
+      [question.runId]: selectedAnswerIds,
     }));
 
     this.checkedQuestions.update((checkedQuestions) => {
       const next = new Set(checkedQuestions);
-      next.add(question.id);
+      next.add(question.runId);
       return next;
     });
+
+    if (this.isAnkiMode()) {
+      this.lastCheckedQuestionRunId.set(question.runId);
+    }
 
     if (!this.canGoNext()) {
       this.resultReady.set(true);
     }
+  }
+
+  scheduleCurrentQuestion(placement: AnkiPlacement): void {
+    const question = this.currentQuestion();
+
+    if (
+      !this.isAnkiMode() ||
+      !question ||
+      !this.currentQuestionChecked() ||
+      this.isLastQuestion() ||
+      this.ankiPlacements()[question.runId]
+    ) {
+      return;
+    }
+
+    const anchorRunId = this.lastCheckedQuestionRunId();
+    const anchorIndex = this.questions().findIndex((candidate) => candidate.runId === anchorRunId);
+
+    if (anchorIndex < 0) {
+      return;
+    }
+
+    const remainingCount = this.questions().length - anchorIndex - 1;
+    const insertionOffset = this.ankiInsertionOffset(placement, remainingCount);
+    const copy: QuizQuestionInstance = {
+      ...question,
+      runId: this.nextQuestionRunId++,
+      answers: [...question.answers],
+    };
+    const questions = this.questions();
+    const insertionIndex = anchorIndex + insertionOffset + 1;
+    const nextQuestions = [
+      ...questions.slice(0, insertionIndex),
+      copy,
+      ...questions.slice(insertionIndex),
+    ];
+
+    this.questions.set(nextQuestions);
+    this.currentIndex.set(nextQuestions.findIndex((candidate) => candidate.runId === question.runId));
+    this.ankiPlacements.update((placements) => ({
+      ...placements,
+      [question.runId]: placement,
+    }));
+  }
+
+  ankiPlacementLabel(placement: AnkiPlacement): string {
+    return {
+      soon: 'Za chwilę',
+      middle: 'W środek',
+      nearEnd: 'Pod koniec',
+      end: 'Na koniec',
+    }[placement];
+  }
+
+  private ankiInsertionOffset(placement: AnkiPlacement, remainingCount: number): number {
+    const offsets: Record<AnkiPlacement, number> = {
+      soon: Math.ceil(remainingCount / 4),
+      middle: Math.ceil(remainingCount / 2),
+      nearEnd: Math.ceil((remainingCount * 3) / 4),
+      end: remainingCount,
+    };
+
+    return offsets[placement];
   }
 
   private persistScore(quizId: number, score: number, maxScore: number): void {
@@ -418,26 +503,26 @@ export class QuizPlayPageComponent {
     }
   }
 
-  isSelectedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
-    const selectedAnswerIds = this.selectedAnswers()[question.id] ?? [];
-    const isChecked = this.checkedQuestions().has(question.id);
+  isSelectedAnswer(question: QuizQuestionInstance, answer: AnswerPlayDTO): boolean {
+    const selectedAnswerIds = this.selectedAnswers()[question.runId] ?? [];
+    const isChecked = this.checkedQuestions().has(question.runId);
 
-    return selectedAnswerIds.includes(answer.id) && (isChecked || this.activeSelectedQuestionId() === question.id);
+    return selectedAnswerIds.includes(answer.id) && (isChecked || this.activeSelectedQuestionId() === question.runId);
   }
 
-  isCorrectAnswerVisible(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
-    return this.showAnswerFeedback() && answer.correct && (this.resultReady() || this.checkedQuestions().has(question.id));
+  isCorrectAnswerVisible(question: QuizQuestionInstance, answer: AnswerPlayDTO): boolean {
+    return this.showAnswerFeedback() && answer.correct && (this.resultReady() || this.checkedQuestions().has(question.runId));
   }
 
-  isSubmittedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
-    return (this.submittedAnswers()[question.id] ?? []).includes(answer.id);
+  isSubmittedAnswer(question: QuizQuestionInstance, answer: AnswerPlayDTO): boolean {
+    return (this.submittedAnswers()[question.runId] ?? []).includes(answer.id);
   }
 
-  isWrongSubmittedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
+  isWrongSubmittedAnswer(question: QuizQuestionInstance, answer: AnswerPlayDTO): boolean {
     return this.showAnswerFeedback() && this.isSubmittedAnswer(question, answer) && !answer.correct;
   }
 
-  isCorrectSubmittedAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): boolean {
+  isCorrectSubmittedAnswer(question: QuizQuestionInstance, answer: AnswerPlayDTO): boolean {
     return this.showAnswerFeedback() && this.isSubmittedAnswer(question, answer) && answer.correct;
   }
 
@@ -445,18 +530,18 @@ export class QuizPlayPageComponent {
     this.router.navigateByUrl('/');
   }
 
-  isQuestionChecked(question: QuestionPlayDTO): boolean {
-    return this.checkedQuestions().has(question.id);
+  isQuestionChecked(question: QuizQuestionInstance): boolean {
+    return this.checkedQuestions().has(question.runId);
   }
 
-  questionScoreText(question: QuestionPlayDTO): string {
-    const selectedIds = this.submittedAnswers()[question.id] ?? [];
+  questionScoreText(question: QuizQuestionInstance): string {
+    const selectedIds = this.submittedAnswers()[question.runId] ?? [];
     const awarded = awardedQuestionScore(question.answers, selectedIds, this.scoring());
     const maxScore = questionMaxScore(question.answers, this.scoring());
     return `${this.formatScore(awarded)}/${this.formatScore(maxScore)}`;
   }
 
-  answerPointsLabel(question: QuestionPlayDTO, answer: AnswerPlayDTO): string | null {
+  answerPointsLabel(question: QuizQuestionInstance, answer: AnswerPlayDTO): string | null {
     if (!this.showAnswerFeedback() || this.scoring().mode !== 'custom' || (!this.isQuestionChecked(question) && !this.resultReady())) {
       return null;
     }
@@ -471,13 +556,13 @@ export class QuizPlayPageComponent {
   private clearPendingSelectionForCurrentQuestion(): void {
     const question = this.currentQuestion();
 
-    if (!question || this.checkedQuestions().has(question.id)) {
+    if (!question || this.checkedQuestions().has(question.runId)) {
       return;
     }
 
     this.selectedAnswers.update((answers) => {
       const next = { ...answers };
-      delete next[question.id];
+      delete next[question.runId];
       return next;
     });
   }

@@ -88,6 +88,27 @@
             </div>
           </div>
 
+          @if (isAnkiMode() && currentQuestionChecked() && !isLastQuestion()) {
+            <div class="anki-add-controls" aria-label="Dodaj pytanie ponownie do kolejki">
+              <p>Dodaj</p>
+              <div class="anki-add-actions">
+                @for (placement of ankiPlacementOptions; track placement) {
+                  <button
+                    class="anki-add-button squircle"
+                    type="button"
+                    [class.added]="ankiPlacements()[question.runId] === placement"
+                    [disabled]="!!ankiPlacements()[question.runId]"
+                    (click)="scheduleCurrentQuestion(placement)">
+                    @if (ankiPlacements()[question.runId] === placement) {
+                      <span aria-hidden="true">✓</span>
+                    }
+                    {{ ankiPlacementLabel(placement) }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
         </div>
       }
 
@@ -133,16 +154,20 @@
 
       @if (resultReady()) {
         <div class="result-box squircle">
-          <p>Wynik: {{ formattedScore() }} / {{ formattedMaxScore() }}</p>
-          <p>Skuteczność: {{ scorePercent() }}%</p>
+          @if (isAnkiMode()) {
+            <p>Quiz zakończony</p>
+          } @else {
+            <p>Wynik: {{ formattedScore() }} / {{ formattedMaxScore() }}</p>
+            <p>Skuteczność: {{ scorePercent() }}%</p>
 
-          @if (isLoggedIn()) {
-            @if (resultSaveError()) {
-              <p class="result-status error">{{ resultSaveError() }}</p>
-            } @else if (resultSaved()) {
-              <p class="result-status success">Wynik został zapisany.</p>
-            } @else {
-              <p class="result-status">Zapisywanie wyniku...</p>
+            @if (isLoggedIn()) {
+              @if (resultSaveError()) {
+                <p class="result-status error">{{ resultSaveError() }}</p>
+              } @else if (resultSaved()) {
+                <p class="result-status success">Wynik został zapisany.</p>
+              } @else {
+                <p class="result-status">Zapisywanie wyniku...</p>
+              }
             }
           }
 

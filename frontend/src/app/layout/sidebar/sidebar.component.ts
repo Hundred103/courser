@@ -110,6 +110,7 @@ export class SidebarComponent {
   readonly quizPendingStart = signal<QuizPlayDTO | null>(null);
   readonly startQuizLoading = signal(false);
   readonly startRandomQuestionOrder = signal(false);
+  readonly startAnkiMode = signal(false);
   readonly completedAttemptsCount = signal<number | null>(null);
   readonly quizPendingShare = signal<QuizRawDTO | null>(null);
   readonly authPromptMessage = signal<string | null>(null);
@@ -434,6 +435,7 @@ export class SidebarComponent {
           const limits = normalizeQuizLimits(quizToStart.limits);
           this.quizPendingStart.set(quizToStart);
           this.startRandomQuestionOrder.set(limits.randomQuestionOrder);
+          this.startAnkiMode.set(false);
           this.completedAttemptsCount.set(attempts);
         },
         error: () => {
@@ -459,12 +461,17 @@ export class SidebarComponent {
     void this.router.navigate(['/quizzes', quiz.id, 'play'], {
       queryParams: {
         randomQuestionOrder: this.startRandomQuestionOrder(),
+        anki: this.startAnkiMode(),
       },
     });
   }
 
   updateStartRandomQuestionOrder(event: Event): void {
     this.startRandomQuestionOrder.set((event.target as HTMLInputElement).checked);
+  }
+
+  updateStartAnkiMode(event: Event): void {
+    this.startAnkiMode.set((event.target as HTMLInputElement).checked);
   }
 
   cancelDeleteQuiz(): void {
