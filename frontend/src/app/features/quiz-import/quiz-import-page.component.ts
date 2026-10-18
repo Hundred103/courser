@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
-import { UNLIMITED_QUIZ_LIMITS } from '../../core/models/quiz-limits.model';
+import { DEFAULT_QUIZ_LIMITS } from '../../core/models/quiz-limits.model';
 import { QuizCreateDTO } from '../../core/models/quiz.model';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { buildQuizZip, normalizeQuiz, parseQuizZip } from '../../core/utils/quiz-zip.util';
@@ -16,7 +16,7 @@ const QUIZ_TEMPLATE: QuizCreateDTO = {
     incorrectPenalty: 1,
     penaltyMode: 'points',
   },
-  limits: { ...UNLIMITED_QUIZ_LIMITS },
+  limits: { ...DEFAULT_QUIZ_LIMITS },
   questions: [
     {
       content: 'Która odpowiedź jest poprawna?',

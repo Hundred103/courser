@@ -1,14 +1,14 @@
-import { Component, OnDestroy, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, map, of, startWith, switchMap } from 'rxjs';
 import { AnswerPlayDTO } from '../../core/models/answer.model';
-import { limitsAreActive, normalizeQuizLimits } from '../../core/models/quiz-limits.model';
+import { normalizeQuizLimits } from '../../core/models/quiz-limits.model';
 import { QuestionPlayDTO } from '../../core/models/question.model';
 import { QuizPlayDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
-import { AttemptStateResponse, QuizApiService } from '../../core/services/quiz-api.service';
+import { QuizApiService } from '../../core/services/quiz-api.service';
 import { QuizScoreService } from '../../core/services/quiz-score.service';
 import { toImageSrc } from '../../core/utils/image-compression.util';
 import { awardedQuestionScore, normalizeQuizScoring, questionMaxScore } from '../../core/utils/quiz-scoring.util';
@@ -24,7 +24,7 @@ type QuizState =
   templateUrl: './quiz-play-page.component.html',
   styleUrl: './quiz-play-page.component.css',
 })
-export class QuizPlayPageComponent implements OnDestroy {
+export class QuizPlayPageComponent {
   private readonly quizApiService = inject(QuizApiService);
   private readonly authService = inject(AuthService);
   private readonly quizScoreService = inject(QuizScoreService);
@@ -34,14 +34,6 @@ export class QuizPlayPageComponent implements OnDestroy {
   private currentRandomQuestions: boolean | null = null;
   private exitDecision: ((canLeave: boolean) => void) | null = null;
   private exitDecisionPromise: Promise<boolean> | null = null;
-  private tickHandle: number | null = null;
-  private pollHandle: number | null = null;
-  private quizDeadlineLocal: number | null = null;
-  private questionDeadlineLocal: number | null = null;
-  private endingWarningMs = 10_000;
-  private openingQuestionId: number | null = null;
-  private submittingQuestionIds = new Set<number>();
-  private quizAutoFinished = false;
 
   private readonly quizState = toSignal(
     this.route.paramMap.pipe(
@@ -92,13 +84,6 @@ export class QuizPlayPageComponent implements OnDestroy {
   readonly resultReady = signal(false);
   readonly resultSaved = signal(false);
   readonly resultSaveError = signal<string | null>(null);
-  readonly attemptId = signal<number | null>(null);
-  readonly playBlockMessage = signal<string | null>(null);
-  readonly cheatingMessage = signal<string | null>(null);
-  readonly quizRemainingMs = signal<number | null>(null);
-  readonly questionRemainingMs = signal<number | null>(null);
-  readonly quizEndingSoon = signal(false);
-  readonly questionEndingSoon = signal(false);
   readonly showIncompleteConfirm = signal(false);
   readonly showExitConfirm = signal(false);
   readonly activeSelectedQuestionId = signal<number | null>(null);
@@ -153,8 +138,6 @@ export class QuizPlayPageComponent implements OnDestroy {
   );
   readonly formattedScore = computed(() => this.formatScore(this.score()));
   readonly formattedMaxScore = computed(() => this.formatScore(this.maxScore()));
-  readonly formattedQuizTime = computed(() => this.formatDuration(this.quizRemainingMs()));
-  readonly formattedQuestionTime = computed(() => this.formatDuration(this.questionRemainingMs()));
   readonly scorePercent = computed(() => {
     const maxScore = this.maxScore();
     return maxScore === 0 ? 0 : Math.round((this.score() / maxScore) * 100);
@@ -176,28 +159,7 @@ export class QuizPlayPageComponent implements OnDestroy {
         this.currentRandomQuestions = null;
         this.questions.set(this.prepareQuestions(quiz.questions, normalizeQuizLimits(quiz.limits).randomQuestionOrder));
         this.resetQuizProgress();
-        this.beginTimedAttempt(quiz);
       }
-    });
-
-    effect(() => {
-      const attemptId = this.attemptId();
-      const question = this.currentQuestion();
-      const quiz = this.quiz();
-
-      if (!attemptId || !question || !quiz || this.playBlockMessage() || this.cheatingMessage() || this.resultReady()) {
-        return;
-      }
-
-      if (this.openingQuestionId === question.id || this.checkedQuestions().has(question.id)) {
-        return;
-      }
-
-      this.openingQuestionId = question.id;
-      this.quizApiService.openAttemptQuestion(quiz.id, attemptId, question.id).subscribe({
-        next: (state) => this.applyServerClock(state),
-        error: (error) => this.handleAttemptError(error),
-      });
     });
 
     effect(() => {
@@ -218,19 +180,6 @@ export class QuizPlayPageComponent implements OnDestroy {
         return;
       }
 
-      if (this.cheatingMessage()) {
-        this.resultSaved.set(true);
-        this.resultSaveError.set(this.cheatingMessage());
-        return;
-      }
-
-      const limits = normalizeQuizLimits(quiz.limits);
-      const attemptId = this.attemptId();
-
-      if (limitsAreActive(limits) && !attemptId) {
-        return;
-      }
-
       this.resultSaved.set(true);
       this.resultSaveError.set(null);
       const scaledMax = Math.max(0, this.quizScoreService.toScaledScore(this.maxScore()));
@@ -240,21 +189,8 @@ export class QuizPlayPageComponent implements OnDestroy {
         scaledScore = scaledMax;
       }
 
-      if (limitsAreActive(limits) && attemptId) {
-
-        this.quizApiService.finishAttempt(quiz.id, attemptId).subscribe({
-          next: () => this.persistScore(quiz.id, scaledScore, scaledMax, attemptId),
-          error: (error) => this.handleSaveError(error),
-        });
-        return;
-      }
-
-      this.persistScore(quiz.id, scaledScore, scaledMax, null);
+      this.persistScore(quiz.id, scaledScore, scaledMax);
     });
-  }
-
-  ngOnDestroy(): void {
-    this.stopTimers();
   }
 
   selectAnswer(question: QuestionPlayDTO, answer: AnswerPlayDTO): void {
@@ -353,19 +289,6 @@ export class QuizPlayPageComponent implements OnDestroy {
     this.showIncompleteConfirm.set(false);
     this.showExitConfirm.set(false);
     this.activeSelectedQuestionId.set(null);
-    this.attemptId.set(null);
-    this.playBlockMessage.set(null);
-    this.cheatingMessage.set(null);
-    this.quizRemainingMs.set(null);
-    this.questionRemainingMs.set(null);
-    this.quizEndingSoon.set(false);
-    this.questionEndingSoon.set(false);
-    this.quizDeadlineLocal = null;
-    this.questionDeadlineLocal = null;
-    this.openingQuestionId = null;
-    this.submittingQuestionIds.clear();
-    this.quizAutoFinished = false;
-    this.stopTimers();
   }
 
   private prepareQuestions(questions: QuestionPlayDTO[], randomQuestions: boolean): QuestionPlayDTO[] {
@@ -395,29 +318,6 @@ export class QuizPlayPageComponent implements OnDestroy {
       return;
     }
 
-    const attemptId = this.attemptId();
-    const quiz = this.quiz();
-
-    if (attemptId && quiz && limitsAreActive(normalizeQuizLimits(quiz.limits))) {
-      if (this.submittingQuestionIds.has(question.id)) {
-        return;
-      }
-
-      this.submittingQuestionIds.add(question.id);
-      // QUIZ_ANSWERS_IN: send the player's selected answer ids
-      this.quizApiService.submitAttemptAnswers(quiz.id, attemptId, question.id, selectedAnswerIds).subscribe({
-        next: () => {
-          this.submittingQuestionIds.delete(question.id);
-          this.applyLocalCheck(question, selectedAnswerIds);
-        },
-        error: (error) => {
-          this.submittingQuestionIds.delete(question.id);
-          this.handleAttemptError(error);
-        },
-      });
-      return;
-    }
-
     this.applyLocalCheck(question, selectedAnswerIds);
   }
 
@@ -433,150 +333,17 @@ export class QuizPlayPageComponent implements OnDestroy {
       return next;
     });
 
-    if (this.quizAutoFinished || !this.canGoNext()) {
+    if (!this.canGoNext()) {
       this.resultReady.set(true);
-      this.stopTimers();
     }
   }
 
-  private beginTimedAttempt(quiz: QuizPlayDTO): void {
-    const limits = normalizeQuizLimits(quiz.limits);
-
-    if (!limitsAreActive(limits)) {
-      return;
-    }
-
-    if (!this.authService.user() || quiz.id < 0) {
-      this.playBlockMessage.set('Żeby rozwiązać quiz z limitem czasu lub podejść, zaloguj się.');
-      return;
-    }
-
-    this.quizApiService.startAttempt(quiz.id).subscribe({
-      next: (state) => {
-        this.attemptId.set(state.attemptId);
-        this.applyServerClock(state);
-        this.startTimerLoops(quiz.id);
-      },
-      error: (error) => {
-        this.playBlockMessage.set(this.readErrorMessage(error));
-      },
-    });
-  }
-
-  private startTimerLoops(quizId: number): void {
-    this.stopTimers();
-    this.tickHandle = window.setInterval(() => this.tickTimers(), 200);
-    this.pollHandle = window.setInterval(() => this.pollAttempt(quizId), 1000);
-  }
-
-  private stopTimers(): void {
-    if (this.tickHandle != null) {
-      window.clearInterval(this.tickHandle);
-      this.tickHandle = null;
-    }
-
-    if (this.pollHandle != null) {
-      window.clearInterval(this.pollHandle);
-      this.pollHandle = null;
-    }
-  }
-
-  private pollAttempt(quizId: number): void {
-    const attemptId = this.attemptId();
-
-    if (!attemptId || this.resultReady() || this.cheatingMessage()) {
-      return;
-    }
-
-    this.quizApiService.attemptState(quizId, attemptId, this.currentQuestion()?.id).subscribe({
-      next: (state) => {
-        this.applyServerClock(state);
-        if (state.quizExpired) {
-          this.expireQuiz();
-        } else if (state.questionExpired) {
-          this.expireQuestion();
-        }
-      },
-    });
-  }
-
-  private applyServerClock(state: AttemptStateResponse): void {
-    this.endingWarningMs = state.endingWarningSeconds * 1000;
-    this.quizDeadlineLocal = state.quizRemainingMillis == null ? null : Date.now() + state.quizRemainingMillis;
-    this.questionDeadlineLocal = state.questionRemainingMillis == null ? null : Date.now() + state.questionRemainingMillis;
-    this.tickTimers();
-  }
-
-  private tickTimers(): void {
-    if (this.resultReady() || this.cheatingMessage()) {
-      return;
-    }
-
-    const now = Date.now();
-
-    if (this.quizDeadlineLocal != null) {
-      const left = this.quizDeadlineLocal - now;
-      this.quizRemainingMs.set(Math.max(0, left));
-      this.quizEndingSoon.set(left > 0 && left <= this.endingWarningMs);
-      if (left <= 0) {
-        this.expireQuiz();
-      }
-    } else {
-      this.quizRemainingMs.set(null);
-      this.quizEndingSoon.set(false);
-    }
-
-    if (this.questionDeadlineLocal != null) {
-      const left = this.questionDeadlineLocal - now;
-      this.questionRemainingMs.set(Math.max(0, left));
-      this.questionEndingSoon.set(left > 0 && left <= this.endingWarningMs);
-      if (left <= 0) {
-        this.expireQuestion();
-      }
-    } else {
-      this.questionRemainingMs.set(null);
-      this.questionEndingSoon.set(false);
-    }
-  }
-
-  private expireQuestion(): void {
-    if (this.quizAutoFinished || this.cheatingMessage()) {
-      return;
-    }
-
-    const question = this.currentQuestion();
-
-    if (!question || this.checkedQuestions().has(question.id)) {
-      return;
-    }
-
-    this.finishCurrentQuestionCheck(question, true);
-  }
-
-  private expireQuiz(): void {
-    if (this.quizAutoFinished || this.resultReady() || this.cheatingMessage()) {
-      return;
-    }
-
-    this.quizAutoFinished = true;
-    const question = this.currentQuestion();
-
-    if (question && !this.checkedQuestions().has(question.id)) {
-      this.finishCurrentQuestionCheck(question, true);
-      return;
-    }
-
-    this.resultReady.set(true);
-    this.stopTimers();
-  }
-
-  private persistScore(quizId: number, score: number, maxScore: number, attemptId: number | null): void {
+  private persistScore(quizId: number, score: number, maxScore: number): void {
     this.quizScoreService
       .saveQuizResult({
         quizId,
         score,
         maxScore,
-        attemptId,
       })
       .subscribe({
         error: (error) => this.handleSaveError(error),
@@ -586,36 +353,8 @@ export class QuizPlayPageComponent implements OnDestroy {
   private handleSaveError(error: unknown): void {
     const message = this.readErrorMessage(error);
 
-    if (message.startsWith('Oszustwo')) {
-      this.cheatingMessage.set(message);
-      this.resultSaveError.set(message);
-      this.stopTimers();
-      return;
-    }
-
     this.resultSaved.set(false);
     this.resultSaveError.set(message);
-  }
-
-  private handleAttemptError(error: unknown): void {
-    const message = this.readErrorMessage(error);
-
-    if (message.startsWith('Oszustwo') || message.startsWith('Wykorzystano')) {
-      this.cheatingMessage.set(message.startsWith('Oszustwo') ? message : null);
-      this.playBlockMessage.set(message.startsWith('Wykorzystano') ? message : this.playBlockMessage());
-      if (message.startsWith('Oszustwo')) {
-        this.resultReady.set(true);
-        this.resultSaveError.set(message);
-        this.resultSaved.set(true);
-      }
-      this.stopTimers();
-      return;
-    }
-
-    if (this.quizAutoFinished) {
-      this.resultReady.set(true);
-      this.stopTimers();
-    }
   }
 
   private readErrorMessage(error: unknown): string {
@@ -633,17 +372,6 @@ export class QuizPlayPageComponent implements OnDestroy {
     }
 
     return 'Nie udało się zapisać rozwiązania.';
-  }
-
-  private formatDuration(milliseconds: number | null): string | null {
-    if (milliseconds == null) {
-      return null;
-    }
-
-    const totalSeconds = Math.ceil(milliseconds / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
   private resolveExitDecision(canLeave: boolean): void {

@@ -2,7 +2,6 @@ package net.edu.courser.quizservice.dto;
 import net.edu.courser.quizservice.entity.Answer;
 import net.edu.courser.quizservice.entity.*;
 import net.edu.courser.quizservice.service.ImageCompressor;
-import net.edu.courser.quizservice.service.QuizLimitsRules;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -96,20 +95,11 @@ public class MapperDTO {
         for (int index = 0; index < questions.size(); index++) {
             quiz.addQuestion(toQuestionEntity(questions.get(index), index, customScoring));
         }
-        QuizLimitsRules.validate(
-                quiz.getMaxAttempts(),
-                quiz.getQuizTimeSeconds(),
-                quiz.getQuestionTimeSeconds(),
-                questions.size()
-        );
         return quiz;
     }
 
     public QuizLimitsDTO toLimitsDto(Quiz quiz) {
         return new QuizLimitsDTO(
-                quiz.getMaxAttempts(),
-                quiz.getQuizTimeSeconds(),
-                quiz.getQuestionTimeSeconds(),
                 quiz.isRandomQuestionOrder(),
                 quiz.isShowCorrectAnswers()
         );
@@ -117,17 +107,11 @@ public class MapperDTO {
 
     public void applyLimits(Quiz quiz, QuizLimitsDTO limits) {
         if (limits == null) {
-            quiz.setMaxAttempts(null);
-            quiz.setQuizTimeSeconds(null);
-            quiz.setQuestionTimeSeconds(null);
             quiz.setRandomQuestionOrder(false);
             quiz.setShowCorrectAnswers(true);
             return;
         }
 
-        quiz.setMaxAttempts(limits.maxAttempts());
-        quiz.setQuizTimeSeconds(limits.quizTimeSeconds());
-        quiz.setQuestionTimeSeconds(limits.questionTimeSeconds());
         quiz.setRandomQuestionOrder(Boolean.TRUE.equals(limits.randomQuestionOrder()));
         quiz.setShowCorrectAnswers(limits.showCorrectAnswers() == null || limits.showCorrectAnswers());
     }

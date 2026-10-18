@@ -2,7 +2,7 @@ import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription, finalize } from 'rxjs';
-import { UNLIMITED_QUIZ_LIMITS, QuizLimits, normalizeQuizLimits, quizLimitsError } from '../../core/models/quiz-limits.model';
+import { DEFAULT_QUIZ_LIMITS, QuizLimits, normalizeQuizLimits } from '../../core/models/quiz-limits.model';
 import { QuizCreateDTO, QuizPlayDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
@@ -18,14 +18,6 @@ const NEW_QUIZ_SCORING: QuizScoring = {
 };
 
 const MAX_SCORE_VALUE = 99.99;
-const LIMIT_MAXIMUMS = {
-  maxAttempts: 1000,
-  quizTimeSeconds: 43_200,
-  questionTimeSeconds: 3_600,
-} as const;
-
-type QuizLimitField = keyof typeof LIMIT_MAXIMUMS;
-
 interface DraftAnswer {
   id: number;
   content: string;
@@ -74,7 +66,7 @@ export class QuizCreatePageComponent implements OnDestroy {
 
   readonly title = signal('');
   readonly scoring = signal<QuizScoring>({ ...NEW_QUIZ_SCORING });
-  readonly limits = signal<QuizLimits>({ ...UNLIMITED_QUIZ_LIMITS });
+  readonly limits = signal<QuizLimits>({ ...DEFAULT_QUIZ_LIMITS });
   readonly useDefaultPointsLook = signal(true);
   readonly questions = signal<DraftQuestion[]>([
     {
@@ -98,7 +90,6 @@ export class QuizCreatePageComponent implements OnDestroy {
   readonly usesPercentPenalty = computed(() => this.scoring().penaltyMode === 'percent');
   readonly showPointControls = computed(() => !this.useDefaultPointsLook());
   readonly wrongAnswerPoints = computed(() => -this.scoring().incorrectPenalty);
-  readonly limitsError = computed(() => quizLimitsError(this.limits(), this.questions().length));
   readonly canUndoChanges = computed(
     () => this.isEditMode() && this.hasUnsavedChanges() && !this.isSaving() && !this.isLoadingQuiz(),
   );
@@ -110,13 +101,9 @@ export class QuizCreatePageComponent implements OnDestroy {
     const hasTitle = this.title().trim().length > 0;
     const hasValidQuestions = this.questions().every((question) => this.isQuestionReady(question));
 
-    return hasTitle && hasValidQuestions && !this.limitsError() && !this.isSaving() && !this.isLoadingQuiz();
+    return hasTitle && hasValidQuestions && !this.isSaving() && !this.isLoadingQuiz();
   });
   readonly saveButtonTitle = computed(() => {
-    if (this.limitsError()) {
-      return this.limitsError();
-    }
-
     if (this.canSave()) {
       return '';
     }
@@ -223,12 +210,6 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.saveError.set('');
   }
 
-  blockDecimalKey(event: KeyboardEvent): void {
-    if (['.', ',', 'e', 'E', '+', '-'].includes(event.key)) {
-      event.preventDefault();
-    }
-  }
-
   blockScoreKey(event: KeyboardEvent, allowNegative: boolean): void {
     if (event.ctrlKey || event.metaKey || ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
       return;
@@ -269,33 +250,6 @@ export class QuizCreatePageComponent implements OnDestroy {
     }
 
     event.preventDefault();
-  }
-
-  updateLimit(field: QuizLimitField, event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const digits = input.value.replace(/\D/g, '').replace(/^0+/, '');
-
-    if (input.value !== digits) {
-      input.value = digits;
-    }
-
-    if (digits === '') {
-      this.limits.update((limits) => ({ ...limits, [field]: null }));
-      this.saveError.set('');
-      return;
-    }
-
-    const maximum = LIMIT_MAXIMUMS[field];
-    const maximumText = maximum.toString();
-    const exceedsMaximum = digits.length > maximumText.length || (digits.length === maximumText.length && digits > maximumText);
-    const value = exceedsMaximum ? maximum : Number(digits);
-
-    if (exceedsMaximum) {
-      input.value = maximumText;
-    }
-
-    this.limits.update((limits) => ({ ...limits, [field]: value }));
-    this.saveError.set('');
   }
 
   toggleAllowNegative(event: Event): void {
@@ -646,7 +600,7 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.rememberedPointPenalty = NEW_QUIZ_SCORING.incorrectPenalty;
     this.rememberedPercentPenalty = 50;
     this.stashedScoring = null;
-    this.limits.set({ ...UNLIMITED_QUIZ_LIMITS });
+    this.limits.set({ ...DEFAULT_QUIZ_LIMITS });
     this.useDefaultPointsLook.set(true);
     this.questions.set([
       {
@@ -780,7 +734,7 @@ export class QuizCreatePageComponent implements OnDestroy {
     }
 
     const scoringChanged = JSON.stringify(this.scoring()) !== JSON.stringify(NEW_QUIZ_SCORING);
-    const limitsChanged = JSON.stringify(this.limits()) !== JSON.stringify(UNLIMITED_QUIZ_LIMITS);
+    const limitsChanged = JSON.stringify(this.limits()) !== JSON.stringify(DEFAULT_QUIZ_LIMITS);
 
     return (
       scoringChanged ||

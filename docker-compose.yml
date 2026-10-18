@@ -66,7 +66,6 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 8082
       APP_JWT_SECRET: courser-local-development-secret-change-me
-      QUIZ_SERVICE_URL: http://quiz-service:8081
 
   gateway:
     build:

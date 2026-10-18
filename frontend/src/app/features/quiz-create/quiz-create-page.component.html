@@ -323,47 +323,6 @@
       }
 
       <label class="option-row">
-        <span>Liczba podejść</span>
-        <input
-          class="option-limit-input"
-          type="text"
-          inputmode="numeric"
-          placeholder="bez limitu"
-          [value]="limits().maxAttempts ?? ''"
-          (keydown)="blockDecimalKey($event)"
-          (input)="updateLimit('maxAttempts', $event)"
-        />
-      </label>
-      <label class="option-row">
-        <span>Czas quizu (s)</span>
-        <input
-          class="option-limit-input"
-          type="text"
-          inputmode="numeric"
-          placeholder="bez limitu"
-          [value]="limits().quizTimeSeconds ?? ''"
-          (keydown)="blockDecimalKey($event)"
-          (input)="updateLimit('quizTimeSeconds', $event)"
-        />
-      </label>
-      <label class="option-row">
-        <span>Czas pytania (s)</span>
-        <input
-          class="option-limit-input"
-          type="text"
-          inputmode="numeric"
-          placeholder="bez limitu"
-          [value]="limits().questionTimeSeconds ?? ''"
-          (keydown)="blockDecimalKey($event)"
-          (input)="updateLimit('questionTimeSeconds', $event)"
-        />
-      </label>
-
-      @if (limitsError()) {
-        <p class="status-text error">{{ limitsError() }}</p>
-      }
-
-      <label class="option-row">
         <span>Ujemny wynik obniża sumę quizu</span>
         <span class="scoring-toggle-control">
           <input type="checkbox" [checked]="scoring().allowNegativeScore" (change)="toggleAllowNegative($event)" />

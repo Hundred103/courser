@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { QuizCreateDTO } from '../models/quiz.model';
-import { parseQuizLimits, quizLimitsError, UNLIMITED_QUIZ_LIMITS } from '../models/quiz-limits.model';
+import { DEFAULT_QUIZ_LIMITS, parseQuizLimits } from '../models/quiz-limits.model';
 import { DEFAULT_QUIZ_SCORING, parseAnswerPoints, parseQuizScoring } from './quiz-scoring.util';
 
 const QUIZ_JSON = 'quiz.json';
@@ -52,7 +52,7 @@ export async function buildQuizZip(quiz: QuizCreateDTO): Promise<Blob> {
   const exportQuiz = {
     title: quiz.title,
     scoring: quiz.scoring ?? { ...DEFAULT_QUIZ_SCORING },
-    limits: quiz.limits ?? { ...UNLIMITED_QUIZ_LIMITS },
+    limits: quiz.limits ?? { ...DEFAULT_QUIZ_LIMITS },
     questions: quiz.questions.map((question, index) => ({
       content: question.content,
       image: question.image ? `image${index + 1}.jpg` : null,
@@ -89,11 +89,6 @@ export function normalizeQuiz(value: unknown): QuizCreateDTO {
 
   const questions = value['questions'].map((question, questionIndex) => normalizeQuestion(question, questionIndex));
   const limits = parseQuizLimits(value['limits']);
-  const limitsError = quizLimitsError(limits, questions.length);
-
-  if (limitsError) {
-    throw new Error(limitsError);
-  }
 
   return {
     title: value['title'].trim(),
