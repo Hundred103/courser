@@ -510,12 +510,20 @@ export class QuizPlayPageComponent {
 
   goNext(): void {
     if (this.canGoNext()) {
-      this.showIncompleteConfirm.set(false);
-      this.showExitConfirm.set(false);
-      this.clearPendingSelectionForCurrentQuestion();
-      this.activeSelectedQuestionId.set(null);
-      this.currentIndex.update((index) => index + 1);
+      this.goToQuestion(this.currentIndex() + 1);
     }
+  }
+
+  goToQuestion(index: number): void {
+    if (index < 0 || index >= this.totalQuestions() || index === this.currentIndex()) {
+      return;
+    }
+
+    this.showIncompleteConfirm.set(false);
+    this.showExitConfirm.set(false);
+    this.clearPendingSelectionForCurrentQuestion();
+    this.activeSelectedQuestionId.set(null);
+    this.currentIndex.set(index);
   }
 
   isSelectedAnswer(question: QuizQuestionInstance, answer: AnswerPlayDTO): boolean {
@@ -547,6 +555,22 @@ export class QuizPlayPageComponent {
 
   isQuestionChecked(question: QuizQuestionInstance): boolean {
     return this.checkedQuestions().has(question.runId);
+  }
+
+  isQuestionFullyCorrect(question: QuizQuestionInstance): boolean {
+    if (!this.isQuestionChecked(question)) {
+      return false;
+    }
+
+    const selectedAnswerIds = this.submittedAnswers()[question.runId] ?? [];
+    const correctAnswerIds = question.answers
+      .filter((answer) => answer.correct)
+      .map((answer) => answer.id);
+
+    return (
+      selectedAnswerIds.length === correctAnswerIds.length &&
+      correctAnswerIds.every((answerId) => selectedAnswerIds.includes(answerId))
+    );
   }
 
   questionScoreText(question: QuizQuestionInstance): string {

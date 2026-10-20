@@ -10,14 +10,15 @@
   } @else if (errorMessage()) {
     <p class="status-text error">{{ errorMessage() }}</p>
   } @else if (quiz(); as quizData) {
-    <article class="quiz-play squircle fade-in">
-      <header class="quiz-header">
-        <p>Pytanie {{ currentQuestionNumber() }} / {{ totalQuestions() }}</p>
-        <h2 class="neon-title">{{ quizData.title }}</h2>
-      </header>
+    <div class="quiz-play-layout">
+      <article class="quiz-play squircle fade-in">
+        <header class="quiz-header">
+          <p>Pytanie {{ currentQuestionNumber() }} / {{ totalQuestions() }}</p>
+          <h2 class="neon-title">{{ quizData.title }}</h2>
+        </header>
 
-      @if (currentQuestion(); as question) {
-        <div class="question-card squircle">
+        @if (currentQuestion(); as question) {
+          <div class="question-card squircle">
           <h3>{{ question.content }}</h3>
 
           @if (questionImageSrc(question); as imageSrc) {
@@ -109,10 +110,10 @@
             </div>
           }
 
-        </div>
-      }
+          </div>
+        }
 
-      @if (showIncompleteConfirm()) {
+        @if (showIncompleteConfirm()) {
         <div class="confirm-overlay">
           <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
             <p>Nie wszystkie pytania zostały rozwiązane. Czy na pewno chcesz zakończyć quiz?</p>
@@ -127,9 +128,9 @@
             </div>
           </div>
         </div>
-      }
+        }
 
-      @if (showExitConfirm()) {
+        @if (showExitConfirm()) {
         <div class="confirm-overlay">
           <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
             <p>
@@ -150,9 +151,9 @@
             </div>
           </div>
         </div>
-      }
+        }
 
-      @if (resultReady()) {
+        @if (resultReady()) {
         <div class="result-box squircle">
           <p>Wynik: {{ formattedScore() }} / {{ formattedMaxScore() }}</p>
           <p>Skuteczność: {{ scorePercent() }}%</p>
@@ -171,7 +172,26 @@
             Strona główna
           </button>
         </div>
-      }
-    </article>
+        }
+      </article>
+
+      <aside class="question-navigator" aria-label="Nawigacja po pytaniach">
+        <div class="question-navigator-grid">
+          @for (question of questions(); track question.runId; let index = $index) {
+            <button
+              class="question-navigator-tile squircle"
+              type="button"
+              [class.current]="index === currentIndex()"
+              [class.correct]="isQuestionFullyCorrect(question)"
+              [class.incorrect]="isQuestionChecked(question) && !isQuestionFullyCorrect(question)"
+              [attr.aria-current]="index === currentIndex() ? 'step' : null"
+              [attr.aria-label]="'Przejdź do pytania ' + (index + 1)"
+              (click)="goToQuestion(index)">
+              {{ index + 1 }}
+            </button>
+          }
+        </div>
+      </aside>
+    </div>
   }
 </section>
