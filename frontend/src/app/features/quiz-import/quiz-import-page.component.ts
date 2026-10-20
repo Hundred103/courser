@@ -14,7 +14,7 @@ const QUIZ_TEMPLATE: QuizCreateDTO = {
     allowNegativeScore: false,
     pointsPerCorrect: 1,
     incorrectPenalty: 1,
-    penaltyMode: 'points',
+    penaltyMode: 'fraction',
   },
   limits: { ...DEFAULT_QUIZ_LIMITS },
   questions: [
@@ -34,6 +34,19 @@ const QUIZ_TEMPLATE: QuizCreateDTO = {
     },
   ],
 };
+
+const TEMPLATE_INSTRUCTIONS = [
+  'To pole jest tylko opisem i można je usunąć.',
+  'image zawiera wyłącznie nazwę pliku z folderu images/, np. "obraz.jpg", albo null. Archiwum powinno zawierać: quiz.json oraz images/obraz.jpg.',
+  'mode: default = wspólne zasady punktacji; custom = punkty ustawione przy każdej odpowiedzi.',
+  'Dla default penaltyMode może być: fraction, points albo percent.',
+  'fraction odpowiada opcji „Domyślne punkty”; aplikacja zawsze używa +1 oraz -1.',
+  'Dla fraction wartości pointsPerCorrect i incorrectPenalty są ignorowane.',
+  'points: każda poprawna daje pointsPerCorrect, a błędna odejmuje incorrectPenalty.',
+  'percent: incorrectPenalty to procent kary; np. pointsPerCorrect: 2 i incorrectPenalty: 25 oznacza +2 za poprawną oraz -0,5 za błędną odpowiedź.',
+  'allowNegativeScore: true pozwala, aby ujemny wynik pytania obniżył wynik quizu.',
+  'Dla custom liczy się jedno pole points przy każdej odpowiedzi; np. { "text": "Warszawa", "correct": true, "points": 2 } albo { "text": "Kraków", "correct": false, "points": -1 }. Pozostałe ustawienia punktacji nie wpływają na wynik.',
+] as const;
 
 @Component({
   selector: 'app-quiz-import-page',
@@ -59,6 +72,7 @@ export class QuizImportPageComponent {
   readonly isCodeImporting = signal(false);
   readonly templateJson = JSON.stringify(
     {
+      _instrukcja: TEMPLATE_INSTRUCTIONS,
       title: QUIZ_TEMPLATE.title,
       scoring: QUIZ_TEMPLATE.scoring,
       limits: QUIZ_TEMPLATE.limits,
@@ -120,7 +134,7 @@ export class QuizImportPageComponent {
   }
 
   async downloadTemplate(): Promise<void> {
-    const blob = await buildQuizZip(QUIZ_TEMPLATE);
+    const blob = await buildQuizZip(QUIZ_TEMPLATE, TEMPLATE_INSTRUCTIONS);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
 

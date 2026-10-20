@@ -143,6 +143,16 @@ public class MapperDTO {
             default -> "fraction";
         };
 
+        if ("fraction".equals(penaltyMode)) {
+            return new QuizScoringDTO(
+                    mode,
+                    Boolean.TRUE.equals(scoring.allowNegativeScore()),
+                    1d,
+                    1d,
+                    "fraction"
+            );
+        }
+
         return new QuizScoringDTO(
                 mode,
                 Boolean.TRUE.equals(scoring.allowNegativeScore()),

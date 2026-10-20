@@ -47,9 +47,10 @@ export async function parseQuizZip(file: ArrayBuffer): Promise<QuizCreateDTO> {
   };
 }
 
-export async function buildQuizZip(quiz: QuizCreateDTO): Promise<Blob> {
+export async function buildQuizZip(quiz: QuizCreateDTO, instructions?: readonly string[]): Promise<Blob> {
   const zip = new JSZip();
   const exportQuiz = {
+    ...(instructions?.length ? { _instrukcja: instructions } : {}),
     title: quiz.title,
     scoring: quiz.scoring ?? { ...DEFAULT_QUIZ_SCORING },
     limits: quiz.limits ?? { ...DEFAULT_QUIZ_LIMITS },

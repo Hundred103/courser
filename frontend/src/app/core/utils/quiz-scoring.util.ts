@@ -98,12 +98,24 @@ export function parseQuizScoring(value: unknown): QuizScoring {
     throw new Error('Pole scoring.allowNegativeScore musi być typu boolean.');
   }
 
+  const normalizedPenaltyMode = penaltyMode === 'points' || penaltyMode === 'percent' ? penaltyMode : 'fraction';
+
+  if (normalizedPenaltyMode === 'fraction') {
+    return {
+      mode: mode === 'custom' ? 'custom' : 'default',
+      allowNegativeScore: allowNegativeScore === true,
+      pointsPerCorrect: 1,
+      incorrectPenalty: 1,
+      penaltyMode: 'fraction',
+    };
+  }
+
   return {
     mode: mode === 'custom' ? 'custom' : 'default',
     allowNegativeScore: allowNegativeScore === true,
     pointsPerCorrect: readNonNegative(value['pointsPerCorrect'], 1, 'scoring.pointsPerCorrect'),
     incorrectPenalty: readNonNegative(value['incorrectPenalty'], 1, 'scoring.incorrectPenalty'),
-    penaltyMode: penaltyMode === 'points' || penaltyMode === 'percent' ? penaltyMode : 'fraction',
+    penaltyMode: normalizedPenaltyMode,
   };
 }
 
