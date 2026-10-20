@@ -20,10 +20,10 @@ type QuizState =
 
 interface QuizRunOptions {
   randomQuestionOrder: boolean | null;
-  anki: boolean | null;
+  studyMode: boolean | null;
 }
 
-type AnkiPlacement = 'soon' | 'middle' | 'nearEnd' | 'end';
+type StudyPlacement = 'soon' | 'middle' | 'nearEnd' | 'end';
 
 interface QuizQuestionInstance extends QuestionPlayDTO {
   readonly runId: number;
@@ -91,13 +91,13 @@ export class QuizPlayPageComponent {
     this.route.queryParamMap.pipe(
       map((params): QuizRunOptions => ({
         randomQuestionOrder: this.readOptionalBoolean(params.get('randomQuestionOrder')),
-        anki: this.readOptionalBoolean(params.get('anki')),
+        studyMode: this.readOptionalBoolean(params.get('studyMode')),
       })),
     ),
     {
       initialValue: {
         randomQuestionOrder: null,
-        anki: null,
+        studyMode: null,
       } satisfies QuizRunOptions,
     },
   );
@@ -109,13 +109,14 @@ export class QuizPlayPageComponent {
   readonly currentIndex = signal(0);
   readonly resultReady = signal(false);
   readonly resultSaved = signal(false);
+  readonly completedAttemptRecorded = signal(false);
   readonly resultSaveError = signal<string | null>(null);
   readonly showIncompleteConfirm = signal(false);
   readonly showExitConfirm = signal(false);
   readonly activeSelectedQuestionId = signal<number | null>(null);
-  readonly ankiPlacements = signal<Record<number, AnkiPlacement>>({});
+  readonly studyPlacements = signal<Record<number, StudyPlacement>>({});
   readonly lastCheckedQuestionRunId = signal<number | null>(null);
-  readonly ankiPlacementOptions: readonly AnkiPlacement[] = ['soon', 'middle', 'nearEnd', 'end'];
+  readonly studyPlacementOptions: readonly StudyPlacement[] = ['soon', 'middle', 'nearEnd', 'end'];
   readonly showAnswerFeedback = computed(() => {
     return normalizeQuizLimits(this.quiz()?.limits).showCorrectAnswers || this.resultReady();
   });
@@ -130,7 +131,7 @@ export class QuizPlayPageComponent {
   readonly canGoNext = computed(() => this.currentIndex() < this.totalQuestions() - 1);
   readonly isLastQuestion = computed(() => this.currentIndex() === this.totalQuestions() - 1);
   readonly checkButtonLabel = computed(() => (this.isLastQuestion() ? 'Sprawdź i zakończ' : 'Sprawdź'));
-  readonly isAnkiMode = computed(() => this.runOptions().anki === true);
+  readonly isStudyMode = computed(() => this.runOptions().studyMode === true);
   readonly isLoggedIn = this.authService.isLoggedIn;
   readonly canLeaveQuiz = computed(() => this.resultReady() || this.checkedQuestions().size === 0);
   readonly hasUnansweredQuestions = computed(() => {
@@ -201,13 +202,21 @@ export class QuizPlayPageComponent {
       const user = this.authService.user();
       const quiz = this.quiz();
 
-      if (this.isAnkiMode() || !user || !quiz || quiz.id < 0) {
+      if (!user || !quiz || quiz.id < 0) {
         return;
       }
 
       const totalQuestions = this.totalQuestions();
 
       if (totalQuestions === 0) {
+        return;
+      }
+
+      if (this.isStudyMode()) {
+        if (!this.completedAttemptRecorded()) {
+          this.completedAttemptRecorded.set(true);
+          this.recordCompletedAttempt(quiz.id);
+        }
         return;
       }
 
@@ -316,11 +325,12 @@ export class QuizPlayPageComponent {
     this.currentIndex.set(0);
     this.resultReady.set(false);
     this.resultSaved.set(false);
+    this.completedAttemptRecorded.set(false);
     this.resultSaveError.set(null);
     this.showIncompleteConfirm.set(false);
     this.showExitConfirm.set(false);
     this.activeSelectedQuestionId.set(null);
-    this.ankiPlacements.set({});
+    this.studyPlacements.set({});
     this.lastCheckedQuestionRunId.set(null);
   }
 
@@ -369,7 +379,7 @@ export class QuizPlayPageComponent {
       return next;
     });
 
-    if (this.isAnkiMode()) {
+    if (this.isStudyMode()) {
       this.lastCheckedQuestionRunId.set(question.runId);
     }
 
@@ -378,15 +388,16 @@ export class QuizPlayPageComponent {
     }
   }
 
-  scheduleCurrentQuestion(placement: AnkiPlacement): void {
+  scheduleCurrentQuestion(placement: StudyPlacement): void {
     const question = this.currentQuestion();
 
     if (
-      !this.isAnkiMode() ||
+      !this.isStudyMode() ||
+      this.resultReady() ||
       !question ||
       !this.currentQuestionChecked() ||
       this.isLastQuestion() ||
-      this.ankiPlacements()[question.runId]
+      this.studyPlacements()[question.runId]
     ) {
       return;
     }
@@ -399,7 +410,7 @@ export class QuizPlayPageComponent {
     }
 
     const remainingCount = this.questions().length - anchorIndex - 1;
-    const insertionOffset = this.ankiInsertionOffset(placement, remainingCount);
+    const insertionOffset = this.studyInsertionOffset(placement, remainingCount);
     const copy: QuizQuestionInstance = {
       ...question,
       runId: this.nextQuestionRunId++,
@@ -415,23 +426,23 @@ export class QuizPlayPageComponent {
 
     this.questions.set(nextQuestions);
     this.currentIndex.set(nextQuestions.findIndex((candidate) => candidate.runId === question.runId));
-    this.ankiPlacements.update((placements) => ({
+    this.studyPlacements.update((placements) => ({
       ...placements,
       [question.runId]: placement,
     }));
   }
 
-  ankiPlacementLabel(placement: AnkiPlacement): string {
+  studyPlacementLabel(placement: StudyPlacement): string {
     return {
-      soon: 'Za chwilę',
+      soon: 'Na początek',
       middle: 'W środek',
       nearEnd: 'Pod koniec',
       end: 'Na koniec',
     }[placement];
   }
 
-  private ankiInsertionOffset(placement: AnkiPlacement, remainingCount: number): number {
-    const offsets: Record<AnkiPlacement, number> = {
+  private studyInsertionOffset(placement: StudyPlacement, remainingCount: number): number {
+    const offsets: Record<StudyPlacement, number> = {
       soon: Math.ceil(remainingCount / 4),
       middle: Math.ceil(remainingCount / 2),
       nearEnd: Math.ceil((remainingCount * 3) / 4),
@@ -451,6 +462,10 @@ export class QuizPlayPageComponent {
       .subscribe({
         error: (error) => this.handleSaveError(error),
       });
+  }
+
+  private recordCompletedAttempt(quizId: number): void {
+    this.quizScoreService.recordCompletedAttempt(quizId).subscribe();
   }
 
   private handleSaveError(error: unknown): void {

@@ -246,28 +246,28 @@
     0 0 35px rgba(75, 29, 115, 0.25);
 }
 
-.anki-add-controls {
+.study-add-controls {
   display: grid;
   gap: 0.5rem;
   justify-items: center;
   margin-top: 0.5rem;
 }
 
-.anki-add-controls p {
+.study-add-controls p {
   margin: 0;
   color: var(--text-soft);
   font-size: 0.82rem;
   font-weight: 800;
 }
 
-.anki-add-actions {
+.study-add-actions {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.45rem;
   width: min(100%, 520px);
 }
 
-.anki-add-button {
+.study-add-button {
   cursor: pointer;
   min-width: 0;
   min-height: 2.25rem;
@@ -281,25 +281,25 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
-.anki-add-button:hover:not(:disabled) {
+.study-add-button:hover:not(:disabled) {
   transform: translateY(-1px);
   border-color: rgba(255, 184, 77, 0.74);
   background: rgba(255, 184, 77, 0.12);
 }
 
-.anki-add-button:disabled {
+.study-add-button:disabled {
   cursor: default;
   opacity: 0.45;
 }
 
-.anki-add-button.added {
+.study-add-button.added {
   border-color: rgba(134, 239, 172, 0.72);
   color: #d8ffe4;
   opacity: 1;
   background: rgba(74, 222, 128, 0.18);
 }
 
-.anki-add-button span {
+.study-add-button span {
   margin-right: 0.22rem;
   color: #86efac;
 }
@@ -393,11 +393,11 @@
     min-height: 360px;
   }
 
-  .anki-add-actions {
+  .study-add-actions {
     gap: 0.35rem;
   }
 
-  .anki-add-button {
+  .study-add-button {
     font-size: 0.7rem;
   }
 }

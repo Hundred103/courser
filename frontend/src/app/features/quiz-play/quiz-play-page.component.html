@@ -88,21 +88,21 @@
             </div>
           </div>
 
-          @if (isAnkiMode() && currentQuestionChecked() && !isLastQuestion()) {
-            <div class="anki-add-controls" aria-label="Dodaj pytanie ponownie do kolejki">
+          @if (isStudyMode() && currentQuestionChecked() && !isLastQuestion()) {
+            <div class="study-add-controls" aria-label="Dodaj pytanie ponownie do kolejki">
               <p>Dodaj</p>
-              <div class="anki-add-actions">
-                @for (placement of ankiPlacementOptions; track placement) {
+              <div class="study-add-actions">
+                @for (placement of studyPlacementOptions; track placement) {
                   <button
-                    class="anki-add-button squircle"
+                    class="study-add-button squircle"
                     type="button"
-                    [class.added]="ankiPlacements()[question.runId] === placement"
-                    [disabled]="!!ankiPlacements()[question.runId]"
+                    [class.added]="studyPlacements()[question.runId] === placement"
+                    [disabled]="resultReady() || !!studyPlacements()[question.runId]"
                     (click)="scheduleCurrentQuestion(placement)">
-                    @if (ankiPlacements()[question.runId] === placement) {
+                    @if (studyPlacements()[question.runId] === placement) {
                       <span aria-hidden="true">✓</span>
                     }
-                    {{ ankiPlacementLabel(placement) }}
+                    {{ studyPlacementLabel(placement) }}
                   </button>
                 }
               </div>
@@ -154,20 +154,16 @@
 
       @if (resultReady()) {
         <div class="result-box squircle">
-          @if (isAnkiMode()) {
-            <p>Quiz zakończony</p>
-          } @else {
-            <p>Wynik: {{ formattedScore() }} / {{ formattedMaxScore() }}</p>
-            <p>Skuteczność: {{ scorePercent() }}%</p>
+          <p>Wynik: {{ formattedScore() }} / {{ formattedMaxScore() }}</p>
+          <p>Skuteczność: {{ scorePercent() }}%</p>
 
-            @if (isLoggedIn()) {
-              @if (resultSaveError()) {
-                <p class="result-status error">{{ resultSaveError() }}</p>
-              } @else if (resultSaved()) {
-                <p class="result-status success">Wynik został zapisany.</p>
-              } @else {
-                <p class="result-status">Zapisywanie wyniku...</p>
-              }
+          @if (isLoggedIn() && !isStudyMode()) {
+            @if (resultSaveError()) {
+              <p class="result-status error">{{ resultSaveError() }}</p>
+            } @else if (resultSaved()) {
+              <p class="result-status success">Wynik został zapisany.</p>
+            } @else {
+              <p class="result-status">Zapisywanie wyniku...</p>
             }
           }
 

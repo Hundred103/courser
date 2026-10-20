@@ -4,8 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import net.edu.courser.user.dto.BestQuizScoreResponse;
+import net.edu.courser.user.dto.CompleteQuizAttemptRequest;
 import net.edu.courser.user.dto.SaveQuizResultRequest;
+import net.edu.courser.user.entity.CompletedQuizAttempt;
 import net.edu.courser.user.entity.QuizResult;
+import net.edu.courser.user.repository.CompletedQuizAttemptRepository;
 import net.edu.courser.user.repository.QuizResultRepository;
 import net.edu.courser.user.repository.UserRepository;
 
@@ -20,6 +23,7 @@ import java.util.Map;
 public class QuizResultService {
 
     private final QuizResultRepository quizResultRepository;
+    private final CompletedQuizAttemptRepository completedQuizAttemptRepository;
     private final UserRepository userRepository;
 
     @Transactional
@@ -51,7 +55,9 @@ public class QuizResultService {
                 .maxScore(request.getMaxScore())
                 .build();
 
-        return quizResultRepository.save(result);
+        QuizResult savedResult = quizResultRepository.save(result);
+        saveCompletedAttempt(userId, request.getQuizId());
+        return savedResult;
     }
 
     public List<BestQuizScoreResponse> getBestScoresByUser(Long userId) {
@@ -85,6 +91,33 @@ public class QuizResultService {
         return response;
     }
 
+    @Transactional
+    public CompletedQuizAttempt saveCompletedAttempt(Long userId, Long quizId) {
+        if (!userRepository.existsById(userId)) {
+            throw new RuntimeException("Użytkownik nie istnieje");
+        }
+
+        if (quizId == null || quizId <= 0) {
+            throw new RuntimeException("Nieprawidłowy identyfikator quizu");
+        }
+
+        CompletedQuizAttempt attempt = CompletedQuizAttempt.builder()
+                .userId(userId)
+                .quizId(quizId)
+                .build();
+
+        return completedQuizAttemptRepository.save(attempt);
+    }
+
+    @Transactional
+    public CompletedQuizAttempt saveCompletedAttempt(Long userId, CompleteQuizAttemptRequest request) {
+        if (request == null) {
+            throw new RuntimeException("Ukończone podejście jest wymagane");
+        }
+
+        return saveCompletedAttempt(userId, request.getQuizId());
+    }
+
     public long getCompletedAttemptsCount(Long userId, Long quizId) {
         if (!userRepository.existsById(userId)) {
             throw new RuntimeException("Użytkownik nie istnieje");
@@ -94,7 +127,7 @@ public class QuizResultService {
             throw new RuntimeException("Nieprawidłowy identyfikator quizu");
         }
 
-        return quizResultRepository.countByUserIdAndQuizId(userId, quizId);
+        return completedQuizAttemptRepository.countByUserIdAndQuizId(userId, quizId);
     }
 
     private double scoreRatio(QuizResult result) {

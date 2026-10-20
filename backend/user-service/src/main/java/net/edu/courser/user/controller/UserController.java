@@ -7,6 +7,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 import net.edu.courser.user.dto.BestQuizScoreResponse;
+import net.edu.courser.user.dto.CompleteQuizAttemptRequest;
 import net.edu.courser.user.dto.LoginRequest;
 import net.edu.courser.user.dto.LoginResponse;
 import net.edu.courser.user.dto.RegisterRequest;
@@ -165,6 +166,20 @@ public class UserController {
         }
     }
 
+    @PostMapping("/me/quiz-attempts")
+    public ResponseEntity<?> saveCurrentUserCompletedQuizAttempt(
+            @AuthenticationPrincipal JwtClaims claims,
+            @RequestBody CompleteQuizAttemptRequest request
+    ) {
+        try {
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(quizResultService.saveCompletedAttempt(claims.userId(), request));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(java.util.Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/{id}/quiz-results/best")
     public ResponseEntity<?> getBestQuizScores(
             @PathVariable Long id,
@@ -191,7 +206,7 @@ public class UserController {
         }
     }
 
-    @GetMapping("/me/quiz-results/count")
+    @GetMapping("/me/quiz-attempts/count")
     public ResponseEntity<?> getCurrentUserCompletedAttemptsCount(
             @AuthenticationPrincipal JwtClaims claims,
             @RequestParam Long quizId
