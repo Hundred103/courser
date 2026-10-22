@@ -232,7 +232,24 @@
       </label>
 
       <label class="option-row">
-        <span>Domyślne punkty</span>
+        <span class="option-label-with-info">
+          <span>Domyślne punkty</span>
+          <span
+            class="info-tooltip-trigger"
+            role="img"
+            tabindex="0"
+            aria-label="Informacja o domyślnych punktach"
+            aria-describedby="default-points-tooltip"
+            (click)="$event.preventDefault(); $event.stopPropagation()"
+          >
+            <span aria-hidden="true">i</span>
+            <span id="default-points-tooltip" class="info-tooltip" role="tooltip">
+              Punkty za pytanie są liczone według wzoru:<br />
+              <strong>liczba zaznaczonych poprawnych odpowiedzi / liczba wszystkich poprawnych odpowiedzi − liczba zaznaczonych błędnych odpowiedzi / liczba wszystkich błędnych odpowiedzi.</strong><br />
+              Pełna poprawna odpowiedź daje 1 pkt. Przykład: gdy pytanie ma 2 poprawne i 2 błędne odpowiedzi, zaznaczenie 1 poprawnej i 1 błędnej daje 1/2 − 1/2 = 0 pkt.
+            </span>
+          </span>
+        </span>
         <span class="scoring-toggle-control">
           <input type="checkbox" [checked]="useDefaultPointsLook()" (change)="toggleDefaultPointsLook($event)" />
           <span class="toggle-track" aria-hidden="true">
@@ -244,7 +261,22 @@
       @if (showPointControls()) {
         @if (!usesCustomPoints()) {
           <label class="option-row">
-            <span>Kara procentowa</span>
+            <span class="option-label-with-info">
+              <span>Kara procentowa</span>
+              <span
+                class="info-tooltip-trigger"
+                role="img"
+                tabindex="0"
+                aria-label="Informacja o karze procentowej"
+                aria-describedby="percent-penalty-tooltip"
+                (click)="$event.preventDefault(); $event.stopPropagation()"
+              >
+                <span aria-hidden="true">i</span>
+                <span id="percent-penalty-tooltip" class="info-tooltip" role="tooltip">
+                  Każda błędna odpowiedź odejmuje wskazany procent punktów za poprawną odpowiedź. Przykład: przy 2 pkt za poprawną i karze 25%, błędna odpowiedź odejmuje 0,5 pkt.
+                </span>
+              </span>
+            </span>
             <span class="scoring-toggle-control">
               <input type="checkbox" [checked]="usesPercentPenalty()" (change)="togglePercentPenalty($event)" />
               <span class="toggle-track" aria-hidden="true">
@@ -253,7 +285,7 @@
             </span>
           </label>
 
-          <div class="options-points with-note">
+          <div class="options-points" [class.with-note]="!usesPercentPenalty()">
             <label class="scoring-field">
               <span>Poprawna odpowiedź</span>
               <input
@@ -304,10 +336,8 @@
             }
           </div>
 
-          @if (usesPercentPenalty()) {
-            <p class="penalty-note">Każda błędna odpowiedź odejmuje ten procent punktów zdobytych za poprawne.</p>
-          } @else {
-            <p class="penalty-note">Każda poprawna odpowiedź dodaje te punkty, a każda błędna odejmuje podaną karę.</p>
+          @if (!usesPercentPenalty()) {
+            <p class="penalty-note">Każda zaznaczona poprawna odpowiedź dodaje wskazaną liczbę punktów, a każda błędna ją odejmuje.</p>
           }
         }
 
