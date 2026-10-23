@@ -57,13 +57,13 @@ export class AuthService {
   }
 
   migrateGuestQuizzesToUser(user: AuthResponse): Observable<unknown[]> {
-    const guestQuizzes = this.guestQuizStorage.getAllCreateDtos();
+    const guestQuizzes = this.guestQuizStorage.getAllImports();
 
     if (guestQuizzes.length === 0) {
       return of([]);
     }
 
-    return forkJoin(guestQuizzes.map((quiz) => this.http.post(this.quizzesApiUrl, quiz))).pipe(
+    return forkJoin(guestQuizzes.map(({ quiz, rankingVersionId }) => this.http.post(`${this.quizzesApiUrl}/import-archive`, { quiz, rankingVersionId }))).pipe(
       tap(() => this.guestQuizStorage.clear()),
     );
   }

@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { catchError, combineLatest, finalize, forkJoin, map, of, startWith, switchMap } from 'rxjs';
-import { QuizPlayDTO, QuizRawDTO } from '../../core/models/quiz.model';
+import { QuizCreateDTO, QuizPlayDTO, QuizRawDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { GuestQuizStorageService } from '../../core/services/guest-quiz-storage.service';
@@ -202,13 +202,13 @@ export class SidebarComponent {
   exportQuiz(quiz: QuizRawDTO): void {
     this.openMenuQuizId.set(null);
 
-    if (quiz.id < 0) {
-      void this.exportGuestQuiz(quiz);
+    if (!this.isLoggedIn()) {
+      this.authPromptMessage.set('Żeby wyeksportować quiz, musisz się zalogować.');
       return;
     }
 
-    if (!this.isLoggedIn()) {
-      this.authPromptMessage.set('Żeby wyeksportować quiz, musisz się zalogować.');
+    if (quiz.id < 0) {
+      void this.exportGuestQuiz(quiz);
       return;
     }
 
@@ -265,6 +265,39 @@ export class SidebarComponent {
     this.shareCode.set('');
     this.shareError.set('');
     this.shareCopied.set(false);
+  }
+
+  copyQuiz(quiz: QuizRawDTO): void {
+    this.openMenuQuizId.set(null);
+
+    if (this.busyQuizId() === quiz.id) {
+      return;
+    }
+
+    if (quiz.id < 0) {
+      const dto = this.guestQuizStorage.toCreateDtoById(quiz.id);
+      if (!dto) return;
+      const copy = this.guestQuizStorage.create({ ...dto, title: `${dto.title} (kopia)` });
+      this.localQuizzes.update((quizzes) => [...quizzes, copy]);
+      return;
+    }
+
+    if (!this.isLoggedIn()) {
+      this.authPromptMessage.set('Żeby utworzyć kopię quizu, musisz się zalogować.');
+      return;
+    }
+
+    this.busyQuizId.set(quiz.id);
+    this.quizApiService
+      .getQuizById(quiz.id)
+      .pipe(
+        switchMap((sourceQuiz) => this.quizApiService.forkQuiz(quiz.id, this.toCreateDto(sourceQuiz))),
+        finalize(() => this.busyQuizId.set(null)),
+      )
+      .subscribe({
+        next: (copy) => this.localQuizzes.update((quizzes) => [...quizzes, copy]),
+        error: () => this.authPromptMessage.set('Nie udało się utworzyć kopii quizu.'),
+      });
   }
 
   updateDraftTitle(event: Event): void {
@@ -324,6 +357,23 @@ export class SidebarComponent {
           this.renameError.set(this.renameErrorMessage(error));
         },
       });
+  }
+
+  private toCreateDto(quiz: QuizPlayDTO): QuizCreateDTO {
+    return {
+      title: quiz.title,
+      scoring: quiz.scoring ?? null,
+      limits: quiz.limits ?? null,
+      questions: quiz.questions.map((question) => ({
+        content: question.content,
+        image: question.image ?? null,
+        answers: question.answers.map((answer) => ({
+          content: answer.content,
+          correct: answer.correct,
+          points: answer.points ?? null,
+        })),
+      })),
+    };
   }
 
   private renameErrorMessage(error: unknown): string {

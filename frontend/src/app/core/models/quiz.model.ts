@@ -32,3 +32,8 @@ export interface QuizCreateDTO {
 export interface QuizEditTitleDTO {
   title: string;
 }
+
+export interface QuizShareCodePreviewDTO {
+  quiz: QuizCreateDTO;
+  rankingVersionId: string;
+}

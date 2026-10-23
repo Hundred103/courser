@@ -38,6 +38,7 @@ interface QuizQuestionInstance extends QuestionPlayDTO {
   styleUrl: './quiz-play-page.component.css',
 })
 export class QuizPlayPageComponent {
+  private static readonly MAX_RANKING_DURATION_MS = 6 * 60 * 60 * 1000;
   private readonly quizApiService = inject(QuizApiService);
   private readonly authService = inject(AuthService);
   private readonly quizScoreService = inject(QuizScoreService);
@@ -123,6 +124,7 @@ export class QuizPlayPageComponent {
   readonly rankingSeconds = signal(0);
   readonly confettiPieces = Array.from({ length: 36 }, (_, index) => index);
   private rankingTimer: ReturnType<typeof setInterval> | null = null;
+  private rankingDeadlineTimer: ReturnType<typeof setTimeout> | null = null;
   private rankingStartedAt = 0;
   readonly studyPlacementOptions: readonly StudyPlacement[] = ['soon', 'middle', 'nearEnd', 'end'];
   readonly showAnswerFeedback = computed(() => {
@@ -346,6 +348,7 @@ export class QuizPlayPageComponent {
     this.rankingAttemptId.set(null);
     this.rankingResult.set(null);
     this.rankingSeconds.set(0);
+    this.stopRankingTimers();
   }
 
   private nextQuestionRunId = 1;
@@ -430,7 +433,7 @@ export class QuizPlayPageComponent {
     const copy: QuizQuestionInstance = {
       ...question,
       runId: this.nextQuestionRunId++,
-      answers: [...question.answers],
+      answers: this.shuffle(question.answers),
     };
     const questions = this.questions();
     const insertionIndex = anchorIndex + insertionOffset + 1;
@@ -485,7 +488,15 @@ export class QuizPlayPageComponent {
       next: ({ attemptId }) => {
         this.rankingAttemptId.set(attemptId);
         this.rankingStartedAt = Date.now();
-        this.rankingTimer = setInterval(() => this.rankingSeconds.set(Math.floor((Date.now() - this.rankingStartedAt) / 1000)), 250);
+        this.rankingTimer = setInterval(() => {
+          const elapsedMs = Date.now() - this.rankingStartedAt;
+          this.rankingSeconds.set(Math.min(Math.floor(elapsedMs / 1000), QuizPlayPageComponent.MAX_RANKING_DURATION_MS / 1000));
+          if (elapsedMs >= QuizPlayPageComponent.MAX_RANKING_DURATION_MS) this.finishQuizDueToRankingTimeLimit();
+        }, 250);
+        this.rankingDeadlineTimer = setTimeout(
+          () => this.finishQuizDueToRankingTimeLimit(),
+          QuizPlayPageComponent.MAX_RANKING_DURATION_MS,
+        );
       },
     });
   }
@@ -493,7 +504,7 @@ export class QuizPlayPageComponent {
   private finishRanking(quizId: number): void {
     const attemptId = this.rankingAttemptId();
     if (!attemptId || this.rankingResult()) return;
-    if (this.rankingTimer) { clearInterval(this.rankingTimer); this.rankingTimer = null; }
+    this.stopRankingTimers();
     const answers = this.questions().map((question) => ({
       questionIndex: question.rankingQuestionIndex,
       answerIndexes: (this.submittedAnswers()[question.runId] ?? []).map((answerId) => question.rankingAnswerIndexes[answerId]).filter((index): index is number => index !== undefined),
@@ -503,11 +514,52 @@ export class QuizPlayPageComponent {
 
   rankingTimeText(): string {
     const seconds = this.rankingSeconds();
-    return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+    return hours > 0
+      ? `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
+      : `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
   rankingDurationText(milliseconds: number): string {
-    return `${(milliseconds / 1000).toFixed(3).replace('.', ',')} s`;
+    const safeMilliseconds = Math.max(0, milliseconds);
+    const hours = Math.floor(safeMilliseconds / 3_600_000);
+    const minutes = Math.floor((safeMilliseconds % 3_600_000) / 60_000);
+    const seconds = ((safeMilliseconds % 60_000) / 1000).toFixed(3).replace('.', ',');
+    if (hours > 0) return `${hours} godz. ${minutes} min ${seconds} s`;
+    if (minutes > 0) return `${minutes} min ${seconds} s`;
+    return `${seconds} s`;
+  }
+
+  rankingPercentText(scoreScaled: number, maxScoreScaled: number): string {
+    if (maxScoreScaled === 0) return '0%';
+    const value = Math.round((scoreScaled / maxScoreScaled) * 10_000) / 100;
+    return `${value.toFixed(2).replace(/\.?0+$/, '').replace('.', ',')}%`;
+  }
+
+  private finishQuizDueToRankingTimeLimit(): void {
+    if (this.resultReady() || !this.rankingAttemptId()) return;
+
+    const question = this.currentQuestion();
+    if (question && !this.currentQuestionChecked()) {
+      const selectedAnswerIds = this.selectedAnswers()[question.runId] ?? [];
+      if (selectedAnswerIds.length > 0) this.finishCurrentQuestionCheck(question);
+    }
+
+    this.showIncompleteConfirm.set(false);
+    this.resultReady.set(true);
+  }
+
+  private stopRankingTimers(): void {
+    if (this.rankingTimer) {
+      clearInterval(this.rankingTimer);
+      this.rankingTimer = null;
+    }
+    if (this.rankingDeadlineTimer) {
+      clearTimeout(this.rankingDeadlineTimer);
+      this.rankingDeadlineTimer = null;
+    }
   }
 
   private recordCompletedAttempt(quizId: number): void {

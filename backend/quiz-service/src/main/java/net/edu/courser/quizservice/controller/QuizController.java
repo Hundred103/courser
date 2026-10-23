@@ -102,8 +102,9 @@ public class QuizController {
     }
 
     @PostMapping("/share-code-preview")
-    public QuizCreateDTO previewByCode(@RequestBody QuizImportByCodeDTO dto) {
-        return quizService.getCreateDtoByShareCode(dto.code());
+    public QuizShareCodePreviewDTO previewByCode(@RequestBody QuizImportByCodeDTO dto) {
+        QuizRankingVersion version = quizService.findRankingVersionByShareCode(dto.code());
+        return new QuizShareCodePreviewDTO(quizService.readSnapshot(version), version.getId().toString());
     }
 
     @PostMapping("/{id}/fork")

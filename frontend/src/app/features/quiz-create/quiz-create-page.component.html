@@ -43,7 +43,12 @@
       <section class="question-editor squircle">
         <div class="section-heading">
           <span>Pytanie {{ currentQuestionNumber() }}</span>
-          @if (rankingProtected()) { <span class="ranking-warning" title="Zmiana lub usunięcie pytania utworzy prywatną kopię z własnym rankingiem.">⚠</span> }
+          @if (rankingProtected()) {
+            <span class="ranking-warning question-ranking-warning" role="img" tabindex="0" aria-label="Ostrzeżenie dotyczące rankingu" aria-describedby="ranking-question-tooltip">
+              <svg viewBox="2 3 20 17" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.5h.01" /></svg>
+              <span id="ranking-question-tooltip" class="ranking-warning-tooltip" role="tooltip">Zmiana lub usunięcie pytania utworzy prywatną kopię z własnym rankingiem.</span>
+            </span>
+          }
           <div class="question-heading-actions">
             @if (totalQuestions() > 1) {
               <button
@@ -193,7 +198,7 @@
       <div class="control-side left">
         @if (canGoPrevious()) {
           <button class="question-nav-button secondary-button squircle" type="button" (click)="goPrevious()">
-            <span aria-hidden="true">&larr;</span>
+            <span class="nav-arrow" aria-hidden="true">&larr;</span>
             Poprzednie pytanie
           </button>
         }
@@ -201,10 +206,15 @@
 
       <div class="control-side right">
         <button class="question-nav-button secondary-button squircle" type="button" (click)="goNext()">
+          @if (rankingProtected() && currentIndex() === totalQuestions() - 1) {
+            <span class="ranking-warning" role="img" tabindex="0" aria-label="Ostrzeżenie dotyczące rankingu" aria-describedby="ranking-add-question-tooltip" (click)="$event.stopPropagation()">
+              <svg viewBox="2 3 20 17" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.5h.01" /></svg>
+              <span id="ranking-add-question-tooltip" class="ranking-warning-tooltip" role="tooltip">Dodanie pytania utworzy prywatną kopię z własnym rankingiem.</span>
+            </span>
+          }
           Następne pytanie
-          <span aria-hidden="true">&rarr;</span>
+          <span class="nav-arrow" aria-hidden="true">&rarr;</span>
         </button>
-        @if (rankingProtected() && currentIndex() === totalQuestions() - 1) { <span class="ranking-warning" title="Dodanie pytania utworzy prywatną kopię z własnym rankingiem.">⚠</span> }
       </div>
     </div>
 
@@ -236,7 +246,12 @@
       <label class="option-row">
         <span class="option-label-with-info">
           <span>Domyślne punkty</span>
-          @if (rankingProtected()) { <span class="ranking-warning" title="Zmiana punktacji utworzy prywatną kopię z własnym rankingiem.">⚠</span> }
+          @if (rankingProtected()) {
+            <span class="ranking-warning" role="img" tabindex="0" aria-label="Ostrzeżenie dotyczące rankingu" aria-describedby="ranking-default-scoring-tooltip" (click)="$event.preventDefault(); $event.stopPropagation()">
+              <svg viewBox="2 3 20 17" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.5h.01" /></svg>
+              <span id="ranking-default-scoring-tooltip" class="ranking-warning-tooltip" role="tooltip">Zmiana punktacji utworzy prywatną kopię z własnym rankingiem.</span>
+            </span>
+          }
           <span
             class="info-tooltip-trigger"
             role="img"
@@ -266,6 +281,12 @@
           <label class="option-row">
             <span class="option-label-with-info">
               <span>Kara procentowa</span>
+              @if (rankingProtected()) {
+                <span class="ranking-warning" role="img" tabindex="0" aria-label="Ostrzeżenie dotyczące rankingu" aria-describedby="ranking-percent-penalty-tooltip" (click)="$event.preventDefault(); $event.stopPropagation()">
+                  <svg viewBox="2 3 20 17" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.5h.01" /></svg>
+                  <span id="ranking-percent-penalty-tooltip" class="ranking-warning-tooltip" role="tooltip">Zmiana punktacji utworzy prywatną kopię z własnym rankingiem.</span>
+                </span>
+              }
               <span
                 class="info-tooltip-trigger"
                 role="img"
@@ -356,8 +377,15 @@
       }
 
       <label class="option-row">
-        <span>Ujemny wynik obniża sumę quizu</span>
-        @if (rankingProtected()) { <span class="ranking-warning" title="Zmiana punktacji utworzy prywatną kopię z własnym rankingiem.">⚠</span> }
+        <span class="option-label-with-info">
+          <span>Ujemny wynik obniża sumę quizu</span>
+          @if (rankingProtected()) {
+            <span class="ranking-warning" role="img" tabindex="0" aria-label="Ostrzeżenie dotyczące rankingu" aria-describedby="ranking-negative-score-tooltip" (click)="$event.preventDefault(); $event.stopPropagation()">
+              <svg viewBox="2 3 20 17" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.5h.01" /></svg>
+              <span id="ranking-negative-score-tooltip" class="ranking-warning-tooltip" role="tooltip">Zmiana punktacji utworzy prywatną kopię z własnym rankingiem.</span>
+            </span>
+          }
+        </span>
         <span class="scoring-toggle-control">
           <input type="checkbox" [checked]="scoring().allowNegativeScore" (change)="toggleAllowNegative($event)" />
           <span class="toggle-track" aria-hidden="true">

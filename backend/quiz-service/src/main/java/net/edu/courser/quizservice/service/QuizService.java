@@ -29,6 +29,7 @@ import java.util.List;
 public class QuizService {
     private static final String SHARE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int SHARE_CODE_LENGTH = 10;
+    private static final Duration MAX_RANKING_DURATION = Duration.ofHours(6);
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final QuizRepository quizRepository;
@@ -198,15 +199,41 @@ public class QuizService {
     @Transactional
     public Quiz importArchive(QuizArchiveImportDTO request, Long ownerUserId) {
         QuizCreateDTO dto = request.quiz();
-        Quiz quiz = mapperDTO.toQuizEntity(dto);
-        quiz.setOwnerUserId(ownerUserId);
+        QuizCreateDTO quizToImport = dto;
+        QuizRankingVersion matchingVersion = null;
         if (request.rankingVersionId() != null) {
             try {
                 QuizRankingVersion version = rankingVersionRepository.findById(UUID.fromString(request.rankingVersionId())).orElse(null);
                 if (version != null && version.getContentHash().equals(rankingContentHash(dto))) {
-                    quiz.setRankingVersion(version); version.setHasLoggedImport(true);
-                } else quiz.setTitle(dto.title() + " (kopia)");
-            } catch (IllegalArgumentException ignored) { quiz.setTitle(dto.title() + " (kopia)"); }
+                    // ZIP i kod udostępniania mają prowadzić do tego samego
+                    // snapshotu wersji rankingowej. Tytuł i dwa ustawienia
+                    // prezentacji nie są częścią treści rankingowej, więc ich
+                    // ręczna zmiana w ZIP-ie nie może zmienić wspólnego quizu.
+                    QuizCreateDTO snapshot = readSnapshot(version);
+                    quizToImport = new QuizCreateDTO(
+                            snapshot.title(),
+                            dto.questions(),
+                            dto.scoring(),
+                            snapshot.limits()
+                    );
+                    matchingVersion = version;
+                } else {
+                    quizToImport = new QuizCreateDTO(
+                            dto.title() + " (kopia)", dto.questions(), dto.scoring(), dto.limits()
+                    );
+                }
+            } catch (IllegalArgumentException ignored) {
+                quizToImport = new QuizCreateDTO(
+                        dto.title() + " (kopia)", dto.questions(), dto.scoring(), dto.limits()
+                );
+            }
+        }
+
+        Quiz quiz = mapperDTO.toQuizEntity(quizToImport);
+        quiz.setOwnerUserId(ownerUserId);
+        if (matchingVersion != null) {
+            quiz.setRankingVersion(matchingVersion);
+            matchingVersion.setHasLoggedImport(true);
         }
         Quiz saved = quizRepository.save(quiz);
         if (saved.getRankingVersion() == null) saved.setRankingVersion(ensureRankingVersion(saved, saved.getQuestions()));
@@ -261,7 +288,10 @@ public class QuizService {
         double score = 0;
         for (int i=0;i<snapshot.questions().size();i++) score += questionScore(snapshot.questions().get(i), submitted.getOrDefault(i, List.of()), snapshot.scoring());
         int scaled = (int)Math.round(score * 100);
-        long duration = Math.max(0, Duration.between(attempt.getStartedAt(), LocalDateTime.now()).toMillis());
+        long duration = Math.min(
+                MAX_RANKING_DURATION.toMillis(),
+                Math.max(0, Duration.between(attempt.getStartedAt(), LocalDateTime.now()).toMillis())
+        );
         attempt.setCompletedAt(LocalDateTime.now()); attempt.setStatus("FINISHED");
         QuizRankingVersion version = attempt.getRankingVersion();
         QuizRankingEntry candidate = QuizRankingEntry.builder().rankingVersion(version).userId(userId).scoreScaled(scaled).maxScoreScaled(max).durationMs(duration).completedAt(attempt.getCompletedAt()).build();
@@ -415,7 +445,7 @@ public class QuizService {
         }
     }
 
-    private QuizRankingVersion findRankingVersionByShareCode(String rawCode) {
+    public QuizRankingVersion findRankingVersionByShareCode(String rawCode) {
         String code = normalizeShareCode(rawCode);
         QuizShareCode shareCode = quizShareCodeRepository.findByCodeAndActiveTrue(code).orElseThrow(() -> new EntityNotFoundException("Share code not found"));
         if (shareCode.getExpiresAt() != null && !shareCode.getExpiresAt().isAfter(LocalDateTime.now())) throw new EntityNotFoundException("Share code expired");
@@ -427,7 +457,7 @@ public class QuizService {
         return version;
     }
 
-    private QuizCreateDTO readSnapshot(QuizRankingVersion version) {
+    public QuizCreateDTO readSnapshot(QuizRankingVersion version) {
         try { return objectMapper.readValue(version.getSnapshotJson(), QuizCreateDTO.class); }
         catch (Exception exception) { throw new IllegalStateException("Uszkodzona wersja rankingowa.", exception); }
     }

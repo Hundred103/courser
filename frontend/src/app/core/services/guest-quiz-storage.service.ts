@@ -5,6 +5,15 @@ import { normalizeQuizScoring } from '../utils/quiz-scoring.util';
 
 const STORAGE_KEY = 'guestQuizzes';
 
+export interface GuestQuizImport {
+  quiz: QuizCreateDTO;
+  rankingVersionId: string | null;
+}
+
+interface StoredGuestQuiz extends QuizPlayDTO {
+  rankingVersionId?: string | null;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -20,9 +29,9 @@ export class GuestQuizStorageService {
     return this.loadQuizzes().find((quiz) => quiz.id === id) ?? null;
   }
 
-  create(dto: QuizCreateDTO): QuizRawDTO {
+  create(dto: QuizCreateDTO, rankingVersionId: string | null = null): QuizRawDTO {
     const quizzes = this.loadQuizzes();
-    const quiz = this.toLocalQuiz(dto);
+    const quiz = this.toLocalQuiz(dto, rankingVersionId);
     this.saveQuizzes([...quizzes, quiz]);
 
     return {
@@ -35,8 +44,11 @@ export class GuestQuizStorageService {
     this.saveQuizzes(this.loadQuizzes().filter((quiz) => quiz.id !== id));
   }
 
-  getAllCreateDtos(): QuizCreateDTO[] {
-    return this.loadQuizzes().map((quiz) => this.toCreateDto(quiz));
+  getAllImports(): GuestQuizImport[] {
+    return this.loadQuizzes().map((quiz) => ({
+      quiz: this.toCreateDto(quiz),
+      rankingVersionId: typeof quiz.rankingVersionId === 'string' ? quiz.rankingVersionId : null,
+    }));
   }
 
   toCreateDtoById(id: number): QuizCreateDTO | null {
@@ -48,7 +60,7 @@ export class GuestQuizStorageService {
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  private toLocalQuiz(dto: QuizCreateDTO): QuizPlayDTO {
+  private toLocalQuiz(dto: QuizCreateDTO, rankingVersionId: string | null): StoredGuestQuiz {
     const quizId = this.nextLocalId();
     let nextQuestionId = quizId * 1000;
     let nextAnswerId = quizId * 100000;
@@ -58,6 +70,7 @@ export class GuestQuizStorageService {
       title: dto.title,
       scoring: normalizeQuizScoring(dto.scoring),
       limits: normalizeQuizLimits(dto.limits),
+      rankingVersionId,
       questions: dto.questions.map((question) => ({
         id: nextQuestionId--,
         content: question.content,
@@ -72,7 +85,7 @@ export class GuestQuizStorageService {
     };
   }
 
-  private toCreateDto(quiz: QuizPlayDTO): QuizCreateDTO {
+  private toCreateDto(quiz: StoredGuestQuiz): QuizCreateDTO {
     return {
       title: quiz.title,
       scoring: normalizeQuizScoring(quiz.scoring),
@@ -94,7 +107,7 @@ export class GuestQuizStorageService {
     return Math.min(-1, ...ids) - 1;
   }
 
-  private loadQuizzes(): QuizPlayDTO[] {
+  private loadQuizzes(): StoredGuestQuiz[] {
     const raw = localStorage.getItem(STORAGE_KEY);
 
     if (!raw) {
@@ -102,7 +115,7 @@ export class GuestQuizStorageService {
     }
 
     try {
-      const parsed = JSON.parse(raw) as QuizPlayDTO[];
+      const parsed = JSON.parse(raw) as StoredGuestQuiz[];
       return Array.isArray(parsed) ? parsed.filter((quiz) => quiz.id < 0) : [];
     } catch {
       localStorage.removeItem(STORAGE_KEY);
@@ -110,7 +123,7 @@ export class GuestQuizStorageService {
     }
   }
 
-  private saveQuizzes(quizzes: QuizPlayDTO[]): void {
+  private saveQuizzes(quizzes: StoredGuestQuiz[]): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(quizzes));
   }
 }

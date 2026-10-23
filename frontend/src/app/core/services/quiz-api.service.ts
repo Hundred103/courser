@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, of, throwError } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
-import { QuizPlayDTO, QuizRawDTO, QuizCreateDTO, QuizEditTitleDTO, RankingFinishDTO, RankingLeaderboardDTO } from '../models/quiz.model';
+import { QuizPlayDTO, QuizRawDTO, QuizCreateDTO, QuizEditTitleDTO, QuizShareCodePreviewDTO, RankingFinishDTO, RankingLeaderboardDTO } from '../models/quiz.model';
 import { environment } from '../../../environment';
 import { AuthService } from './auth.service';
 import { GuestQuizStorageService } from './guest-quiz-storage.service';
@@ -86,18 +86,18 @@ export class QuizApiService {
     return this.http.post<QuizRawDTO>(this.apiUrl, dto);
   }
 
-  importQuiz(dto: QuizCreateDTO): Observable<QuizRawDTO> {
+  importQuiz(dto: QuizCreateDTO, rankingVersionId: string | null = null): Observable<QuizRawDTO> {
     const user = this.authService.getCurrentUser();
 
     if (!user) {
-      return of(this.guestQuizStorage.create(dto));
+      return of(this.guestQuizStorage.create(dto, rankingVersionId));
     }
 
     return this.createQuiz(dto);
   }
 
   importArchiveQuiz(dto: QuizCreateDTO, rankingVersionId: string | null): Observable<QuizRawDTO> {
-    if (!this.authService.getCurrentUser()) return this.importQuiz(dto);
+    if (!this.authService.getCurrentUser()) return this.importQuiz(dto, rankingVersionId);
     return this.http.post<QuizRawDTO>(`${this.apiUrl}/import-archive`, { quiz: dto, rankingVersionId });
   }
 
@@ -116,8 +116,8 @@ export class QuizApiService {
 
     if (!user) {
       return this.http
-        .post<QuizCreateDTO>(`${this.apiUrl}/share-code-preview`, { code })
-        .pipe(switchMap((quiz) => this.importQuiz(quiz)));
+        .post<QuizShareCodePreviewDTO>(`${this.apiUrl}/share-code-preview`, { code })
+        .pipe(switchMap((preview) => this.importQuiz(preview.quiz, preview.rankingVersionId)));
     }
 
     return this.http.post<QuizRawDTO>(`${this.apiUrl}/import-code`, { code });

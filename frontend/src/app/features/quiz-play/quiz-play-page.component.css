@@ -502,11 +502,13 @@
  .ranking-timer { color: #8fc8ff; font-variant-numeric: tabular-nums; }
  .top-ranking-timer { margin: 0 0 0 auto; font-size: 1.12rem; font-weight: 900; }
  .ranking-box { margin-top: 1rem; border-top: 1px solid rgba(255,255,255,.18); padding-top: .8rem; text-align: left; }
- .ranking-box h3 { margin: 0 0 .45rem; }
+ .ranking-heading { position: relative; display: flex; align-items: center; min-height: 1.4rem; margin-bottom: .45rem; }
+ .ranking-box h3 { margin: 0; }
  .ranking-entry { display: flex; gap: .45rem; align-items: baseline; margin: .35rem 0; }
  .ranking-entry small { margin-left: auto; opacity: .8; }
- .ranking-entry.current-user { color: #8fc8ff; font-weight: 700; }
- .ranking-first { color: #ffd76a; font-weight: 700; }
+ .result-box .ranking-entry.current-user,
+ .result-box .ranking-entry.current-user small { color: #8fc8ff; font-weight: 700; opacity: 1; }
+ .ranking-first { position: absolute; left: 50%; margin: 0; color: #ffd76a; font-weight: 700; transform: translateX(-50%); white-space: nowrap; }
  .confetti-overlay { pointer-events: none; position: fixed; inset: 0; z-index: 100; overflow: hidden; }
  .confetti-overlay i { position: absolute; bottom: -4vh; left: calc((var(--piece, 0) + 1) * 2.7%); width: 10px; height: 16px; background: #ff6b35; animation: confetti-burst 3.6s cubic-bezier(.12,.7,.25,1) both; }
  .confetti-overlay i:nth-child(3n) { background: #60a5fa; width: 7px; height: 7px; border-radius: 50%; }
