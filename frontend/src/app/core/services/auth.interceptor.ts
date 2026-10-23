@@ -1,7 +1,7 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, throwError } from 'rxjs';
+import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
@@ -19,8 +19,21 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   return next(authRequest).pipe(
     catchError((error: unknown) => {
       if (error instanceof HttpErrorResponse && error.status === 401 && !isAuthEndpoint(request.url)) {
-        authService.logout();
-        void router.navigate(['/login']);
+        return authService.refreshAccessToken().pipe(
+          switchMap((refreshed) => {
+            if (refreshed) {
+              const refreshedToken = authService.getToken();
+              const retriedRequest = refreshedToken
+                ? request.clone({ setHeaders: { Authorization: `Bearer ${refreshedToken}` } })
+                : request;
+              return next(retriedRequest);
+            }
+
+            authService.logout(false);
+            void router.navigate(['/login']);
+            return throwError(() => error);
+          }),
+        );
       }
 
       return throwError(() => error);
@@ -29,5 +42,8 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
 };
 
 function isAuthEndpoint(url: string): boolean {
-  return url.endsWith('/users/login') || url.endsWith('/users/register');
+  return url.endsWith('/users/login')
+    || url.endsWith('/users/register')
+    || url.endsWith('/users/refresh')
+    || url.endsWith('/users/logout');
 }

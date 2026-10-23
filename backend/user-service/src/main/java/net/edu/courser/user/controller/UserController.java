@@ -2,6 +2,8 @@ package net.edu.courser.user.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.server.ResponseStatusException;
@@ -19,7 +21,9 @@ import net.edu.courser.user.security.JwtClaims;
 import net.edu.courser.user.security.JwtService;
 import net.edu.courser.user.service.QuizResultService;
 import net.edu.courser.user.service.UserService;
+import net.edu.courser.user.service.RefreshSessionService;
 
+import java.time.Duration;
 import java.util.List;
 
 @RestController
@@ -30,6 +34,13 @@ public class UserController {
     private final UserService userService;
     private final QuizResultService quizResultService;
     private final JwtService jwtService;
+    private final RefreshSessionService refreshSessionService;
+
+    @org.springframework.beans.factory.annotation.Value("${app.refresh-cookie.secure:false}")
+    private boolean refreshCookieSecure;
+
+    private static final String REFRESH_COOKIE_NAME = "courser_refresh";
+    private static final Duration REFRESH_SESSION_DURATION = Duration.ofHours(48);
 
     @GetMapping
     public ResponseEntity<List<UserProfileResponse>> getAllUsers() {
@@ -83,7 +94,9 @@ public class UserController {
                     .message("Rejestracja powiodła się")
                     .build();
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .header(HttpHeaders.SET_COOKIE, refreshCookie(refreshSessionService.create(created)).toString())
+                    .body(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(java.util.Collections.singletonMap("error", e.getMessage()));
@@ -103,11 +116,43 @@ public class UserController {
                     .message("Zalogowano pomyślnie")
                     .build();
 
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, refreshCookie(refreshSessionService.create(user)).toString())
+                    .body(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(java.util.Collections.singletonMap("error", e.getMessage()));
         }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@CookieValue(value = REFRESH_COOKIE_NAME, required = false) String refreshToken) {
+        try {
+            RefreshSessionService.RefreshResult refreshed = refreshSessionService.rotate(refreshToken);
+            User user = refreshed.user();
+            LoginResponse response = LoginResponse.builder()
+                    .id(user.getId())
+                    .email(user.getEmail())
+                    .username(user.getUsername())
+                    .token(jwtService.createToken(user))
+                    .message("Sesja odświeżona")
+                    .build();
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, refreshCookie(refreshed.rawToken()).toString())
+                    .body(response);
+        } catch (RuntimeException exception) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .header(HttpHeaders.SET_COOKIE, clearRefreshCookie().toString())
+                    .body(java.util.Collections.singletonMap("error", "Sesja wygasła. Zaloguj się ponownie."));
+        }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@CookieValue(value = REFRESH_COOKIE_NAME, required = false) String refreshToken) {
+        refreshSessionService.revoke(refreshToken);
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, clearRefreshCookie().toString())
+                .build();
     }
 
     @PutMapping("/{id}")
@@ -236,5 +281,25 @@ public class UserController {
                 user.getCreatedAt(),
                 user.getLastLogin()
         );
+    }
+
+    private ResponseCookie refreshCookie(String value) {
+        return ResponseCookie.from(REFRESH_COOKIE_NAME, value)
+                .httpOnly(true)
+                .secure(refreshCookieSecure)
+                .sameSite("Lax")
+                .path("/api/users")
+                .maxAge(REFRESH_SESSION_DURATION)
+                .build();
+    }
+
+    private ResponseCookie clearRefreshCookie() {
+        return ResponseCookie.from(REFRESH_COOKIE_NAME, "")
+                .httpOnly(true)
+                .secure(refreshCookieSecure)
+                .sameSite("Lax")
+                .path("/api/users")
+                .maxAge(Duration.ZERO)
+                .build();
     }
 }
