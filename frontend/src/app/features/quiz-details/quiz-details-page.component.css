@@ -33,7 +33,7 @@
    PANEL
 =========================== */
 .details-panel {
-  width: min(860px, 100%);
+  width: min(1196px, 100%);
   margin: 0 auto;
   display: grid;
   gap: 1.5rem;
@@ -43,6 +43,8 @@
    HEADER
 =========================== */
 .details-header {
+  width: min(860px, 100%);
+  margin-inline: auto;
   display: flex;
   align-items: center;
   gap: 1.2rem;
@@ -95,6 +97,89 @@
 .questions-list {
   display: grid;
   gap: 0.65rem;
+  width: min(860px, 100%);
+  margin-inline: auto;
+}
+
+.details-content-grid {
+  position: relative;
+}
+
+.ranking-box {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(145deg, rgba(38, 41, 48, 0.9), rgba(24, 26, 32, 0.94));
+}
+
+.ranking-heading {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  margin-bottom: .7rem;
+}
+
+.ranking-box h3 {
+  margin: 0;
+}
+
+.ranking-entry {
+  display: flex;
+  align-items: baseline;
+  gap: .45rem;
+  margin: .55rem 0;
+}
+
+.ranking-entry small {
+  margin-left: auto;
+  opacity: .8;
+  text-align: right;
+}
+
+.ranking-entry.current-user {
+  color: #8fc8ff;
+  font-weight: 700;
+}
+
+.ranking-first {
+  margin: 0;
+  color: #ffd76a;
+  font-weight: 700;
+}
+
+.details-ranking .ranking-first {
+  margin-left: auto;
+  text-align: right;
+}
+
+.details-ranking { margin-top: 1.5rem; }
+
+@media (min-width: 700px) {
+  .details-panel.has-ranking .details-header {
+    width: calc(100% - 336px);
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .details-panel.has-ranking .details-content-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    justify-content: space-between;
+    align-items: start;
+    gap: 2.25rem;
+  }
+
+  .details-panel.has-ranking .questions-list {
+    width: 100%;
+    margin-inline: 0;
+  }
+
+  .details-panel.has-ranking .details-ranking {
+    width: 300px;
+    margin-top: 0;
+    align-self: start;
+  }
 }
 
 .question-block {
@@ -247,4 +332,5 @@
     flex-direction: column;
     align-items: flex-start;
   }
+
 }

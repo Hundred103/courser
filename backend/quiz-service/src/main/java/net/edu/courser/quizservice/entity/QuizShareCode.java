@@ -21,8 +21,12 @@ public class QuizShareCode {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "quiz_id", nullable = false)
+    @JoinColumn(name = "quiz_id")
     private Quiz quiz;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ranking_version_id")
+    private QuizRankingVersion rankingVersion;
 
     @Column(nullable = false, length = 10)
     private String code;

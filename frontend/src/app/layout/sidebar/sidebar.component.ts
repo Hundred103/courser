@@ -2,26 +2,21 @@ import { Component, ElementRef, HostListener, ViewChild, computed, effect, injec
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { catchError, combineLatest, finalize, map, of, startWith, switchMap } from 'rxjs';
-import { BestQuizScore } from '../../core/models/quiz-score.model';
-import { QuizRawDTO } from '../../core/models/quiz.model';
+import { catchError, combineLatest, finalize, forkJoin, map, of, startWith, switchMap } from 'rxjs';
+import { QuizCreateDTO, QuizPlayDTO, QuizRawDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
-import { normalizeQuizLimits } from '../../core/models/quiz-limits.model';
-import { QuizApiService, QuizStartInfo } from '../../core/services/quiz-api.service';
+import { QuizApiService } from '../../core/services/quiz-api.service';
 import { GuestQuizStorageService } from '../../core/services/guest-quiz-storage.service';
 import { QuizScoreService } from '../../core/services/quiz-score.service';
 import { buildQuizZip } from '../../core/utils/quiz-zip.util';
+import { normalizeQuizLimits } from '../../core/models/quiz-limits.model';
 
 type QuizSidebarState =
   | { status: 'loading'; quizzes: QuizRawDTO[]; errorMessage: '' }
   | { status: 'ready'; quizzes: QuizRawDTO[]; errorMessage: '' }
   | { status: 'error'; quizzes: QuizRawDTO[]; errorMessage: string };
 
-type BestScoresState =
-  | { status: 'guest'; scores: BestQuizScore[] }
-  | { status: 'loading'; scores: BestQuizScore[] }
-  | { status: 'ready'; scores: BestQuizScore[] }
-  | { status: 'error'; scores: BestQuizScore[] };
+type RankingPositionsState = { positions: Map<number, number> };
 
 @Component({
   selector: 'app-sidebar',
@@ -74,25 +69,34 @@ export class SidebarComponent {
 
   private readonly localQuizzes = signal<QuizRawDTO[]>([]);
 
-  private readonly bestScoresState = toSignal(
+  private readonly rankingPositionsState = toSignal(
     combineLatest([
       toObservable(this.authService.user),
       toObservable(this.quizScoreService.scoresVersion).pipe(startWith(0)),
+      toObservable(this.quizState),
     ]).pipe(
-      switchMap(([user]) => {
+      switchMap(([user, , quizState]) => {
         if (!user) {
-          return of({ status: 'guest', scores: [] } satisfies BestScoresState);
+          return of({ positions: new Map<number, number>() } satisfies RankingPositionsState);
         }
-
-        return this.quizScoreService.getBestScores().pipe(
-          map((scores) => ({ status: 'ready', scores } satisfies BestScoresState)),
-          startWith({ status: 'loading', scores: [] } satisfies BestScoresState),
-          catchError(() => of({ status: 'error', scores: [] } satisfies BestScoresState)),
+        const quizzes = quizState.quizzes.filter((quiz) => quiz.id > 0);
+        if (!quizzes.length) return of({ positions: new Map<number, number>() } satisfies RankingPositionsState);
+        return forkJoin(
+          quizzes.map((quiz) =>
+            this.quizApiService.getRankingPosition(quiz.id).pipe(
+              map((result) => [quiz.id, result.position] as const),
+              catchError(() => of([quiz.id, null] as const)),
+            ),
+          ),
+        ).pipe(
+          map((items) => ({
+            positions: new Map(items.filter((item): item is readonly [number, number] => item[1] !== null)),
+          } satisfies RankingPositionsState)),
         );
       }),
     ),
     {
-      initialValue: { status: 'loading', scores: [] } satisfies BestScoresState,
+      initialValue: { positions: new Map<number, number>() } satisfies RankingPositionsState,
     },
   );
 
@@ -107,10 +111,12 @@ export class SidebarComponent {
   readonly renameError = signal('');
   readonly busyQuizId = signal<number | null>(null);
   readonly quizPendingDelete = signal<QuizRawDTO | null>(null);
-  readonly quizPendingStart = signal<QuizRawDTO | null>(null);
+  readonly quizPendingStart = signal<QuizPlayDTO | null>(null);
+  readonly startQuizLoading = signal(false);
+  readonly startRandomQuestionOrder = signal(false);
+  readonly startStudyMode = signal(false);
+  readonly completedAttemptsCount = signal<number | null>(null);
   readonly quizPendingShare = signal<QuizRawDTO | null>(null);
-  readonly startInfo = signal<QuizStartInfo | null>(null);
-  readonly startInfoError = signal('');
   readonly authPromptMessage = signal<string | null>(null);
   readonly shareExpiresInSeconds = signal<number | null>(604800);
   readonly shareCode = signal('');
@@ -124,11 +130,6 @@ export class SidebarComponent {
     { label: '30 dni', value: 2592000 },
     { label: 'Na zawsze', value: null },
   ];
-
-  private readonly bestScoresByQuizId = computed(() => {
-    const scores = this.bestScoresState().scores;
-    return new Map(scores.map((score) => [score.quizId, score]));
-  });
 
   constructor() {
     effect(() => {
@@ -201,13 +202,13 @@ export class SidebarComponent {
   exportQuiz(quiz: QuizRawDTO): void {
     this.openMenuQuizId.set(null);
 
-    if (quiz.id < 0) {
-      void this.exportGuestQuiz(quiz);
+    if (!this.isLoggedIn()) {
+      this.authPromptMessage.set('Żeby wyeksportować quiz, musisz się zalogować.');
       return;
     }
 
-    if (!this.isLoggedIn()) {
-      this.authPromptMessage.set('Żeby wyeksportować quiz, musisz się zalogować.');
+    if (quiz.id < 0) {
+      void this.exportGuestQuiz(quiz);
       return;
     }
 
@@ -264,6 +265,39 @@ export class SidebarComponent {
     this.shareCode.set('');
     this.shareError.set('');
     this.shareCopied.set(false);
+  }
+
+  copyQuiz(quiz: QuizRawDTO): void {
+    this.openMenuQuizId.set(null);
+
+    if (this.busyQuizId() === quiz.id) {
+      return;
+    }
+
+    if (quiz.id < 0) {
+      const dto = this.guestQuizStorage.toCreateDtoById(quiz.id);
+      if (!dto) return;
+      const copy = this.guestQuizStorage.create({ ...dto, title: `${dto.title} (kopia)` });
+      this.localQuizzes.update((quizzes) => [...quizzes, copy]);
+      return;
+    }
+
+    if (!this.isLoggedIn()) {
+      this.authPromptMessage.set('Żeby utworzyć kopię quizu, musisz się zalogować.');
+      return;
+    }
+
+    this.busyQuizId.set(quiz.id);
+    this.quizApiService
+      .getQuizById(quiz.id)
+      .pipe(
+        switchMap((sourceQuiz) => this.quizApiService.forkQuiz(quiz.id, this.toCreateDto(sourceQuiz))),
+        finalize(() => this.busyQuizId.set(null)),
+      )
+      .subscribe({
+        next: (copy) => this.localQuizzes.update((quizzes) => [...quizzes, copy]),
+        error: () => this.authPromptMessage.set('Nie udało się utworzyć kopii quizu.'),
+      });
   }
 
   updateDraftTitle(event: Event): void {
@@ -323,6 +357,23 @@ export class SidebarComponent {
           this.renameError.set(this.renameErrorMessage(error));
         },
       });
+  }
+
+  private toCreateDto(quiz: QuizPlayDTO): QuizCreateDTO {
+    return {
+      title: quiz.title,
+      scoring: quiz.scoring ?? null,
+      limits: quiz.limits ?? null,
+      questions: quiz.questions.map((question) => ({
+        content: question.content,
+        image: question.image ?? null,
+        answers: question.answers.map((answer) => ({
+          content: answer.content,
+          correct: answer.correct,
+          points: answer.points ?? null,
+        })),
+      })),
+    };
   }
 
   private renameErrorMessage(error: unknown): string {
@@ -400,83 +451,80 @@ export class SidebarComponent {
     });
   }
 
-  bestScoreLabel(quizId: number): string | null {
-    const bestScore = this.bestScoresByQuizId().get(quizId);
+  rankingPositionLabel(quizId: number): string | null {
+    const position = this.rankingPositionsState().positions.get(quizId);
+    if (!position) return null;
+    if (position === 1) return '🥇';
+    if (position === 2) return '🥈';
+    if (position === 3) return '🥉';
+    return position === 4 ? 'Czwarte miejsce' : 'Piąte miejsce';
+  }
 
-    if (!bestScore) {
-      return null;
-    }
-
-    return this.quizScoreService.formatScoreValue(bestScore.score, bestScore.maxScore);
+  isMedalPosition(quizId: number): boolean {
+    const position = this.rankingPositionsState().positions.get(quizId);
+    return position !== undefined && position <= 3;
   }
 
   requestStartQuiz(quiz: QuizRawDTO): void {
     this.openMenuQuizId.set(null);
-    this.startInfo.set(null);
-    this.startInfoError.set('');
-    this.quizPendingStart.set(quiz);
 
-    if (quiz.id < 0) {
-      const stored = this.guestQuizStorage.getById(quiz.id);
-      const limits = normalizeQuizLimits(stored?.limits);
-      this.startInfo.set({
-        id: quiz.id,
-        title: quiz.title,
-        questionCount: stored?.questions.length ?? 0,
-        quizTimeSeconds: limits.quizTimeSeconds,
-        questionTimeSeconds: limits.questionTimeSeconds,
-        maxAttempts: limits.maxAttempts,
-        usedAttempts: 0,
-      });
+    if (this.startQuizLoading()) {
       return;
     }
 
-    this.quizApiService.getStartInfo(quiz.id).subscribe({
-      next: (info) => this.startInfo.set(info),
-      error: () => this.startInfoError.set('Nie udało się pobrać informacji o quizie.'),
-    });
+    this.startQuizLoading.set(true);
+
+    const completedAttemptsCount = this.isLoggedIn() && quiz.id > 0
+      ? this.quizScoreService.getCompletedAttemptsCount(quiz.id).pipe(catchError(() => of(null)))
+      : of(null);
+
+    forkJoin({
+      quiz: this.quizApiService.getQuizById(quiz.id),
+      completedAttemptsCount,
+    })
+      .pipe(finalize(() => this.startQuizLoading.set(false)))
+      .subscribe({
+        next: ({ quiz: quizToStart, completedAttemptsCount: attempts }) => {
+          const limits = normalizeQuizLimits(quizToStart.limits);
+          this.quizPendingStart.set(quizToStart);
+          this.startRandomQuestionOrder.set(limits.randomQuestionOrder);
+          this.startStudyMode.set(false);
+          this.completedAttemptsCount.set(attempts);
+        },
+        error: () => {
+          this.authPromptMessage.set('Nie udało się pobrać ustawień quizu. Spróbuj ponownie.');
+        },
+      });
   }
 
   cancelStartQuiz(): void {
     this.quizPendingStart.set(null);
-    this.startInfo.set(null);
-    this.startInfoError.set('');
-  }
-
-  attemptsLabel(info: QuizStartInfo): string {
-    return info.maxAttempts == null ? `${info.usedAttempts}` : `${info.usedAttempts}/${info.maxAttempts}`;
-  }
-
-  formatLimitSeconds(seconds: number): string {
-    const minutes = Math.floor(seconds / 60);
-    const rest = seconds % 60;
-
-    if (minutes === 0) {
-      return `${rest} s`;
-    }
-
-    if (rest === 0) {
-      return `${minutes} min`;
-    }
-
-    return `${minutes} min ${rest} s`;
-  }
-
-  canStartQuiz(info: QuizStartInfo | null): boolean {
-    return !!info && (info.maxAttempts == null || info.usedAttempts < info.maxAttempts);
+    this.completedAttemptsCount.set(null);
   }
 
   startQuiz(): void {
     const quiz = this.quizPendingStart();
-    const info = this.startInfo();
 
-    if (!quiz || !this.canStartQuiz(info)) {
+    if (!quiz) {
       return;
     }
 
     this.quizPendingStart.set(null);
-    this.startInfo.set(null);
-    void this.router.navigate(['/quizzes', quiz.id, 'play']);
+    this.completedAttemptsCount.set(null);
+    void this.router.navigate(['/quizzes', quiz.id, 'play'], {
+      queryParams: {
+        randomQuestionOrder: this.startRandomQuestionOrder(),
+        studyMode: this.startStudyMode(),
+      },
+    });
+  }
+
+  updateStartRandomQuestionOrder(event: Event): void {
+    this.startRandomQuestionOrder.set((event.target as HTMLInputElement).checked);
+  }
+
+  updateStartStudyMode(event: Event): void {
+    this.startStudyMode.set((event.target as HTMLInputElement).checked);
   }
 
   cancelDeleteQuiz(): void {

@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, of, throwError } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
-import { QuizPlayDTO, QuizRawDTO, QuizCreateDTO, QuizEditTitleDTO } from '../models/quiz.model';
+import { QuizPlayDTO, QuizRawDTO, QuizCreateDTO, QuizEditTitleDTO, QuizShareCodePreviewDTO, RankingFinishDTO, RankingLeaderboardDTO } from '../models/quiz.model';
 import { environment } from '../../../environment';
 import { AuthService } from './auth.service';
 import { GuestQuizStorageService } from './guest-quiz-storage.service';
@@ -86,14 +86,19 @@ export class QuizApiService {
     return this.http.post<QuizRawDTO>(this.apiUrl, dto);
   }
 
-  importQuiz(dto: QuizCreateDTO): Observable<QuizRawDTO> {
+  importQuiz(dto: QuizCreateDTO, rankingVersionId: string | null = null): Observable<QuizRawDTO> {
     const user = this.authService.getCurrentUser();
 
     if (!user) {
-      return of(this.guestQuizStorage.create(dto));
+      return of(this.guestQuizStorage.create(dto, rankingVersionId));
     }
 
     return this.createQuiz(dto);
+  }
+
+  importArchiveQuiz(dto: QuizCreateDTO, rankingVersionId: string | null): Observable<QuizRawDTO> {
+    if (!this.authService.getCurrentUser()) return this.importQuiz(dto, rankingVersionId);
+    return this.http.post<QuizRawDTO>(`${this.apiUrl}/import-archive`, { quiz: dto, rankingVersionId });
   }
 
   createShareCode(id: number, expiresInSeconds: number | null): Observable<QuizShareCodeDTO> {
@@ -111,8 +116,8 @@ export class QuizApiService {
 
     if (!user) {
       return this.http
-        .post<QuizCreateDTO>(`${this.apiUrl}/share-code-preview`, { code })
-        .pipe(switchMap((quiz) => this.importQuiz(quiz)));
+        .post<QuizShareCodePreviewDTO>(`${this.apiUrl}/share-code-preview`, { code })
+        .pipe(switchMap((preview) => this.importQuiz(preview.quiz, preview.rankingVersionId)));
     }
 
     return this.http.post<QuizRawDTO>(`${this.apiUrl}/import-code`, { code });
@@ -150,66 +155,26 @@ export class QuizApiService {
     return this.http.get(`${this.apiUrl}/${id}/export`, { responseType: 'blob' });
   }
 
-  getStartInfo(quizId: number): Observable<QuizStartInfo> {
-    return this.http.get<QuizStartInfo>(`${this.apiUrl}/${quizId}/start-info`);
+  startRankingAttempt(id: number): Observable<{ attemptId: string }> {
+    return this.http.post<{ attemptId: string }>(`${this.apiUrl}/${id}/ranking-attempts`, {});
   }
 
-  startAttempt(quizId: number): Observable<AttemptStateResponse> {
-    return this.http.post<AttemptStateResponse>(`${this.apiUrl}/${quizId}/attempts`, {});
+  finishRankingAttempt(id: number, attemptId: string, answers: { questionIndex: number; answerIndexes: number[] }[]): Observable<RankingFinishDTO> {
+    return this.http.post<RankingFinishDTO>(`${this.apiUrl}/${id}/ranking-attempts/${attemptId}/finish`, { answers });
   }
 
-  attemptState(quizId: number, attemptId: number, questionId?: number | null): Observable<AttemptStateResponse> {
-    return this.http.get<AttemptStateResponse>(`${this.apiUrl}/${quizId}/attempts/${attemptId}`, {
-      params: questionId == null ? {} : { questionId },
-    });
+  getRankingPosition(id: number): Observable<{ position: number | null }> {
+    return this.http.get<{ position: number | null }>(`${this.apiUrl}/${id}/ranking-position`);
   }
 
-  openAttemptQuestion(quizId: number, attemptId: number, questionId: number): Observable<AttemptStateResponse> {
-    return this.http.post<AttemptStateResponse>(
-      `${this.apiUrl}/${quizId}/attempts/${attemptId}/questions/${questionId}/open`,
-      {},
-    );
+  getRankingLeaderboard(id: number): Observable<RankingLeaderboardDTO> {
+    return this.http.get<RankingLeaderboardDTO>(`${this.apiUrl}/${id}/ranking`);
   }
 
-  // QUIZ_ANSWERS_IN: POST the player's selected answer ids
-  submitAttemptAnswers(
-    quizId: number,
-    attemptId: number,
-    questionId: number,
-    answerIds: number[],
-  ): Observable<AttemptStateResponse> {
-    return this.http.post<AttemptStateResponse>(
-      `${this.apiUrl}/${quizId}/attempts/${attemptId}/questions/${questionId}/submit`,
-      { answerIds },
-    );
+  forkQuiz(id: number, dto: QuizCreateDTO): Observable<QuizRawDTO> {
+    return this.http.post<QuizRawDTO>(`${this.apiUrl}/${id}/fork`, dto);
   }
 
-  finishAttempt(quizId: number, attemptId: number): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/${quizId}/attempts/${attemptId}/finish`, {});
-  }
-}
-
-export interface QuizStartInfo {
-  id: number;
-  title: string;
-  questionCount: number;
-  quizTimeSeconds: number | null;
-  questionTimeSeconds: number | null;
-  maxAttempts: number | null;
-  usedAttempts: number;
-}
-
-export interface AttemptStateResponse {
-  attemptId: number;
-  maxAttempts: number | null;
-  usedAttempts: number;
-  quizRemainingMillis: number | null;
-  questionRemainingMillis: number | null;
-  quizEndingSoon: boolean;
-  questionEndingSoon: boolean;
-  quizExpired: boolean;
-  questionExpired: boolean;
-  endingWarningSeconds: number;
 }
 
 export interface QuizShareCodeDTO {

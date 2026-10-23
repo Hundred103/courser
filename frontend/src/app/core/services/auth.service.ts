@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, forkJoin, of, tap } from 'rxjs';
+import { Observable, catchError, finalize, forkJoin, map, of, shareReplay, tap } from 'rxjs';
 import { environment } from '../../../environment';
 import { GuestQuizStorageService } from './guest-quiz-storage.service';
 
@@ -35,9 +35,19 @@ export class AuthService {
   private readonly quizzesApiUrl = `${environment.apiUrl}/quizzes`;
 
   private readonly currentUser = signal<AuthResponse | null>(this.loadStoredUser());
+  private refreshInFlight$: Observable<boolean> | null = null;
 
   readonly user = this.currentUser.asReadonly();
   readonly isLoggedIn = computed(() => this.currentUser() !== null);
+
+  constructor() {
+    // Przy ponownym otwarciu aplikacji odtwarzamy sesję z ciasteczka HttpOnly.
+    // Dzięki temu aktywny użytkownik nie musi logować się ponownie po wygaśnięciu
+    // krótkiego tokenu dostępu.
+    if (this.currentUser()) {
+      this.refreshAccessToken().subscribe();
+    }
+  }
 
   login(email: string, password: string): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, { email, password });
@@ -57,13 +67,13 @@ export class AuthService {
   }
 
   migrateGuestQuizzesToUser(user: AuthResponse): Observable<unknown[]> {
-    const guestQuizzes = this.guestQuizStorage.getAllCreateDtos();
+    const guestQuizzes = this.guestQuizStorage.getAllImports();
 
     if (guestQuizzes.length === 0) {
       return of([]);
     }
 
-    return forkJoin(guestQuizzes.map((quiz) => this.http.post(this.quizzesApiUrl, quiz))).pipe(
+    return forkJoin(guestQuizzes.map(({ quiz, rankingVersionId }) => this.http.post(`${this.quizzesApiUrl}/import-archive`, { quiz, rankingVersionId }))).pipe(
       tap(() => this.guestQuizStorage.clear()),
     );
   }
@@ -72,7 +82,34 @@ export class AuthService {
     return this.currentUser();
   }
 
-  logout(): void {
+  logout(revokeRefreshSession = true): void {
+    if (revokeRefreshSession) {
+      this.http.post<void>(`${this.apiUrl}/logout`, {}, { withCredentials: true }).subscribe({ error: () => undefined });
+    }
+
+    this.clearAuthState();
+  }
+
+  refreshAccessToken(): Observable<boolean> {
+    if (this.refreshInFlight$) {
+      return this.refreshInFlight$;
+    }
+
+    this.refreshInFlight$ = this.http.post<AuthResponse>(`${this.apiUrl}/refresh`, {}, { withCredentials: true }).pipe(
+      tap((user) => this.setCurrentUser(user)),
+      map(() => true),
+      catchError(() => {
+        this.clearAuthState();
+        return of(false);
+      }),
+      finalize(() => this.refreshInFlight$ = null),
+      shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
+    return this.refreshInFlight$;
+  }
+
+  private clearAuthState(): void {
     this.currentUser.set(null);
     localStorage.removeItem(STORAGE_KEY);
   }

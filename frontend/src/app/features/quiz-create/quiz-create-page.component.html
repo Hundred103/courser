@@ -1,18 +1,30 @@
 <section class="view-shell create-shell squircle">
   <div class="top-actions">
-    <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
-      Strona główna
-    </button>
-    @if (isEditMode()) {
-      <button
-        class="undo-button secondary-button squircle"
-        type="button"
-        [disabled]="!canUndoChanges()"
-        (click)="undoChanges()"
-      >
-        Cofnij zmiany
+    <div class="top-actions-left">
+      <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
+        Strona główna
       </button>
-    }
+      @if (isEditMode()) {
+        <button
+          class="undo-button secondary-button squircle"
+          type="button"
+          [disabled]="!canUndoChanges()"
+          (click)="undoChanges()"
+        >
+          Cofnij zmiany
+        </button>
+      }
+    </div>
+
+    <button
+      class="save-button primary-button squircle"
+      type="button"
+      [disabled]="!canSave()"
+      [title]="saveButtonTitle()"
+      (click)="saveQuiz()"
+    >
+      {{ isSaving() ? 'Zapisywanie...' : 'Zapisz quiz' }}
+    </button>
   </div>
 
   <article class="quiz-create squircle fade-in">
@@ -31,6 +43,12 @@
       <section class="question-editor squircle">
         <div class="section-heading">
           <span>Pytanie {{ currentQuestionNumber() }}</span>
+          @if (rankingProtected()) {
+            <span class="ranking-warning question-ranking-warning" role="img" tabindex="0" aria-label="Ostrzeżenie dotyczące rankingu" aria-describedby="ranking-question-tooltip">
+              <svg viewBox="2 3 20 17" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.5h.01" /></svg>
+              <span id="ranking-question-tooltip" class="ranking-warning-tooltip" role="tooltip">Zmiana lub usunięcie pytania utworzy prywatną kopię z własnym rankingiem.</span>
+            </span>
+          }
           <div class="question-heading-actions">
             @if (totalQuestions() > 1) {
               <button
@@ -121,10 +139,14 @@
                     <span>Pkt</span>
                     <input
                       class="points-input"
-                      type="number"
-                      step="any"
+                      type="text"
+                      [min]="answer.correct ? 0 : -99.99"
+                      [max]="answer.correct ? 99.99 : 0"
+                      step="0.01"
+                      inputmode="decimal"
                       [value]="answer.points ?? 0"
-                      (change)="updateAnswerPoints(answer.id, $event)"
+                      (keydown)="blockScoreKey($event, !answer.correct)"
+                      (input)="updateAnswerPoints(answer.id, $event)"
                     />
                   </label>
                 }
@@ -172,6 +194,30 @@
       </section>
     }
 
+    <div class="question-navigation" aria-label="Nawigacja między pytaniami">
+      <div class="control-side left">
+        @if (canGoPrevious()) {
+          <button class="question-nav-button secondary-button squircle" type="button" (click)="goPrevious()">
+            <span class="nav-arrow" aria-hidden="true">&larr;</span>
+            Poprzednie pytanie
+          </button>
+        }
+      </div>
+
+      <div class="control-side right">
+        <button class="question-nav-button secondary-button squircle" type="button" (click)="goNext()">
+          @if (rankingProtected() && currentIndex() === totalQuestions() - 1) {
+            <span class="ranking-warning" role="img" tabindex="0" aria-label="Ostrzeżenie dotyczące rankingu" aria-describedby="ranking-add-question-tooltip" (click)="$event.stopPropagation()">
+              <svg viewBox="2 3 20 17" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.5h.01" /></svg>
+              <span id="ranking-add-question-tooltip" class="ranking-warning-tooltip" role="tooltip">Dodanie pytania utworzy prywatną kopię z własnym rankingiem.</span>
+            </span>
+          }
+          Następne pytanie
+          <span class="nav-arrow" aria-hidden="true">&rarr;</span>
+        </button>
+      </div>
+    </div>
+
     <section class="options-panel squircle">
       <div class="section-heading">
         <span>OPCJE</span>
@@ -198,7 +244,30 @@
       </label>
 
       <label class="option-row">
-        <span>Domyślne punkty</span>
+        <span class="option-label-with-info">
+          <span>Domyślne punkty</span>
+          @if (rankingProtected()) {
+            <span class="ranking-warning" role="img" tabindex="0" aria-label="Ostrzeżenie dotyczące rankingu" aria-describedby="ranking-default-scoring-tooltip" (click)="$event.preventDefault(); $event.stopPropagation()">
+              <svg viewBox="2 3 20 17" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.5h.01" /></svg>
+              <span id="ranking-default-scoring-tooltip" class="ranking-warning-tooltip" role="tooltip">Zmiana punktacji utworzy prywatną kopię z własnym rankingiem.</span>
+            </span>
+          }
+          <span
+            class="info-tooltip-trigger"
+            role="img"
+            tabindex="0"
+            aria-label="Informacja o domyślnych punktach"
+            aria-describedby="default-points-tooltip"
+            (click)="$event.preventDefault(); $event.stopPropagation()"
+          >
+            <span aria-hidden="true">i</span>
+            <span id="default-points-tooltip" class="info-tooltip" role="tooltip">
+              Punkty za pytanie są liczone według wzoru:<br />
+              <strong>liczba zaznaczonych poprawnych odpowiedzi / liczba wszystkich poprawnych odpowiedzi − liczba zaznaczonych błędnych odpowiedzi / liczba wszystkich błędnych odpowiedzi.</strong><br />
+              Pełna poprawna odpowiedź daje 1 pkt. Przykład: gdy pytanie ma 2 poprawne i 2 błędne odpowiedzi, zaznaczenie 1 poprawnej i 1 błędnej daje 1/2 − 1/2 = 0 pkt.
+            </span>
+          </span>
+        </span>
         <span class="scoring-toggle-control">
           <input type="checkbox" [checked]="useDefaultPointsLook()" (change)="toggleDefaultPointsLook($event)" />
           <span class="toggle-track" aria-hidden="true">
@@ -210,7 +279,28 @@
       @if (showPointControls()) {
         @if (!usesCustomPoints()) {
           <label class="option-row">
-            <span>Kara procentowa</span>
+            <span class="option-label-with-info">
+              <span>Kara procentowa</span>
+              @if (rankingProtected()) {
+                <span class="ranking-warning" role="img" tabindex="0" aria-label="Ostrzeżenie dotyczące rankingu" aria-describedby="ranking-percent-penalty-tooltip" (click)="$event.preventDefault(); $event.stopPropagation()">
+                  <svg viewBox="2 3 20 17" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.5h.01" /></svg>
+                  <span id="ranking-percent-penalty-tooltip" class="ranking-warning-tooltip" role="tooltip">Zmiana punktacji utworzy prywatną kopię z własnym rankingiem.</span>
+                </span>
+              }
+              <span
+                class="info-tooltip-trigger"
+                role="img"
+                tabindex="0"
+                aria-label="Informacja o karze procentowej"
+                aria-describedby="percent-penalty-tooltip"
+                (click)="$event.preventDefault(); $event.stopPropagation()"
+              >
+                <span aria-hidden="true">i</span>
+                <span id="percent-penalty-tooltip" class="info-tooltip" role="tooltip">
+                  Każda błędna odpowiedź odejmuje wskazany procent punktów za poprawną odpowiedź. Przykład: przy 2 pkt za poprawną i karze 25%, błędna odpowiedź odejmuje 0,5 pkt.
+                </span>
+              </span>
+            </span>
             <span class="scoring-toggle-control">
               <input type="checkbox" [checked]="usesPercentPenalty()" (change)="togglePercentPenalty($event)" />
               <span class="toggle-track" aria-hidden="true">
@@ -219,16 +309,19 @@
             </span>
           </label>
 
-          <div class="options-points with-note">
+          <div class="options-points" [class.with-note]="!usesPercentPenalty()">
             <label class="scoring-field">
               <span>Poprawna odpowiedź</span>
               <input
                 class="scoring-number"
-                type="number"
+                type="text"
                 min="0"
-                step="any"
+                max="99.99"
+                step="0.01"
+                inputmode="decimal"
                 [value]="scoring().pointsPerCorrect"
-                (change)="updateCorrectAnswerPoints($event)"
+                (keydown)="blockScoreKey($event, false)"
+                (input)="updateCorrectAnswerPoints($event)"
               />
             </label>
             @if (usesPercentPenalty()) {
@@ -237,11 +330,14 @@
                 <span class="scoring-number-wrap">
                   <input
                     class="scoring-number"
-                    type="number"
+                    type="text"
                     min="0"
-                    step="any"
+                    max="99.99"
+                    step="0.01"
+                    inputmode="decimal"
                     [value]="scoring().incorrectPenalty"
-                    (change)="updatePercentPenalty($event)"
+                    (keydown)="blockScoreKey($event, false)"
+                    (input)="updatePercentPenalty($event)"
                   />
                   <span class="scoring-suffix" aria-hidden="true">%</span>
                 </span>
@@ -251,20 +347,21 @@
                 <span>Błędna odpowiedź</span>
                 <input
                   class="scoring-number"
-                  type="number"
+                  type="text"
+                  min="-99.99"
                   max="0"
-                  step="any"
+                  step="0.01"
+                  inputmode="decimal"
                   [value]="wrongAnswerPoints()"
-                  (change)="updateWrongAnswerPoints($event)"
+                  (keydown)="blockScoreKey($event, true)"
+                  (input)="updateWrongAnswerPoints($event)"
                 />
               </label>
             }
           </div>
 
-          @if (usesPercentPenalty()) {
-            <p class="penalty-note">Każda błędna odpowiedź odejmuje ten procent punktów zdobytych za poprawne.</p>
-          } @else {
-            <p class="penalty-note">Każda poprawna odpowiedź dodaje te punkty, a każda błędna odejmuje podaną karę.</p>
+          @if (!usesPercentPenalty()) {
+            <p class="penalty-note">Każda zaznaczona poprawna odpowiedź dodaje wskazaną liczbę punktów, a każda błędna ją odejmuje.</p>
           }
         }
 
@@ -280,48 +377,15 @@
       }
 
       <label class="option-row">
-        <span>Liczba podejść</span>
-        <input
-          class="option-limit-input"
-          type="text"
-          inputmode="numeric"
-          placeholder="bez limitu"
-          [value]="limits().maxAttempts ?? ''"
-          (keydown)="blockDecimalKey($event)"
-          (input)="updateLimit('maxAttempts', $event)"
-        />
-      </label>
-      <label class="option-row">
-        <span>Czas quizu (s)</span>
-        <input
-          class="option-limit-input"
-          type="text"
-          inputmode="numeric"
-          placeholder="bez limitu"
-          [value]="limits().quizTimeSeconds ?? ''"
-          (keydown)="blockDecimalKey($event)"
-          (input)="updateLimit('quizTimeSeconds', $event)"
-        />
-      </label>
-      <label class="option-row">
-        <span>Czas pytania (s)</span>
-        <input
-          class="option-limit-input"
-          type="text"
-          inputmode="numeric"
-          placeholder="bez limitu"
-          [value]="limits().questionTimeSeconds ?? ''"
-          (keydown)="blockDecimalKey($event)"
-          (input)="updateLimit('questionTimeSeconds', $event)"
-        />
-      </label>
-
-      @if (limitsError()) {
-        <p class="status-text error">{{ limitsError() }}</p>
-      }
-
-      <label class="option-row">
-        <span>Ujemny wynik obniża sumę quizu</span>
+        <span class="option-label-with-info">
+          <span>Ujemny wynik obniża sumę quizu</span>
+          @if (rankingProtected()) {
+            <span class="ranking-warning" role="img" tabindex="0" aria-label="Ostrzeżenie dotyczące rankingu" aria-describedby="ranking-negative-score-tooltip" (click)="$event.preventDefault(); $event.stopPropagation()">
+              <svg viewBox="2 3 20 17" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.5h.01" /></svg>
+              <span id="ranking-negative-score-tooltip" class="ranking-warning-tooltip" role="tooltip">Zmiana punktacji utworzy prywatną kopię z własnym rankingiem.</span>
+            </span>
+          }
+        </span>
         <span class="scoring-toggle-control">
           <input type="checkbox" [checked]="scoring().allowNegativeScore" (change)="toggleAllowNegative($event)" />
           <span class="toggle-track" aria-hidden="true">
@@ -336,15 +400,6 @@
     }
 
     <footer class="create-controls">
-      <div class="control-side left">
-        @if (canGoPrevious()) {
-          <button class="question-nav-button secondary-button squircle" type="button" (click)="goPrevious()">
-            <span aria-hidden="true">&larr;</span>
-            Poprzednie pytanie
-          </button>
-        }
-      </div>
-
       <button
         class="save-button primary-button squircle"
         type="button"
@@ -354,13 +409,6 @@
       >
         {{ isSaving() ? 'Zapisywanie...' : 'Zapisz quiz' }}
       </button>
-
-      <div class="control-side right">
-        <button class="question-nav-button secondary-button squircle" type="button" (click)="goNext()">
-          Następne pytanie
-          <span aria-hidden="true">&rarr;</span>
-        </button>
-      </div>
     </footer>
   </article>
 
@@ -393,6 +441,18 @@
           <button class="danger-button squircle" type="button" (click)="confirmExitQuiz()">
             Potwierdź
           </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showRankingCopyConfirm()) {
+    <div class="confirm-overlay">
+      <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
+        <p>Ta zmiana utworzy prywatną kopię quizu z własnym rankingiem. Oryginalny quiz i jego ranking pozostaną bez zmian.</p>
+        <div class="confirm-actions">
+          <button class="secondary-button squircle" type="button" (click)="cancelRankingCopy()">Anuluj</button>
+          <button class="primary-button squircle" type="button" (click)="confirmRankingCopy()">Utwórz kopię</button>
         </div>
       </div>
     </div>

@@ -3,37 +3,26 @@
     <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
       Strona główna
     </button>
+    @if (quiz()?.rankingEnabled && isLoggedIn() && !isStudyMode() && !resultReady()) {
+      <p class="ranking-timer top-ranking-timer">Czas: {{ rankingTimeText() }}</p>
+    }
   </div>
 
   @if (isLoading()) {
     <p class="status-text">Ładowanie quizu...</p>
   } @else if (errorMessage()) {
     <p class="status-text error">{{ errorMessage() }}</p>
-  } @else if (playBlockMessage(); as blocked) {
-    <p class="status-text error">{{ blocked }}</p>
   } @else if (quiz(); as quizData) {
-    <article class="quiz-play squircle fade-in">
-      <header class="quiz-header">
-        <p>Pytanie {{ currentQuestionNumber() }} / {{ totalQuestions() }}</p>
-        <h2 class="neon-title">{{ quizData.title }}</h2>
-        @if (formattedQuizTime(); as quizTime) {
-          <p class="quiz-timer" [class.ending]="quizEndingSoon()">Czas quizu: {{ quizTime }}</p>
-        }
-        @if (formattedQuestionTime(); as questionTime) {
-          <p class="question-timer" [class.ending]="questionEndingSoon()">Czas pytania: {{ questionTime }}</p>
-        }
-        @if (quizEndingSoon() || questionEndingSoon()) {
-          <p class="timer-warning">Czas się kończy. Zaznaczona odpowiedź zostanie wysłana automatycznie.</p>
-        }
-        @if (cheatingMessage(); as cheating) {
-          <p class="status-text error">{{ cheating }}</p>
-        }
-      </header>
+    <div class="quiz-play-layout">
+      <article class="quiz-play squircle fade-in">
+        <header class="quiz-header">
+          <p>Pytanie {{ currentQuestionNumber() }} / {{ totalQuestions() }}</p>
+          <h2 class="neon-title">{{ quizData.title }}</h2>
+        </header>
 
-      @if (currentQuestion(); as question) {
-        <div class="question-card squircle">
+        @if (currentQuestion(); as question) {
+          <div class="question-card squircle">
           <h3>{{ question.content }}</h3>
-          <p class="answer-hint">Możesz zaznaczyć więcej niż jedną odpowiedź.</p>
 
           @if (questionImageSrc(question); as imageSrc) {
             <figure class="question-image squircle">
@@ -103,10 +92,31 @@
             </div>
           </div>
 
-        </div>
-      }
+          @if (isStudyMode() && currentQuestionChecked() && !isLastQuestion()) {
+            <div class="study-add-controls" aria-label="Dodaj pytanie ponownie do kolejki">
+              <p>Dodaj</p>
+              <div class="study-add-actions">
+                @for (placement of studyPlacementOptions; track placement) {
+                  <button
+                    class="study-add-button squircle"
+                    type="button"
+                    [class.added]="studyPlacements()[question.runId] === placement"
+                    [disabled]="resultReady() || !!studyPlacements()[question.runId]"
+                    (click)="scheduleCurrentQuestion(placement)">
+                    @if (studyPlacements()[question.runId] === placement) {
+                      <span aria-hidden="true">✓</span>
+                    }
+                    {{ studyPlacementLabel(placement) }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
 
-      @if (showIncompleteConfirm()) {
+          </div>
+        }
+
+        @if (showIncompleteConfirm()) {
         <div class="confirm-overlay">
           <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
             <p>Nie wszystkie pytania zostały rozwiązane. Czy na pewno chcesz zakończyć quiz?</p>
@@ -121,9 +131,9 @@
             </div>
           </div>
         </div>
-      }
+        }
 
-      @if (showExitConfirm()) {
+        @if (showExitConfirm()) {
         <div class="confirm-overlay">
           <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
             <p>
@@ -144,14 +154,17 @@
             </div>
           </div>
         </div>
-      }
+        }
 
-      @if (resultReady()) {
+        @if (resultReady()) {
         <div class="result-box squircle">
           <p>Wynik: {{ formattedScore() }} / {{ formattedMaxScore() }}</p>
           <p>Skuteczność: {{ scorePercent() }}%</p>
+          @if (rankingResult(); as ranking) {
+            <p>Czas: {{ rankingDurationText(ranking.durationMs) }}</p>
+          }
 
-          @if (isLoggedIn()) {
+          @if (isLoggedIn() && !isStudyMode()) {
             @if (resultSaveError()) {
               <p class="result-status error">{{ resultSaveError() }}</p>
             } @else if (resultSaved()) {
@@ -161,11 +174,54 @@
             }
           }
 
+          @if (rankingResult(); as ranking) {
+            <section class="ranking-box" aria-label="Ranking quizu">
+              <div class="ranking-heading">
+                <h3>Ranking</h3>
+                @if (ranking.position === 1) { <p class="ranking-first">🏆 Pierwsze miejsce!</p> }
+              </div>
+              @if (ranking.outsideTopFive) { <p>Nie znalazłeś się w Top 5.</p> }
+              @for (entry of ranking.leaderboard; track entry.position) {
+                <p class="ranking-entry" [class.current-user]="entry.position === ranking.position">
+                  <span>{{ entry.position === 1 ? '🥇' : entry.position === 2 ? '🥈' : entry.position === 3 ? '🥉' : entry.position + '.' }}</span>
+                  {{ entry.username }} <small>{{ rankingPercentText(entry.scoreScaled, entry.maxScoreScaled) }} · {{ rankingDurationText(entry.durationMs) }}</small>
+                </p>
+              }
+            </section>
+          }
+
           <button class="result-back-button primary-button squircle" type="button" (click)="goBack()">
             Strona główna
           </button>
         </div>
+        }
+      </article>
+
+      @if (rankingResult()?.position === 1) {
+        <div class="confetti-overlay" aria-hidden="true">
+          <span class="firework firework-left"></span>
+          <span class="firework firework-right"></span>
+          @for (piece of confettiPieces; track piece) { <i></i> }
+        </div>
       }
-    </article>
+
+      <aside class="question-navigator" aria-label="Nawigacja po pytaniach">
+        <div class="question-navigator-grid">
+          @for (question of questions(); track question.runId; let index = $index) {
+            <button
+              class="question-navigator-tile squircle"
+              type="button"
+              [class.current]="index === currentIndex()"
+              [class.correct]="isQuestionFullyCorrect(question)"
+              [class.incorrect]="isQuestionChecked(question) && !isQuestionFullyCorrect(question)"
+              [attr.aria-current]="index === currentIndex() ? 'step' : null"
+              [attr.aria-label]="'Przejdź do pytania ' + (index + 1)"
+              (click)="goToQuestion(index)">
+              {{ index + 1 }}
+            </button>
+          }
+        </div>
+      </aside>
+    </div>
   }
 </section>
