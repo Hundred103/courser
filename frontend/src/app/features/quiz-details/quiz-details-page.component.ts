@@ -1,7 +1,7 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { QuizApiService } from '../../core/services/quiz-api.service';
-import { QuizPlayDTO } from '../../core/models/quiz.model';
+import { QuizPlayDTO, RankingLeaderboardDTO } from '../../core/models/quiz.model';
 import { QuestionPlayDTO } from '../../core/models/question.model';
 import { toImageSrc } from '../../core/utils/image-compression.util';
 
@@ -20,6 +20,7 @@ export class QuizDetailsPageComponent {
   readonly isLoading = signal(true);
   readonly errorMessage = signal('');
   readonly showImportedBanner = signal(false);
+  readonly ranking = signal<RankingLeaderboardDTO | null>(null);
 
   readonly questionCount = computed(() => this.quiz()?.questions.length ?? 0);
 
@@ -36,6 +37,11 @@ export class QuizDetailsPageComponent {
       next: (quiz) => {
         this.quiz.set(quiz);
         this.isLoading.set(false);
+        if (quiz.rankingEnabled && quiz.id > 0) {
+          this.quizApi.getRankingLeaderboard(quiz.id).subscribe({
+            next: (ranking) => this.ranking.set(ranking.leaderboard.length > 0 ? ranking : null),
+          });
+        }
       },
       error: () => {
         this.errorMessage.set('Nie udało się załadować quizu.');
@@ -60,5 +66,9 @@ export class QuizDetailsPageComponent {
 
   questionImageSrc(question: QuestionPlayDTO): string | null {
     return toImageSrc(question.image);
+  }
+
+  rankingDurationText(milliseconds: number): string {
+    return `${(milliseconds / 1000).toFixed(3).replace('.', ',')} s`;
   }
 }

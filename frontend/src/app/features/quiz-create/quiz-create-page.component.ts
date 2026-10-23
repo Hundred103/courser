@@ -63,6 +63,8 @@ export class QuizCreatePageComponent implements OnDestroy {
   private rememberedPointPenalty = NEW_QUIZ_SCORING.incorrectPenalty;
   private rememberedPercentPenalty = 50;
   private stashedScoring: QuizScoring | null = null;
+  private initialRankingSignature = '';
+  private pendingRankingCopyAction: (() => void) | null = null;
 
   readonly title = signal('');
   readonly scoring = signal<QuizScoring>({ ...NEW_QUIZ_SCORING });
@@ -84,6 +86,8 @@ export class QuizCreatePageComponent implements OnDestroy {
   readonly showExitConfirm = signal(false);
   readonly showAuthPrompt = signal(false);
   readonly editingQuizId = signal<number | null>(null);
+  readonly rankingProtected = signal(false);
+  readonly showRankingCopyConfirm = signal(false);
 
   readonly isEditMode = computed(() => this.editingQuizId() !== null);
   readonly usesCustomPoints = computed(() => this.scoring().mode === 'custom');
@@ -141,7 +145,17 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   toggleDefaultPointsLook(event: Event): void {
-    const useDefault = (event.target as HTMLInputElement).checked;
+    const input = event.target as HTMLInputElement;
+    const useDefault = input.checked;
+
+    if (this.rankingProtected()) {
+      input.checked = this.useDefaultPointsLook();
+    }
+
+    this.requestRankingCopyForAction(() => this.applyDefaultPointsLook(useDefault));
+  }
+
+  private applyDefaultPointsLook(useDefault: boolean): void {
 
     if (useDefault) {
       const current = this.scoring();
@@ -175,7 +189,17 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   togglePerAnswerPoints(event: Event): void {
-    const usePerAnswerPoints = (event.target as HTMLInputElement).checked;
+    const input = event.target as HTMLInputElement;
+    const usePerAnswerPoints = input.checked;
+
+    if (this.rankingProtected()) {
+      input.checked = this.usesCustomPoints();
+    }
+
+    this.requestRankingCopyForAction(() => this.applyPerAnswerPointsToggle(usePerAnswerPoints));
+  }
+
+  private applyPerAnswerPointsToggle(usePerAnswerPoints: boolean): void {
 
     if (!usePerAnswerPoints) {
       this.scoring.update((scoring) => ({
@@ -253,13 +277,33 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   toggleAllowNegative(event: Event): void {
-    const allowNegativeScore = (event.target as HTMLInputElement).checked;
+    const input = event.target as HTMLInputElement;
+    const allowNegativeScore = input.checked;
+
+    if (this.rankingProtected()) {
+      input.checked = this.scoring().allowNegativeScore;
+    }
+
+    this.requestRankingCopyForAction(() => this.applyAllowNegativeToggle(allowNegativeScore));
+  }
+
+  private applyAllowNegativeToggle(allowNegativeScore: boolean): void {
     this.scoring.update((scoring) => ({ ...scoring, allowNegativeScore }));
     this.saveError.set('');
   }
 
   togglePercentPenalty(event: Event): void {
-    const usePercent = (event.target as HTMLInputElement).checked;
+    const input = event.target as HTMLInputElement;
+    const usePercent = input.checked;
+
+    if (this.rankingProtected()) {
+      input.checked = this.usesPercentPenalty();
+    }
+
+    this.requestRankingCopyForAction(() => this.applyPercentPenaltyToggle(usePercent));
+  }
+
+  private applyPercentPenaltyToggle(usePercent: boolean): void {
     const scoring = this.scoring();
 
     if (usePercent) {
@@ -366,10 +410,7 @@ export class QuizCreatePageComponent implements OnDestroy {
 
     try {
       const image = await compressImageFile(file);
-      this.questions.update((questions) =>
-        questions.map((question) => (question.id === currentQuestion.id ? { ...question, image } : question)),
-      );
-      this.saveError.set('');
+      this.requestRankingCopyForAction(() => this.setQuestionImage(currentQuestion.id, image));
     } catch {
       this.saveError.set('Nie udało się przetworzyć obrazu.');
     }
@@ -382,8 +423,12 @@ export class QuizCreatePageComponent implements OnDestroy {
       return;
     }
 
+    this.requestRankingCopyForAction(() => this.setQuestionImage(currentQuestion.id, null));
+  }
+
+  private setQuestionImage(questionId: number, image: string | null): void {
     this.questions.update((questions) =>
-      questions.map((question) => (question.id === currentQuestion.id ? { ...question, image: null } : question)),
+      questions.map((question) => (question.id === questionId ? { ...question, image } : question)),
     );
     this.saveError.set('');
   }
@@ -400,7 +445,18 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   toggleCorrectAnswer(answerId: number, event: Event): void {
-    const correct = (event.target as HTMLInputElement).checked;
+    const input = event.target as HTMLInputElement;
+    const correct = input.checked;
+    const currentCorrect = this.currentQuestion()?.answers.find((answer) => answer.id === answerId)?.correct;
+
+    if (this.rankingProtected() && currentCorrect !== undefined) {
+      input.checked = currentCorrect;
+    }
+
+    this.requestRankingCopyForAction(() => this.applyCorrectAnswerToggle(answerId, correct));
+  }
+
+  private applyCorrectAnswerToggle(answerId: number, correct: boolean): void {
     const scoring = this.scoring();
     const rightPoints = scoring.pointsPerCorrect;
     const wrongPoints = this.fixedWrongPoints(scoring);
@@ -446,19 +502,22 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   addAnswer(): void {
-    const answer = this.blankAnswer();
-
-    this.nextAnswerId += 1;
-    this.updateCurrentQuestionAnswers((answers) => [...answers, answer]);
+    this.requestRankingCopyForAction(() => {
+      const answer = this.blankAnswer();
+      this.nextAnswerId += 1;
+      this.updateCurrentQuestionAnswers((answers) => [...answers, answer]);
+    });
   }
 
   removeAnswer(answerId: number): void {
-    this.updateCurrentQuestionAnswers((answers) => {
-      if (answers.length <= 1) {
-        return answers;
-      }
+    this.requestRankingCopyForAction(() => {
+      this.updateCurrentQuestionAnswers((answers) => {
+        if (answers.length <= 1) {
+          return answers;
+        }
 
-      return answers.filter((answer) => answer.id !== answerId);
+        return answers.filter((answer) => answer.id !== answerId);
+      });
     });
   }
 
@@ -469,7 +528,11 @@ export class QuizCreatePageComponent implements OnDestroy {
       return;
     }
 
-    this.questions.update((questions) => questions.filter((question) => question.id !== currentQuestion.id));
+    this.requestRankingCopyForAction(() => this.removeQuestionById(currentQuestion.id));
+  }
+
+  private removeQuestionById(questionId: number): void {
+    this.questions.update((questions) => questions.filter((question) => question.id !== questionId));
     this.currentIndex.update((index) => Math.min(index, this.totalQuestions() - 1));
     this.saveError.set('');
   }
@@ -533,19 +596,26 @@ export class QuizCreatePageComponent implements OnDestroy {
 
   goNext(): void {
     if (this.currentIndex() === this.totalQuestions() - 1) {
-      this.questions.update((questions) => [
-        ...questions,
-        {
-          id: this.nextQuestionId,
-          content: '',
-          image: null,
-          answers: [this.blankAnswer()],
-        },
-      ]);
-      this.nextQuestionId += 1;
-      this.nextAnswerId += 1;
+      this.requestRankingCopyForAction(() => this.addNextQuestion());
+      return;
     }
 
+    this.currentIndex.update((index) => index + 1);
+    this.saveError.set('');
+  }
+
+  private addNextQuestion(): void {
+    this.questions.update((questions) => [
+      ...questions,
+      {
+        id: this.nextQuestionId,
+        content: '',
+        image: null,
+        answers: [this.blankAnswer()],
+      },
+    ]);
+    this.nextQuestionId += 1;
+    this.nextAnswerId += 1;
     this.currentIndex.update((index) => index + 1);
     this.saveError.set('');
   }
@@ -560,6 +630,29 @@ export class QuizCreatePageComponent implements OnDestroy {
       return;
     }
 
+    if (this.rankingProtected() && this.rankingSignature() !== this.initialRankingSignature) {
+      this.pendingRankingCopyAction = null;
+      this.showRankingCopyConfirm.set(true);
+      return;
+    }
+    this.performSave(false);
+  }
+
+  cancelRankingCopy(): void {
+    this.showRankingCopyConfirm.set(false);
+    this.pendingRankingCopyAction = null;
+    this.restoreRankingProtectedChanges();
+  }
+
+  confirmRankingCopy(): void {
+    this.showRankingCopyConfirm.set(false);
+    const action = this.pendingRankingCopyAction;
+    this.pendingRankingCopyAction = null;
+    action?.();
+    this.performSave(true);
+  }
+
+  private performSave(createCopy: boolean): void {
     this.isSaving.set(true);
     this.saveError.set('');
 
@@ -573,7 +666,7 @@ export class QuizCreatePageComponent implements OnDestroy {
       return;
     }
 
-    const saveRequest = quizId ? this.quizApiService.updateQuiz(quizId, dto) : this.quizApiService.createQuiz(dto);
+    const saveRequest = createCopy && quizId ? this.quizApiService.forkQuiz(quizId, dto) : quizId ? this.quizApiService.updateQuiz(quizId, dto) : this.quizApiService.createQuiz(dto);
 
     saveRequest.pipe(finalize(() => this.isSaving.set(false))).subscribe({
       next: () => {
@@ -588,6 +681,8 @@ export class QuizCreatePageComponent implements OnDestroy {
 
   private prepareNewQuiz(): void {
     this.editingQuizId.set(null);
+    this.rankingProtected.set(false);
+    this.pendingRankingCopyAction = null;
     this.showAuthPrompt.set(!this.authService.isLoggedIn());
     this.initialDraftSignature = '';
     this.initialDraft = null;
@@ -616,6 +711,7 @@ export class QuizCreatePageComponent implements OnDestroy {
 
   private loadQuizForEdit(quizId: number): void {
     this.editingQuizId.set(quizId);
+    this.pendingRankingCopyAction = null;
     this.quizSaved = false;
     this.isLoadingQuiz.set(true);
     this.loadError.set('');
@@ -672,6 +768,8 @@ export class QuizCreatePageComponent implements OnDestroy {
     this.currentIndex.set(this.questions().length - 1);
     this.recalculateNextIds();
     this.initialDraftSignature = this.getDraftSignature();
+    this.rankingProtected.set(quiz.rankingProtected === true);
+    this.initialRankingSignature = this.rankingSignature();
     this.initialDraft = {
       title: this.title(),
       questions: this.cloneQuestions(this.questions()),
@@ -705,6 +803,33 @@ export class QuizCreatePageComponent implements OnDestroy {
         question.id === currentQuestion.id ? { ...question, answers: updateAnswers(question.answers) } : question,
       ),
     );
+    this.saveError.set('');
+  }
+
+  private requestRankingCopyForAction(action: () => void): void {
+    if (!this.rankingProtected()) {
+      action();
+      return;
+    }
+
+    this.pendingRankingCopyAction = action;
+    this.showRankingCopyConfirm.set(true);
+  }
+
+  private restoreRankingProtectedChanges(): void {
+    if (!this.rankingProtected() || !this.initialDraft) {
+      return;
+    }
+
+    // Tytuł oraz ustawienia sposobu wyświetlania pytań są bezpieczne dla
+    // wspólnego rankingu, dlatego przy anulowaniu zostają bez zmian.
+    this.questions.set(this.cloneQuestions(this.initialDraft.questions));
+    this.scoring.set({ ...this.initialDraft.scoring });
+    this.syncRememberedPenalties(this.initialDraft.scoring);
+    this.stashedScoring = null;
+    this.useDefaultPointsLook.set(this.isPlainDefaultPoints(this.initialDraft.scoring));
+    this.currentIndex.update((index) => Math.min(index, this.questions().length - 1));
+    this.recalculateNextIds();
     this.saveError.set('');
   }
 
@@ -747,6 +872,10 @@ export class QuizCreatePageComponent implements OnDestroy {
           question.answers.some((answer) => answer.content.trim().length > 0 || answer.points !== null),
       )
     );
+  }
+
+  private rankingSignature(): string {
+    return JSON.stringify({ questions: this.questions(), scoring: this.scoring() });
   }
 
   private isQuestionReady(question: DraftQuestion): boolean {

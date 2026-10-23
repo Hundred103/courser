@@ -3,7 +3,6 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { catchError, combineLatest, finalize, forkJoin, map, of, startWith, switchMap } from 'rxjs';
-import { BestQuizScore } from '../../core/models/quiz-score.model';
 import { QuizPlayDTO, QuizRawDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
@@ -17,11 +16,7 @@ type QuizSidebarState =
   | { status: 'ready'; quizzes: QuizRawDTO[]; errorMessage: '' }
   | { status: 'error'; quizzes: QuizRawDTO[]; errorMessage: string };
 
-type BestScoresState =
-  | { status: 'guest'; scores: BestQuizScore[] }
-  | { status: 'loading'; scores: BestQuizScore[] }
-  | { status: 'ready'; scores: BestQuizScore[] }
-  | { status: 'error'; scores: BestQuizScore[] };
+type RankingPositionsState = { positions: Map<number, number> };
 
 @Component({
   selector: 'app-sidebar',
@@ -74,25 +69,34 @@ export class SidebarComponent {
 
   private readonly localQuizzes = signal<QuizRawDTO[]>([]);
 
-  private readonly bestScoresState = toSignal(
+  private readonly rankingPositionsState = toSignal(
     combineLatest([
       toObservable(this.authService.user),
       toObservable(this.quizScoreService.scoresVersion).pipe(startWith(0)),
+      toObservable(this.quizState),
     ]).pipe(
-      switchMap(([user]) => {
+      switchMap(([user, , quizState]) => {
         if (!user) {
-          return of({ status: 'guest', scores: [] } satisfies BestScoresState);
+          return of({ positions: new Map<number, number>() } satisfies RankingPositionsState);
         }
-
-        return this.quizScoreService.getBestScores().pipe(
-          map((scores) => ({ status: 'ready', scores } satisfies BestScoresState)),
-          startWith({ status: 'loading', scores: [] } satisfies BestScoresState),
-          catchError(() => of({ status: 'error', scores: [] } satisfies BestScoresState)),
+        const quizzes = quizState.quizzes.filter((quiz) => quiz.id > 0);
+        if (!quizzes.length) return of({ positions: new Map<number, number>() } satisfies RankingPositionsState);
+        return forkJoin(
+          quizzes.map((quiz) =>
+            this.quizApiService.getRankingPosition(quiz.id).pipe(
+              map((result) => [quiz.id, result.position] as const),
+              catchError(() => of([quiz.id, null] as const)),
+            ),
+          ),
+        ).pipe(
+          map((items) => ({
+            positions: new Map(items.filter((item): item is readonly [number, number] => item[1] !== null)),
+          } satisfies RankingPositionsState)),
         );
       }),
     ),
     {
-      initialValue: { status: 'loading', scores: [] } satisfies BestScoresState,
+      initialValue: { positions: new Map<number, number>() } satisfies RankingPositionsState,
     },
   );
 
@@ -126,11 +130,6 @@ export class SidebarComponent {
     { label: '30 dni', value: 2592000 },
     { label: 'Na zawsze', value: null },
   ];
-
-  private readonly bestScoresByQuizId = computed(() => {
-    const scores = this.bestScoresState().scores;
-    return new Map(scores.map((score) => [score.quizId, score]));
-  });
 
   constructor() {
     effect(() => {
@@ -402,14 +401,18 @@ export class SidebarComponent {
     });
   }
 
-  bestScoreLabel(quizId: number): string | null {
-    const bestScore = this.bestScoresByQuizId().get(quizId);
+  rankingPositionLabel(quizId: number): string | null {
+    const position = this.rankingPositionsState().positions.get(quizId);
+    if (!position) return null;
+    if (position === 1) return '🥇';
+    if (position === 2) return '🥈';
+    if (position === 3) return '🥉';
+    return position === 4 ? 'Czwarte miejsce' : 'Piąte miejsce';
+  }
 
-    if (!bestScore) {
-      return null;
-    }
-
-    return this.quizScoreService.formatScoreValue(bestScore.score, bestScore.maxScore);
+  isMedalPosition(quizId: number): boolean {
+    const position = this.rankingPositionsState().positions.get(quizId);
+    return position !== undefined && position <= 3;
   }
 
   requestStartQuiz(quiz: QuizRawDTO): void {

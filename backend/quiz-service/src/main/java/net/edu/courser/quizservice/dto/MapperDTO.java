@@ -20,7 +20,7 @@ public class MapperDTO {
     }
 
     public QuizRawDTO toQuizRawDTO (Quiz quiz) {
-        return new QuizRawDTO(quiz.getId(), quiz.getTitle());
+        return new QuizRawDTO(quiz.getId(), quiz.getTitle(), quiz.getRankingVersion() != null && quiz.getRankingVersion().isHasLoggedImport());
     }
 
     //ENTITY --> DTO (wysylamy do uzytkownika)
@@ -33,7 +33,9 @@ public class MapperDTO {
                         .map(this::toQuestionPlayDTO)
                         .toList(),
                 toScoringDto(quiz),
-                toLimitsDto(quiz)
+                toLimitsDto(quiz),
+                quiz.getRankingVersion() != null,
+                quiz.getRankingVersion() != null && quiz.getRankingVersion().isHasLoggedImport()
         );
     }
     private QuestionPlayDTO toQuestionPlayDTO(Question question) {

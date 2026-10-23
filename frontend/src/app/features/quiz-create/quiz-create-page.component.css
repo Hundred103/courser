@@ -628,3 +628,4 @@
     justify-content: center;
   }
 }
+.ranking-warning { color: #ffd54f; cursor: help; font-size: 1.05rem; line-height: 1; margin-left: .35rem; }

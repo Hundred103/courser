@@ -62,6 +62,7 @@ export class QuizImportPageComponent {
   readonly selectedFileName = signal('');
   readonly activeTab = signal<'file' | 'code'>('code');
   readonly importedQuiz = signal<QuizCreateDTO | null>(null);
+  readonly importedRankingVersionId = signal<string | null>(null);
   readonly validationError = signal('');
   readonly importError = signal('');
   readonly isReadingFile = signal(false);
@@ -167,7 +168,7 @@ export class QuizImportPageComponent {
     this.importError.set('');
 
     this.quizApiService
-      .importQuiz(quiz)
+      .importArchiveQuiz(quiz, this.importedRankingVersionId())
       .pipe(finalize(() => this.isImporting.set(false)))
       .subscribe({
         next: (createdQuiz) => {
@@ -230,10 +231,13 @@ export class QuizImportPageComponent {
     try {
       if (lowerName.endsWith('.zip')) {
         const buffer = await file.arrayBuffer();
-        this.importedQuiz.set(await parseQuizZip(buffer));
+        const parsed = await parseQuizZip(buffer);
+        this.importedQuiz.set(parsed.quiz);
+        this.importedRankingVersionId.set(parsed.rankingVersionId);
       } else {
         const rawJson = await file.text();
         this.importedQuiz.set(this.parseJsonQuiz(rawJson));
+        this.importedRankingVersionId.set(null);
       }
     } catch (error) {
       this.importedQuiz.set(null);

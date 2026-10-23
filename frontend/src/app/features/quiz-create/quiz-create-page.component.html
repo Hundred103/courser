@@ -43,6 +43,7 @@
       <section class="question-editor squircle">
         <div class="section-heading">
           <span>Pytanie {{ currentQuestionNumber() }}</span>
+          @if (rankingProtected()) { <span class="ranking-warning" title="Zmiana lub usunięcie pytania utworzy prywatną kopię z własnym rankingiem.">⚠</span> }
           <div class="question-heading-actions">
             @if (totalQuestions() > 1) {
               <button
@@ -203,6 +204,7 @@
           Następne pytanie
           <span aria-hidden="true">&rarr;</span>
         </button>
+        @if (rankingProtected() && currentIndex() === totalQuestions() - 1) { <span class="ranking-warning" title="Dodanie pytania utworzy prywatną kopię z własnym rankingiem.">⚠</span> }
       </div>
     </div>
 
@@ -234,6 +236,7 @@
       <label class="option-row">
         <span class="option-label-with-info">
           <span>Domyślne punkty</span>
+          @if (rankingProtected()) { <span class="ranking-warning" title="Zmiana punktacji utworzy prywatną kopię z własnym rankingiem.">⚠</span> }
           <span
             class="info-tooltip-trigger"
             role="img"
@@ -354,6 +357,7 @@
 
       <label class="option-row">
         <span>Ujemny wynik obniża sumę quizu</span>
+        @if (rankingProtected()) { <span class="ranking-warning" title="Zmiana punktacji utworzy prywatną kopię z własnym rankingiem.">⚠</span> }
         <span class="scoring-toggle-control">
           <input type="checkbox" [checked]="scoring().allowNegativeScore" (change)="toggleAllowNegative($event)" />
           <span class="toggle-track" aria-hidden="true">
@@ -409,6 +413,18 @@
           <button class="danger-button squircle" type="button" (click)="confirmExitQuiz()">
             Potwierdź
           </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showRankingCopyConfirm()) {
+    <div class="confirm-overlay">
+      <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
+        <p>Ta zmiana utworzy prywatną kopię quizu z własnym rankingiem. Oryginalny quiz i jego ranking pozostaną bez zmian.</p>
+        <div class="confirm-actions">
+          <button class="secondary-button squircle" type="button" (click)="cancelRankingCopy()">Anuluj</button>
+          <button class="primary-button squircle" type="button" (click)="confirmRankingCopy()">Utwórz kopię</button>
         </div>
       </div>
     </div>

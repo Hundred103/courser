@@ -3,6 +3,9 @@
     <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
       Strona główna
     </button>
+    @if (quiz()?.rankingEnabled && isLoggedIn() && !isStudyMode() && !resultReady()) {
+      <p class="ranking-timer top-ranking-timer">Czas: {{ rankingTimeText() }}</p>
+    }
   </div>
 
   @if (isLoading()) {
@@ -157,6 +160,9 @@
         <div class="result-box squircle">
           <p>Wynik: {{ formattedScore() }} / {{ formattedMaxScore() }}</p>
           <p>Skuteczność: {{ scorePercent() }}%</p>
+          @if (rankingResult(); as ranking) {
+            <p>Czas: {{ rankingDurationText(ranking.durationMs) }}</p>
+          }
 
           @if (isLoggedIn() && !isStudyMode()) {
             @if (resultSaveError()) {
@@ -168,12 +174,34 @@
             }
           }
 
+          @if (rankingResult(); as ranking) {
+            <section class="ranking-box" aria-label="Ranking quizu">
+              <h3>Ranking</h3>
+              @if (ranking.position === 1) { <p class="ranking-first">🏆 Pierwsze miejsce!</p> }
+              @if (ranking.outsideTopFive) { <p>Nie znalazłeś się w Top 5.</p> }
+              @for (entry of ranking.leaderboard; track entry.position) {
+                <p class="ranking-entry" [class.current-user]="entry.position === ranking.position">
+                  <span>{{ entry.position === 1 ? '🥇' : entry.position === 2 ? '🥈' : entry.position === 3 ? '🥉' : entry.position + '.' }}</span>
+                  {{ entry.username }} <small>{{ (entry.scoreScaled / 100).toString().replace('.', ',') }} pkt · {{ rankingDurationText(entry.durationMs) }}</small>
+                </p>
+              }
+            </section>
+          }
+
           <button class="result-back-button primary-button squircle" type="button" (click)="goBack()">
             Strona główna
           </button>
         </div>
         }
       </article>
+
+      @if (rankingResult()?.position === 1) {
+        <div class="confetti-overlay" aria-hidden="true">
+          <span class="firework firework-left"></span>
+          <span class="firework firework-right"></span>
+          @for (piece of confettiPieces; track piece) { <i></i> }
+        </div>
+      }
 
       <aside class="question-navigator" aria-label="Nawigacja po pytaniach">
         <div class="question-navigator-grid">

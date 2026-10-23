@@ -44,11 +44,14 @@ public class QuizExportService {
         return limits;
     }
 
-    public byte[] exportAsZip(Quiz quiz, List<Question> questions) {
+    public byte[] exportAsZip(Quiz quiz, List<Question> questions, String rankingVersionId, String rankingContentHash) {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("title", quiz.getTitle());
         root.set("scoring", scoringNode(quiz));
         root.set("limits", limitsNode(quiz));
+        ObjectNode ranking = root.putObject("_ranking");
+        ranking.put("versionId", rankingVersionId);
+        ranking.put("contentHash", rankingContentHash);
 
         ArrayNode questionsNode = root.putArray("questions");
 

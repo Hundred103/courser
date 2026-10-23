@@ -97,6 +97,58 @@
   gap: 0.65rem;
 }
 
+.details-content-grid {
+  position: relative;
+}
+
+.ranking-box {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(145deg, rgba(38, 41, 48, 0.9), rgba(24, 26, 32, 0.94));
+}
+
+.ranking-box h3 {
+  margin: 0 0 .7rem;
+}
+
+.ranking-entry {
+  display: flex;
+  align-items: baseline;
+  gap: .45rem;
+  margin: .55rem 0;
+}
+
+.ranking-entry small {
+  margin-left: auto;
+  opacity: .8;
+  text-align: right;
+}
+
+.ranking-entry.current-user {
+  color: #8fc8ff;
+  font-weight: 700;
+}
+
+.ranking-first {
+  color: #ffd76a;
+  font-weight: 700;
+}
+
+.details-ranking {
+  margin-top: 1.5rem;
+}
+
+@media (min-width: 1481px) {
+  .details-ranking {
+    position: absolute;
+    top: 0;
+    left: calc(100% + 25vw - 25% - 160px);
+    width: 320px;
+    margin-top: 0;
+  }
+}
+
 .question-block {
   --surface-angle: 145deg;
   --surface-border: rgba(255, 255, 255, 0.08);
@@ -247,4 +299,5 @@
     flex-direction: column;
     align-items: flex-start;
   }
+
 }

@@ -5,7 +5,8 @@ import { DEFAULT_QUIZ_SCORING, parseAnswerPoints, parseQuizScoring } from './qui
 
 const QUIZ_JSON = 'quiz.json';
 
-export async function parseQuizZip(file: ArrayBuffer): Promise<QuizCreateDTO> {
+export interface ParsedQuizZip { quiz: QuizCreateDTO; rankingVersionId: string | null; }
+export async function parseQuizZip(file: ArrayBuffer): Promise<ParsedQuizZip> {
   const zip = await JSZip.loadAsync(file);
   const jsonEntry = zip.file(QUIZ_JSON) ?? zip.file('quiz-template.json');
 
@@ -16,13 +17,14 @@ export async function parseQuizZip(file: ArrayBuffer): Promise<QuizCreateDTO> {
   const rawJson = await jsonEntry.async('string');
   const parsed = JSON.parse(rawJson) as unknown;
   const quiz = normalizeQuiz(parsed);
+  const rankingVersionId = isRecord(parsed) && isRecord(parsed['_ranking']) && typeof parsed['_ranking']['versionId'] === 'string' ? parsed['_ranking']['versionId'] : null;
   const imageFiles = zip.folder('images');
 
   if (!imageFiles) {
-    return quiz;
+    return { quiz, rankingVersionId };
   }
 
-  return {
+  return { quiz: {
     ...quiz,
     questions: await Promise.all(
       quiz.questions.map(async (question, index) => {
@@ -44,7 +46,7 @@ export async function parseQuizZip(file: ArrayBuffer): Promise<QuizCreateDTO> {
         };
       }),
     ),
-  };
+  }, rankingVersionId };
 }
 
 export async function buildQuizZip(quiz: QuizCreateDTO, instructions?: readonly string[]): Promise<Blob> {

@@ -6,7 +6,7 @@ import { catchError, map, of, startWith, switchMap } from 'rxjs';
 import { AnswerPlayDTO } from '../../core/models/answer.model';
 import { normalizeQuizLimits } from '../../core/models/quiz-limits.model';
 import { QuestionPlayDTO } from '../../core/models/question.model';
-import { QuizPlayDTO } from '../../core/models/quiz.model';
+import { QuizPlayDTO, RankingFinishDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { QuizScoreService } from '../../core/services/quiz-score.service';
@@ -27,6 +27,8 @@ type StudyPlacement = 'soon' | 'middle' | 'nearEnd' | 'end';
 
 interface QuizQuestionInstance extends QuestionPlayDTO {
   readonly runId: number;
+  readonly rankingQuestionIndex: number;
+  readonly rankingAnswerIndexes: Record<number, number>;
 }
 
 @Component({
@@ -116,6 +118,12 @@ export class QuizPlayPageComponent {
   readonly activeSelectedQuestionId = signal<number | null>(null);
   readonly studyPlacements = signal<Record<number, StudyPlacement>>({});
   readonly lastCheckedQuestionRunId = signal<number | null>(null);
+  readonly rankingAttemptId = signal<string | null>(null);
+  readonly rankingResult = signal<RankingFinishDTO | null>(null);
+  readonly rankingSeconds = signal(0);
+  readonly confettiPieces = Array.from({ length: 36 }, (_, index) => index);
+  private rankingTimer: ReturnType<typeof setInterval> | null = null;
+  private rankingStartedAt = 0;
   readonly studyPlacementOptions: readonly StudyPlacement[] = ['soon', 'middle', 'nearEnd', 'end'];
   readonly showAnswerFeedback = computed(() => {
     return normalizeQuizLimits(this.quiz()?.limits).showCorrectAnswers || this.resultReady();
@@ -191,6 +199,7 @@ export class QuizPlayPageComponent {
         const randomQuestions = this.runOptions().randomQuestionOrder ?? configuredRandomQuestions;
         this.questions.set(this.prepareQuestions(quiz.questions, randomQuestions));
         this.resetQuizProgress();
+        if (quiz.rankingEnabled && this.authService.isLoggedIn() && this.runOptions().studyMode !== true && quiz.id > 0) this.startRanking(quiz.id);
       }
     });
 
@@ -219,6 +228,8 @@ export class QuizPlayPageComponent {
         }
         return;
       }
+
+      if (quiz.rankingEnabled && this.rankingAttemptId()) this.finishRanking(quiz.id);
 
       this.resultSaved.set(true);
       this.resultSaveError.set(null);
@@ -332,15 +343,20 @@ export class QuizPlayPageComponent {
     this.activeSelectedQuestionId.set(null);
     this.studyPlacements.set({});
     this.lastCheckedQuestionRunId.set(null);
+    this.rankingAttemptId.set(null);
+    this.rankingResult.set(null);
+    this.rankingSeconds.set(0);
   }
 
   private nextQuestionRunId = 1;
 
   private prepareQuestions(questions: QuestionPlayDTO[], randomQuestions: boolean): QuizQuestionInstance[] {
-    const questionsWithRandomAnswers = questions.map((question) => ({
+    const questionsWithRandomAnswers = questions.map((question, rankingQuestionIndex) => ({
       ...question,
       runId: this.nextQuestionRunId++,
       answers: this.shuffle(question.answers),
+      rankingQuestionIndex,
+      rankingAnswerIndexes: Object.fromEntries(question.answers.map((answer, index) => [answer.id, index])),
     }));
 
     return randomQuestions ? this.shuffle(questionsWithRandomAnswers) : questionsWithRandomAnswers;
@@ -462,6 +478,36 @@ export class QuizPlayPageComponent {
       .subscribe({
         error: (error) => this.handleSaveError(error),
       });
+  }
+
+  private startRanking(quizId: number): void {
+    this.quizApiService.startRankingAttempt(quizId).subscribe({
+      next: ({ attemptId }) => {
+        this.rankingAttemptId.set(attemptId);
+        this.rankingStartedAt = Date.now();
+        this.rankingTimer = setInterval(() => this.rankingSeconds.set(Math.floor((Date.now() - this.rankingStartedAt) / 1000)), 250);
+      },
+    });
+  }
+
+  private finishRanking(quizId: number): void {
+    const attemptId = this.rankingAttemptId();
+    if (!attemptId || this.rankingResult()) return;
+    if (this.rankingTimer) { clearInterval(this.rankingTimer); this.rankingTimer = null; }
+    const answers = this.questions().map((question) => ({
+      questionIndex: question.rankingQuestionIndex,
+      answerIndexes: (this.submittedAnswers()[question.runId] ?? []).map((answerId) => question.rankingAnswerIndexes[answerId]).filter((index): index is number => index !== undefined),
+    }));
+    this.quizApiService.finishRankingAttempt(quizId, attemptId, answers).subscribe({ next: (result) => this.rankingResult.set(result) });
+  }
+
+  rankingTimeText(): string {
+    const seconds = this.rankingSeconds();
+    return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+  }
+
+  rankingDurationText(milliseconds: number): string {
+    return `${(milliseconds / 1000).toFixed(3).replace('.', ',')} s`;
   }
 
   private recordCompletedAttempt(quizId: number): void {

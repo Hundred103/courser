@@ -26,45 +26,61 @@
         </div>
       </header>
 
-      <div class="questions-list">
-        @for (question of q.questions; track question.id; let i = $index) {
-          <div class="question-block squircle" [class.expanded]="isExpanded(i)">
+      <div class="details-content-grid">
+        <div class="questions-list">
+          @for (question of q.questions; track question.id; let i = $index) {
+            <div class="question-block squircle" [class.expanded]="isExpanded(i)">
 
-            <button
-              class="question-toggle"
-              type="button"
-              [attr.aria-expanded]="isExpanded(i)"
-              (click)="toggleQuestion(i)"
-            >
-              <span class="question-number">{{ i + 1 }}</span>
-              <span class="question-text">{{ question.content }}</span>
-              <span class="toggle-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-                     stroke="currentColor" stroke-width="2.5"
-                     stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M6 9l6 6 6-6"/>
-                </svg>
-              </span>
-            </button>
+              <button
+                class="question-toggle"
+                type="button"
+                [attr.aria-expanded]="isExpanded(i)"
+                (click)="toggleQuestion(i)"
+              >
+                <span class="question-number">{{ i + 1 }}</span>
+                <span class="question-text">{{ question.content }}</span>
+                <span class="toggle-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+                       stroke="currentColor" stroke-width="2.5"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 9l6 6 6-6"/>
+                  </svg>
+                </span>
+              </button>
 
-            @if (isExpanded(i)) {
-              @if (questionImageSrc(question); as imageSrc) {
-                <figure class="question-image squircle">
-                  <img [src]="imageSrc" alt="Ilustracja do pytania" />
-                </figure>
+              @if (isExpanded(i)) {
+                @if (questionImageSrc(question); as imageSrc) {
+                  <figure class="question-image squircle">
+                    <img [src]="imageSrc" alt="Ilustracja do pytania" />
+                  </figure>
+                }
+
+                <ul class="answers-list" role="list">
+                  @for (answer of question.answers; track answer.id) {
+                    <li class="answer-item">
+                      <span class="answer-dot" aria-hidden="true"></span>
+                      {{ answer.content }}
+                    </li>
+                  }
+                </ul>
               }
 
-              <ul class="answers-list" role="list">
-                @for (answer of question.answers; track answer.id) {
-                  <li class="answer-item">
-                    <span class="answer-dot" aria-hidden="true"></span>
-                    {{ answer.content }}
-                  </li>
-                }
-              </ul>
-            }
+            </div>
+          }
+        </div>
 
-          </div>
+        @if (ranking(); as currentRanking) {
+          <aside class="ranking-box details-ranking squircle" aria-label="Ranking quizu">
+            <h3>Ranking</h3>
+            @if (currentRanking.position === 1) { <p class="ranking-first">🏆 Pierwsze miejsce!</p> }
+            @for (entry of currentRanking.leaderboard; track entry.position) {
+              <p class="ranking-entry" [class.current-user]="entry.position === currentRanking.position">
+                <span>{{ entry.position === 1 ? '🥇' : entry.position === 2 ? '🥈' : entry.position === 3 ? '🥉' : entry.position + '.' }}</span>
+                {{ entry.username }}
+                <small>{{ (entry.scoreScaled / 100).toString().replace('.', ',') }} pkt · {{ rankingDurationText(entry.durationMs) }}</small>
+              </p>
+            }
+          </aside>
         }
       </div>
 

@@ -101,6 +101,12 @@ h2 {
   line-height: 1.2;
 }
 
+.quiz-best-score.quiz-rank-medal {
+  display: inline-block;
+  font-size: 1.22rem;
+  line-height: 1.1;
+}
+
 .rename-editor {
   display: grid;
   flex: 1 1 auto;

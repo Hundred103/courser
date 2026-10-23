@@ -50,6 +50,9 @@ public class Quiz {
     @Column(name = "show_correct_answers", nullable = false)
     @Builder.Default
     private boolean showCorrectAnswers = true;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ranking_version_id")
+    private QuizRankingVersion rankingVersion;
 
     public void addQuestion(Question question) {
         questions.add(question);

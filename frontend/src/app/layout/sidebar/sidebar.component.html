@@ -41,8 +41,8 @@
           } @else {
             <div class="quiz-info">
               <a class="quiz-title quiz-title-link" [routerLink]="['/quizzes', quiz.id, 'details']">{{ quiz.title }}</a>
-              @if (isLoggedIn() && bestScoreLabel(quiz.id); as bestScore) {
-                <span class="quiz-best-score">Najlepszy: {{ bestScore }}</span>
+              @if (isLoggedIn() && rankingPositionLabel(quiz.id); as positionLabel) {
+                <span class="quiz-best-score" [class.quiz-rank-medal]="isMedalPosition(quiz.id)">{{ positionLabel }}</span>
               }
             </div>
           }

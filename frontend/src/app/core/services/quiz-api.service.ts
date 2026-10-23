@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, of, throwError } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
-import { QuizPlayDTO, QuizRawDTO, QuizCreateDTO, QuizEditTitleDTO } from '../models/quiz.model';
+import { QuizPlayDTO, QuizRawDTO, QuizCreateDTO, QuizEditTitleDTO, RankingFinishDTO, RankingLeaderboardDTO } from '../models/quiz.model';
 import { environment } from '../../../environment';
 import { AuthService } from './auth.service';
 import { GuestQuizStorageService } from './guest-quiz-storage.service';
@@ -96,6 +96,11 @@ export class QuizApiService {
     return this.createQuiz(dto);
   }
 
+  importArchiveQuiz(dto: QuizCreateDTO, rankingVersionId: string | null): Observable<QuizRawDTO> {
+    if (!this.authService.getCurrentUser()) return this.importQuiz(dto);
+    return this.http.post<QuizRawDTO>(`${this.apiUrl}/import-archive`, { quiz: dto, rankingVersionId });
+  }
+
   createShareCode(id: number, expiresInSeconds: number | null): Observable<QuizShareCodeDTO> {
     const user = this.authService.getCurrentUser();
 
@@ -148,6 +153,26 @@ export class QuizApiService {
     }
 
     return this.http.get(`${this.apiUrl}/${id}/export`, { responseType: 'blob' });
+  }
+
+  startRankingAttempt(id: number): Observable<{ attemptId: string }> {
+    return this.http.post<{ attemptId: string }>(`${this.apiUrl}/${id}/ranking-attempts`, {});
+  }
+
+  finishRankingAttempt(id: number, attemptId: string, answers: { questionIndex: number; answerIndexes: number[] }[]): Observable<RankingFinishDTO> {
+    return this.http.post<RankingFinishDTO>(`${this.apiUrl}/${id}/ranking-attempts/${attemptId}/finish`, { answers });
+  }
+
+  getRankingPosition(id: number): Observable<{ position: number | null }> {
+    return this.http.get<{ position: number | null }>(`${this.apiUrl}/${id}/ranking-position`);
+  }
+
+  getRankingLeaderboard(id: number): Observable<RankingLeaderboardDTO> {
+    return this.http.get<RankingLeaderboardDTO>(`${this.apiUrl}/${id}/ranking`);
+  }
+
+  forkQuiz(id: number, dto: QuizCreateDTO): Observable<QuizRawDTO> {
+    return this.http.post<QuizRawDTO>(`${this.apiUrl}/${id}/fork`, dto);
   }
 
 }

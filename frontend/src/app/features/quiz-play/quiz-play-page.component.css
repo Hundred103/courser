@@ -499,3 +499,23 @@
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
+ .ranking-timer { color: #8fc8ff; font-variant-numeric: tabular-nums; }
+ .top-ranking-timer { margin: 0 0 0 auto; font-size: 1.12rem; font-weight: 900; }
+ .ranking-box { margin-top: 1rem; border-top: 1px solid rgba(255,255,255,.18); padding-top: .8rem; text-align: left; }
+ .ranking-box h3 { margin: 0 0 .45rem; }
+ .ranking-entry { display: flex; gap: .45rem; align-items: baseline; margin: .35rem 0; }
+ .ranking-entry small { margin-left: auto; opacity: .8; }
+ .ranking-entry.current-user { color: #8fc8ff; font-weight: 700; }
+ .ranking-first { color: #ffd76a; font-weight: 700; }
+ .confetti-overlay { pointer-events: none; position: fixed; inset: 0; z-index: 100; overflow: hidden; }
+ .confetti-overlay i { position: absolute; bottom: -4vh; left: calc((var(--piece, 0) + 1) * 2.7%); width: 10px; height: 16px; background: #ff6b35; animation: confetti-burst 3.6s cubic-bezier(.12,.7,.25,1) both; }
+ .confetti-overlay i:nth-child(3n) { background: #60a5fa; width: 7px; height: 7px; border-radius: 50%; }
+ .confetti-overlay i:nth-child(4n) { background: #facc15; }
+ .confetti-overlay i:nth-child(5n) { background: #a78bfa; }
+ .confetti-overlay i:nth-child(2n) { animation-delay: .16s; animation-duration: 3s; }
+ .confetti-overlay i:nth-child(1) { --piece: 1; } .confetti-overlay i:nth-child(2) { --piece: 2; } .confetti-overlay i:nth-child(3) { --piece: 3; } .confetti-overlay i:nth-child(4) { --piece: 4; } .confetti-overlay i:nth-child(5) { --piece: 5; } .confetti-overlay i:nth-child(6) { --piece: 6; } .confetti-overlay i:nth-child(7) { --piece: 7; } .confetti-overlay i:nth-child(8) { --piece: 8; } .confetti-overlay i:nth-child(9) { --piece: 9; } .confetti-overlay i:nth-child(10) { --piece: 10; } .confetti-overlay i:nth-child(11) { --piece: 11; } .confetti-overlay i:nth-child(12) { --piece: 12; } .confetti-overlay i:nth-child(13) { --piece: 13; } .confetti-overlay i:nth-child(14) { --piece: 14; } .confetti-overlay i:nth-child(15) { --piece: 15; } .confetti-overlay i:nth-child(16) { --piece: 16; } .confetti-overlay i:nth-child(17) { --piece: 17; } .confetti-overlay i:nth-child(18) { --piece: 18; } .confetti-overlay i:nth-child(19) { --piece: 19; } .confetti-overlay i:nth-child(20) { --piece: 20; } .confetti-overlay i:nth-child(21) { --piece: 21; } .confetti-overlay i:nth-child(22) { --piece: 22; } .confetti-overlay i:nth-child(23) { --piece: 23; } .confetti-overlay i:nth-child(24) { --piece: 24; } .confetti-overlay i:nth-child(25) { --piece: 25; } .confetti-overlay i:nth-child(26) { --piece: 26; } .confetti-overlay i:nth-child(27) { --piece: 27; } .confetti-overlay i:nth-child(28) { --piece: 28; } .confetti-overlay i:nth-child(29) { --piece: 29; } .confetti-overlay i:nth-child(30) { --piece: 30; } .confetti-overlay i:nth-child(31) { --piece: 31; } .confetti-overlay i:nth-child(32) { --piece: 32; } .confetti-overlay i:nth-child(33) { --piece: 33; } .confetti-overlay i:nth-child(34) { --piece: 34; } .confetti-overlay i:nth-child(35) { --piece: 35; } .confetti-overlay i:nth-child(36) { --piece: 36; }
+ .firework { position: absolute; width: 12px; height: 12px; border-radius: 50%; opacity: 0; animation: firework-bloom 2.7s ease-out both; }
+ .firework-left { left: 22%; top: 28%; color: #facc15; background: #facc15; animation-delay: .32s; }
+ .firework-right { right: 20%; top: 36%; color: #60a5fa; background: #60a5fa; animation-delay: .72s; }
+ @keyframes confetti-burst { 0% { transform: translate3d(0,0,0) rotate(0); opacity: 0; } 8% { opacity: 1; } 38% { transform: translate3d(calc((var(--piece, 0) - 18) * 1.2vw), -78vh, 0) rotate(520deg); opacity: 1; } 100% { transform: translate3d(calc((var(--piece, 0) - 18) * 1.8vw), -15vh, 0) rotate(980deg); opacity: 0; } }
+ @keyframes firework-bloom { 0% { transform: scale(.1); opacity: 0; box-shadow: 0 0 0 0 currentColor; } 15% { opacity: 1; } 45% { transform: scale(1); opacity: 1; box-shadow: 0 -80px 0 -3px currentColor, 56px -56px 0 -3px currentColor, 80px 0 0 -3px currentColor, 56px 56px 0 -3px currentColor, 0 80px 0 -3px currentColor, -56px 56px 0 -3px currentColor, -80px 0 0 -3px currentColor, -56px -56px 0 -3px currentColor; } 100% { transform: scale(1.25); opacity: 0; box-shadow: 0 -120px 0 -5px currentColor, 85px -85px 0 -5px currentColor, 120px 0 0 -5px currentColor, 85px 85px 0 -5px currentColor, 0 120px 0 -5px currentColor, -85px 85px 0 -5px currentColor, -120px 0 0 -5px currentColor, -85px -85px 0 -5px currentColor; } }
