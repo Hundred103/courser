@@ -178,10 +178,7 @@ export class QuizPlayPageComponent {
   );
   readonly formattedScore = computed(() => this.formatScore(this.score()));
   readonly formattedMaxScore = computed(() => this.formatScore(this.maxScore()));
-  readonly scorePercent = computed(() => {
-    const maxScore = this.maxScore();
-    return maxScore === 0 ? 0 : Math.round((this.score() / maxScore) * 100);
-  });
+  readonly scorePercent = computed(() => this.formatPercentage(this.score(), this.maxScore()));
 
   constructor() {
     effect(() => {
@@ -533,9 +530,13 @@ export class QuizPlayPageComponent {
   }
 
   rankingPercentText(scoreScaled: number, maxScoreScaled: number): string {
-    if (maxScoreScaled === 0) return '0%';
-    const value = Math.round((scoreScaled / maxScoreScaled) * 10_000) / 100;
-    return `${value.toFixed(2).replace(/\.?0+$/, '').replace('.', ',')}%`;
+    return `${this.formatPercentage(scoreScaled, maxScoreScaled)}%`;
+  }
+
+  private formatPercentage(score: number, maximum: number): string {
+    if (maximum === 0) return '0';
+    const value = Math.round((score / maximum) * 10_000) / 100;
+    return value.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
   }
 
   private finishQuizDueToRankingTimeLimit(): void {
@@ -669,6 +670,25 @@ export class QuizPlayPageComponent {
       selectedAnswerIds.length === correctAnswerIds.length &&
       correctAnswerIds.every((answerId) => selectedAnswerIds.includes(answerId))
     );
+  }
+
+  questionScorePercentage(question: QuizQuestionInstance): number {
+    if (!this.isQuestionChecked(question)) {
+      return 0;
+    }
+
+    const selectedIds = this.submittedAnswers()[question.runId] ?? [];
+    const awarded = awardedQuestionScore(question.answers, selectedIds, this.scoring());
+    const maximum = questionMaxScore(question.answers, this.scoring());
+
+    // Pytanie z maksymalnym wynikiem 0 może wystąpić przy niestandardowej
+    // punktacji. Wtedy pełna poprawność nadal oznacza 100%, a każda inna
+    // odpowiedź 0%.
+    if (maximum <= 0) {
+      return this.isQuestionFullyCorrect(question) ? 100 : 0;
+    }
+
+    return Math.max(0, Math.min(100, (awarded / maximum) * 100));
   }
 
   questionScoreText(question: QuizQuestionInstance): string {

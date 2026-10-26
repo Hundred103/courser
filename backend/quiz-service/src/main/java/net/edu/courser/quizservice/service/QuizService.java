@@ -201,6 +201,9 @@ public class QuizService {
         QuizCreateDTO dto = request.quiz();
         QuizCreateDTO quizToImport = dto;
         QuizRankingVersion matchingVersion = null;
+        String privateImportTitle = Boolean.TRUE.equals(request.migratingGuestQuiz())
+                ? dto.title()
+                : dto.title() + " (kopia)";
         if (request.rankingVersionId() != null) {
             try {
                 QuizRankingVersion version = rankingVersionRepository.findById(UUID.fromString(request.rankingVersionId())).orElse(null);
@@ -219,17 +222,35 @@ public class QuizService {
                     matchingVersion = version;
                 } else {
                     quizToImport = new QuizCreateDTO(
-                            dto.title() + " (kopia)", dto.questions(), dto.scoring(), dto.limits()
+                            privateImportTitle, dto.questions(), dto.scoring(), dto.limits()
                     );
                 }
             } catch (IllegalArgumentException ignored) {
                 quizToImport = new QuizCreateDTO(
-                        dto.title() + " (kopia)", dto.questions(), dto.scoring(), dto.limits()
+                        privateImportTitle, dto.questions(), dto.scoring(), dto.limits()
                 );
             }
         }
 
         Quiz quiz = mapperDTO.toQuizEntity(quizToImport);
+        if (Boolean.TRUE.equals(request.migratingGuestQuiz())) {
+            // W czasie migracji lokalnych quizów gościa wersja rankingowa jest
+            // jednoznaczną tożsamością wspólnego quizu. Tytuł oraz ustawienia
+            // prezentacji nie mogą więc utworzyć drugiej kopii tej samej wersji.
+            if (matchingVersion != null) {
+                Quiz existingRankingQuiz = quizRepository
+                        .findByOwnerUserIdAndRankingVersion_Id(ownerUserId, matchingVersion.getId())
+                        .orElse(null);
+                if (existingRankingQuiz != null) {
+                    return existingRankingQuiz;
+                }
+            } else {
+                Quiz identicalQuiz = findIdenticalQuizByOwnerUserId(ownerUserId, quiz);
+                if (identicalQuiz != null) {
+                    return identicalQuiz;
+                }
+            }
+        }
         quiz.setOwnerUserId(ownerUserId);
         if (matchingVersion != null) {
             quiz.setRankingVersion(matchingVersion);
@@ -476,6 +497,37 @@ public class QuizService {
             StringBuilder result = new StringBuilder(); for(byte value:digest) result.append(String.format("%02x", value));
             return result.toString();
         } catch(Exception exception) { throw new IllegalStateException("Nie udało się porównać wersji quizu.", exception); }
+    }
+
+    private Quiz findIdenticalQuizByOwnerUserId(Long ownerUserId, Quiz candidate) {
+        String candidateHash = fullQuizContentHash(candidate, candidate.getQuestions());
+
+        for (Quiz existingQuiz : quizRepository.findByOwnerUserId(ownerUserId, Sort.by(Sort.Direction.ASC, "id"))) {
+            List<Question> existingQuestions = questionRepository.findWholeByQuizId(existingQuiz.getId());
+            if (candidateHash.equals(fullQuizContentHash(existingQuiz, existingQuestions))) {
+                return existingQuiz;
+            }
+        }
+
+        return null;
+    }
+
+    private String fullQuizContentHash(Quiz quiz, List<Question> questions) {
+        try {
+            ObjectNode root = objectMapper.createObjectNode();
+            root.put("title", quiz.getTitle());
+            root.set("questions", objectMapper.valueToTree(questions.stream().map(this::toQuestionCreateDTO).toList()));
+            root.set("scoring", objectMapper.valueToTree(mapperDTO.toScoringDto(quiz)));
+            root.set("limits", objectMapper.valueToTree(mapperDTO.toLimitsDto(quiz)));
+
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(objectMapper.writeValueAsBytes(root));
+            StringBuilder result = new StringBuilder();
+            for (byte value : digest) result.append(String.format("%02x", value));
+            return result.toString();
+        } catch (Exception exception) {
+            throw new IllegalStateException("Nie udało się porównać zawartości quizu.", exception);
+        }
     }
 
     private int compareEntries(QuizRankingEntry left, QuizRankingEntry right) {

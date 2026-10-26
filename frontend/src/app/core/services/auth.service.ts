@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpBackend, HttpClient } from '@angular/common/http';
 import { Observable, catchError, finalize, forkJoin, map, of, shareReplay, tap } from 'rxjs';
 import { environment } from '../../../environment';
 import { GuestQuizStorageService } from './guest-quiz-storage.service';
@@ -30,6 +30,11 @@ const STORAGE_KEY = 'user';
 })
 export class AuthService {
   private readonly http = inject(HttpClient);
+  private readonly httpBackend = inject(HttpBackend);
+  // Odświeżenie sesji jest wykonywane już podczas tworzenia AuthService.
+  // Omijamy interceptor, który sam wstrzykuje AuthService, aby nie tworzyć
+  // cyklicznej zależności przy starcie aplikacji.
+  private readonly sessionHttp = new HttpClient(this.httpBackend);
   private readonly guestQuizStorage = inject(GuestQuizStorageService);
   private readonly apiUrl = `${environment.apiUrl}/users`;
   private readonly quizzesApiUrl = `${environment.apiUrl}/quizzes`;
@@ -41,16 +46,14 @@ export class AuthService {
   readonly isLoggedIn = computed(() => this.currentUser() !== null);
 
   constructor() {
-    // Przy ponownym otwarciu aplikacji odtwarzamy sesję z ciasteczka HttpOnly.
-    // Dzięki temu aktywny użytkownik nie musi logować się ponownie po wygaśnięciu
-    // krótkiego tokenu dostępu.
-    if (this.currentUser()) {
-      this.refreshAccessToken().subscribe();
-    }
+    // Ciasteczko HttpOnly jest źródłem prawdy dla trwałej sesji. Odświeżamy ją
+    // zawsze, także gdy wpis w localStorage nie istnieje albo został usunięty.
+    // Dzięki temu zwykłe odświeżenie strony może odtworzyć zalogowanego użytkownika.
+    this.refreshAccessToken().subscribe();
   }
 
   login(email: string, password: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/login`, { email, password });
+    return this.http.post<AuthResponse>(`${this.apiUrl}/login`, { email, password }, { withCredentials: true });
   }
 
   register(email: string, password: string, username: string): Observable<AuthResponse> {
@@ -58,7 +61,7 @@ export class AuthService {
       email,
       password,
       username,
-    });
+    }, { withCredentials: true });
   }
 
   setCurrentUser(user: AuthResponse): void {
@@ -73,7 +76,11 @@ export class AuthService {
       return of([]);
     }
 
-    return forkJoin(guestQuizzes.map(({ quiz, rankingVersionId }) => this.http.post(`${this.quizzesApiUrl}/import-archive`, { quiz, rankingVersionId }))).pipe(
+    return forkJoin(guestQuizzes.map(({ quiz, rankingVersionId }) => this.http.post(`${this.quizzesApiUrl}/import-archive`, {
+      quiz,
+      rankingVersionId,
+      migratingGuestQuiz: true,
+    }))).pipe(
       tap(() => this.guestQuizStorage.clear()),
     );
   }
@@ -95,7 +102,7 @@ export class AuthService {
       return this.refreshInFlight$;
     }
 
-    this.refreshInFlight$ = this.http.post<AuthResponse>(`${this.apiUrl}/refresh`, {}, { withCredentials: true }).pipe(
+    this.refreshInFlight$ = this.sessionHttp.post<AuthResponse>(`${this.apiUrl}/refresh`, {}, { withCredentials: true }).pipe(
       tap((user) => this.setCurrentUser(user)),
       map(() => true),
       catchError(() => {
