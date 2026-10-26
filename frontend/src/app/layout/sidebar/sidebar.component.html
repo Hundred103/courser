@@ -41,8 +41,8 @@
           } @else {
             <div class="quiz-info">
               <a class="quiz-title quiz-title-link" [routerLink]="['/quizzes', quiz.id, 'details']">{{ quiz.title }}</a>
-              @if (isLoggedIn() && bestScoreLabel(quiz.id); as bestScore) {
-                <span class="quiz-best-score">Najlepszy: {{ bestScore }}</span>
+              @if (isLoggedIn() && rankingPositionLabel(quiz.id); as positionLabel) {
+                <span class="quiz-best-score" [class.quiz-rank-medal]="isMedalPosition(quiz.id)">{{ positionLabel }}</span>
               }
             </div>
           }
@@ -66,6 +66,23 @@
 
               @if (openMenuQuizId() === quiz.id) {
                 <div class="options-menu" role="menu">
+                  <button type="button" role="menuitem" (click)="copyQuiz(quiz)">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect x="9" y="9" width="11" height="11" rx="2" />
+                      <path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3" />
+                    </svg>
+                    Utwórz kopię
+                  </button>
                   <button type="button" role="menuitem" (click)="requestShareQuiz(quiz)">
                     <svg
                       viewBox="0 0 24 24"
@@ -78,11 +95,9 @@
                       stroke-linejoin="round"
                       aria-hidden="true"
                     >
-                      <circle cx="18" cy="5" r="3" />
-                      <circle cx="6" cy="12" r="3" />
-                      <circle cx="18" cy="19" r="3" />
-                      <path d="m8.6 10.5 6.8-4" />
-                      <path d="m8.6 13.5 6.8 4" />
+                      <path d="M12 3v12" />
+                      <path d="m8 7 4-4 4 4" />
+                      <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
                     </svg>
                     Udostępnij
                   </button>
@@ -275,33 +290,47 @@
     <div class="confirm-banner settings-banner squircle" role="dialog" aria-modal="true" aria-labelledby="quiz-settings-title">
       <header class="settings-header">
         <h3 id="quiz-settings-title">{{ quizToStart.title }}</h3>
+        <div class="start-facts">
+          <p>Pytania: {{ quizToStart.questions.length }}</p>
+          @if (isLoggedIn() && completedAttemptsCount(); as attempts) {
+            <p>Ukończone podejścia: {{ attempts }}</p>
+          } @else if (isLoggedIn() && completedAttemptsCount() === 0) {
+            <p>Ukończone podejścia: 0</p>
+          }
+        </div>
       </header>
 
-      @if (startInfo(); as info) {
-        <section class="start-facts" aria-label="Informacje o quizie">
-          <p>Liczba pytań: {{ info.questionCount }}</p>
-          @if (info.quizTimeSeconds != null) {
-            <p>Czas quizu: {{ formatLimitSeconds(info.quizTimeSeconds) }}</p>
-          }
-          @if (info.questionTimeSeconds != null) {
-            <p>Czas pytania: {{ formatLimitSeconds(info.questionTimeSeconds) }}</p>
-          }
-          <p>Podejścia: {{ attemptsLabel(info) }}</p>
-          @if (!canStartQuiz(info)) {
-            <p class="start-limit">Limit podejść został wykorzystany.</p>
-          }
-        </section>
-      } @else if (startInfoError()) {
-        <p class="start-limit">{{ startInfoError() }}</p>
-      } @else {
-        <p>Ładowanie...</p>
-      }
+      <section class="settings-section" aria-label="Ustawienia bieżącego rozwiązywania">
+        <label class="start-option-row">
+          <span>Losowa kolejność pytań</span>
+          <span class="start-toggle-control">
+            <input
+              type="checkbox"
+              [checked]="startRandomQuestionOrder()"
+              (change)="updateStartRandomQuestionOrder($event)"
+            />
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+          </span>
+        </label>
+
+        <label class="start-option-row">
+          <span>Tryb nauki</span>
+          <span class="start-toggle-control">
+            <input
+              type="checkbox"
+              [checked]="startStudyMode()"
+              (change)="updateStartStudyMode($event)"
+            />
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+          </span>
+        </label>
+      </section>
 
       <div class="confirm-actions settings-actions">
         <button class="secondary-button squircle" type="button" (click)="cancelStartQuiz()">
           Anuluj
         </button>
-        <button class="primary-button squircle" type="button" [disabled]="!canStartQuiz(startInfo())" (click)="startQuiz()">
+        <button class="primary-button squircle" type="button" (click)="startQuiz()">
           Rozwiąż
         </button>
       </div>

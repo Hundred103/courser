@@ -13,5 +13,4 @@ public class SaveQuizResultRequest {
     private Long quizId;
     private Integer score;
     private Integer maxScore;
-    private Long attemptId;
 }

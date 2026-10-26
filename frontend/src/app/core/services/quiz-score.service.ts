@@ -24,6 +24,18 @@ export class QuizScoreService {
     return this.http.get<BestQuizScore[]>(`${this.apiUrl}/me/quiz-results/best`);
   }
 
+  getCompletedAttemptsCount(quizId: number): Observable<number> {
+    return this.http.get<number>(`${this.apiUrl}/me/quiz-attempts/count`, {
+      params: { quizId },
+    });
+  }
+
+  recordCompletedAttempt(quizId: number): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/me/quiz-attempts`, { quizId }).pipe(
+      tap(() => this.requestRefresh()),
+    );
+  }
+
   requestRefresh(): void {
     this.refreshTick.update((value) => value + 1);
   }

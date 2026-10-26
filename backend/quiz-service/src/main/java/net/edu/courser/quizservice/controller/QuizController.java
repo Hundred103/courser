@@ -96,9 +96,40 @@ public class QuizController {
                 .body(mapperDTO.toQuizRawDTO(importedQuiz));
     }
 
+    @PostMapping("/import-archive")
+    public ResponseEntity<QuizRawDTO> importArchive(@RequestHeader("X-User-Id") Long userId, @RequestBody QuizArchiveImportDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(mapperDTO.toQuizRawDTO(quizService.importArchive(dto, userId)));
+    }
+
     @PostMapping("/share-code-preview")
-    public QuizCreateDTO previewByCode(@RequestBody QuizImportByCodeDTO dto) {
-        return quizService.getCreateDtoByShareCode(dto.code());
+    public QuizShareCodePreviewDTO previewByCode(@RequestBody QuizImportByCodeDTO dto) {
+        QuizRankingVersion version = quizService.findRankingVersionByShareCode(dto.code());
+        return new QuizShareCodePreviewDTO(quizService.readSnapshot(version), version.getId().toString());
+    }
+
+    @PostMapping("/{id}/fork")
+    public ResponseEntity<QuizRawDTO> forkQuiz(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId, @RequestBody QuizCreateDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(mapperDTO.toQuizRawDTO(quizService.fork(id, userId, dto)));
+    }
+
+    @PostMapping("/{id}/ranking-attempts")
+    public RankingAttemptStartDTO startRankingAttempt(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
+        return quizService.startRankingAttempt(id, userId);
+    }
+
+    @GetMapping("/{id}/ranking-position")
+    public RankingPositionDTO getRankingPosition(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
+        return quizService.getRankingPosition(id, userId);
+    }
+
+    @GetMapping("/{id}/ranking")
+    public RankingLeaderboardDTO getRankingLeaderboard(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
+        return quizService.getRankingLeaderboard(id, userId);
+    }
+
+    @PostMapping("/{id}/ranking-attempts/{attemptId}/finish")
+    public RankingFinishDTO finishRankingAttempt(@PathVariable Long id, @PathVariable java.util.UUID attemptId, @RequestHeader("X-User-Id") Long userId, @RequestBody RankingFinishRequestDTO dto) {
+        return quizService.finishRankingAttempt(id, attemptId, userId, dto);
     }
 
     //PUT /quizzes/id -> zmienia caly quiz wraz z pytaniami i odpowiedziami

@@ -2,15 +2,17 @@ package net.edu.courser.quizservice.dto;
 import net.edu.courser.quizservice.entity.Answer;
 import net.edu.courser.quizservice.entity.*;
 import net.edu.courser.quizservice.service.ImageCompressor;
-import net.edu.courser.quizservice.service.QuizLimitsRules;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 
 
 @Component
 public class MapperDTO {
+    private static final double MAX_SCORE_VALUE = 99.99d;
+
     private final ImageCompressor imageCompressor;
 
     public MapperDTO(ImageCompressor imageCompressor) {
@@ -18,7 +20,7 @@ public class MapperDTO {
     }
 
     public QuizRawDTO toQuizRawDTO (Quiz quiz) {
-        return new QuizRawDTO(quiz.getId(), quiz.getTitle());
+        return new QuizRawDTO(quiz.getId(), quiz.getTitle(), quiz.getRankingVersion() != null && quiz.getRankingVersion().isHasLoggedImport());
     }
 
     //ENTITY --> DTO (wysylamy do uzytkownika)
@@ -31,7 +33,9 @@ public class MapperDTO {
                         .map(this::toQuestionPlayDTO)
                         .toList(),
                 toScoringDto(quiz),
-                toLimitsDto(quiz)
+                toLimitsDto(quiz),
+                quiz.getRankingVersion() != null,
+                quiz.getRankingVersion() != null && quiz.getRankingVersion().isHasLoggedImport()
         );
     }
     private QuestionPlayDTO toQuestionPlayDTO(Question question) {
@@ -93,15 +97,11 @@ public class MapperDTO {
         for (int index = 0; index < questions.size(); index++) {
             quiz.addQuestion(toQuestionEntity(questions.get(index), index, customScoring));
         }
-        QuizLimitsRules.validate(quiz.getQuizTimeSeconds(), quiz.getQuestionTimeSeconds(), questions.size());
         return quiz;
     }
 
     public QuizLimitsDTO toLimitsDto(Quiz quiz) {
         return new QuizLimitsDTO(
-                quiz.getMaxAttempts(),
-                quiz.getQuizTimeSeconds(),
-                quiz.getQuestionTimeSeconds(),
                 quiz.isRandomQuestionOrder(),
                 quiz.isShowCorrectAnswers()
         );
@@ -109,27 +109,13 @@ public class MapperDTO {
 
     public void applyLimits(Quiz quiz, QuizLimitsDTO limits) {
         if (limits == null) {
-            quiz.setMaxAttempts(null);
-            quiz.setQuizTimeSeconds(null);
-            quiz.setQuestionTimeSeconds(null);
             quiz.setRandomQuestionOrder(false);
             quiz.setShowCorrectAnswers(true);
             return;
         }
 
-        quiz.setMaxAttempts(positiveOrNull(limits.maxAttempts()));
-        quiz.setQuizTimeSeconds(positiveOrNull(limits.quizTimeSeconds()));
-        quiz.setQuestionTimeSeconds(positiveOrNull(limits.questionTimeSeconds()));
         quiz.setRandomQuestionOrder(Boolean.TRUE.equals(limits.randomQuestionOrder()));
         quiz.setShowCorrectAnswers(limits.showCorrectAnswers() == null || limits.showCorrectAnswers());
-    }
-
-    private Integer positiveOrNull(Integer value) {
-        if (value == null || value <= 0) {
-            return null;
-        }
-
-        return value;
     }
 
     public Question toQuestionEntity(QuestionCreateDTO qDto, int index, boolean customScoring) {
@@ -141,7 +127,7 @@ public class MapperDTO {
             Answer answer = Answer.builder()
                     .content(aDto.content())
                     .correct(aDto.correct())
-                    .points(normalizePoints(aDto.points(), customScoring))
+                    .points(normalizePoints(aDto.points(), customScoring, aDto.correct()))
                     .build();
             question.addAnswer(answer);
         });
@@ -159,11 +145,21 @@ public class MapperDTO {
             default -> "fraction";
         };
 
+        if ("fraction".equals(penaltyMode)) {
+            return new QuizScoringDTO(
+                    mode,
+                    Boolean.TRUE.equals(scoring.allowNegativeScore()),
+                    1d,
+                    1d,
+                    "fraction"
+            );
+        }
+
         return new QuizScoringDTO(
                 mode,
                 Boolean.TRUE.equals(scoring.allowNegativeScore()),
-                nonNegative(scoring.pointsPerCorrect(), 1d),
-                nonNegative(scoring.incorrectPenalty(), 1d),
+                boundedScore(scoring.pointsPerCorrect(), 1d, "Punkty za poprawną odpowiedź", 0d, MAX_SCORE_VALUE),
+                boundedScore(scoring.incorrectPenalty(), 1d, "Kara za błędną odpowiedź", 0d, MAX_SCORE_VALUE),
                 penaltyMode
         );
     }
@@ -172,20 +168,48 @@ public class MapperDTO {
         return new QuizScoringDTO("default", false, 1d, 1d, "fraction");
     }
 
-    private double nonNegative(Double value, double fallback) {
-        if (value == null || !Double.isFinite(value) || value < 0) {
+    private double boundedScore(Double value, double fallback, String label, double min, double max) {
+        if (value == null) {
             return fallback;
         }
 
+        validateScore(value, label, min, max);
         return value;
     }
 
-    private Double normalizePoints(Double points, boolean customScoring) {
-        if (points == null || !Double.isFinite(points)) {
+    private Double normalizePoints(Double points, boolean customScoring, boolean correct) {
+        if (points == null) {
             return customScoring ? 0d : null;
         }
 
+        validateScore(
+                points,
+                "Punkty przy odpowiedzi",
+                correct ? 0d : -MAX_SCORE_VALUE,
+                correct ? MAX_SCORE_VALUE : 0d
+        );
         return points;
+    }
+
+    private void validateScore(Double value, String label, double min, double max) {
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException(label + " musi być liczbą skończoną.");
+        }
+
+        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();
+        if (decimal.scale() > 2) {
+            throw new IllegalArgumentException(label + " może mieć maksymalnie dwie cyfry po przecinku.");
+        }
+
+        if (value < min || value > max) {
+            throw new IllegalArgumentException(
+                    label + " musi mieścić się w zakresie " + formatScoreLimit(min) + "–" + formatScoreLimit(max) + "."
+            );
+        }
+    }
+
+    private String formatScoreLimit(double value) {
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString().replace('.', ',');
     }
 
     public void applyImage(Question question, String imageBase64, int index) {

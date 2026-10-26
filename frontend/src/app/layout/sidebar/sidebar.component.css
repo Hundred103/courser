@@ -101,6 +101,12 @@ h2 {
   line-height: 1.2;
 }
 
+.quiz-best-score.quiz-rank-medal {
+  display: inline-block;
+  font-size: 1.22rem;
+  line-height: 1.1;
+}
+
 .rename-editor {
   display: grid;
   flex: 1 1 auto;
@@ -284,7 +290,7 @@ h2 {
 }
 
 .settings-banner {
-  gap: 1rem;
+  gap: 1.4rem;
   width: min(520px, 100%);
   padding: 1.2rem;
 }
@@ -423,26 +429,28 @@ h2 {
 
 .settings-header {
   display: grid;
-  gap: 0.25rem;
-  padding-bottom: 0.9rem;
+  gap: 0.6rem;
+  padding-bottom: 1.3rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   text-align: left;
 }
 
 .start-facts {
-  display: grid;
-  gap: 0.35rem;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.75rem;
+  align-items: center;
+  min-width: 0;
 }
 
-.start-facts p,
-.start-limit {
+.start-facts p {
   margin: 0;
   color: var(--text-soft);
-  font-weight: 800;
-}
-
-.start-limit {
-  color: var(--danger-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .settings-header h3 {
@@ -457,24 +465,40 @@ h2 {
   gap: 0.75rem;
 }
 
-.setting-row {
+.start-option-row {
   cursor: pointer;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.75rem;
+  display: flex;
   align-items: center;
-  padding: 0.85rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.055);
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0;
 }
 
-.setting-row:hover {
-  border-color: rgba(255, 184, 77, 0.46);
-  background: rgba(255, 184, 77, 0.08);
+.start-option-row > span:first-child {
+  color: var(--text-title);
+  font-weight: 800;
 }
 
-.setting-row input {
+.start-toggle-control {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  width: 3rem;
+  height: 1.65rem;
+}
+
+.start-toggle-control .toggle-track {
+  display: block;
+  width: 3rem;
+  height: 1.65rem;
+}
+
+.start-toggle-control .toggle-thumb {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.start-toggle-control input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
@@ -505,33 +529,22 @@ h2 {
   transition: transform 0.2s ease;
 }
 
-.setting-row input:checked + .toggle-track {
-  border-color: rgba(255, 184, 77, 0.72);
-  background: linear-gradient(135deg, #ffb84d, #ff6b35);
+.start-toggle-control input:checked + .toggle-track {
+  border-color: rgba(134, 239, 172, 0.72);
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.75), rgba(255, 184, 77, 0.75));
 }
 
-.setting-row input:checked + .toggle-track .toggle-thumb {
-  transform: translate(1.35rem, -50%);
+.start-toggle-control input:checked + .toggle-track .toggle-thumb {
+  transform: translate(1.28rem, -50%);
 }
 
-.setting-row input:focus-visible + .toggle-track {
-  outline: 3px solid rgba(255, 184, 77, 0.25);
+.start-toggle-control input:focus-visible + .toggle-track {
+  outline: 3px solid rgba(134, 239, 172, 0.25);
   outline-offset: 3px;
 }
 
-.setting-copy {
-  display: grid;
-  min-width: 0;
-}
-
-.setting-copy strong {
-  color: var(--text-main);
-  font-size: 1rem;
-  line-height: 1.25;
-}
-
 .settings-actions {
-  padding-top: 0.1rem;
+  padding-top: 0.8rem;
   justify-content: flex-end;
 }
 

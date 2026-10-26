@@ -64,6 +64,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         return method == HttpMethod.OPTIONS
                 || path.equals("/api/users/login")
                 || path.equals("/api/users/register")
+                || path.equals("/api/users/refresh")
+                || path.equals("/api/users/logout")
                 || path.equals("/api/users/leaderboard")
                 || path.equals("/api/quizzes/share-code-preview")
                 || path.startsWith("/actuator");

@@ -1,11 +1,12 @@
 import JSZip from 'jszip';
 import { QuizCreateDTO } from '../models/quiz.model';
-import { parseQuizLimits, quizLimitsError, UNLIMITED_QUIZ_LIMITS } from '../models/quiz-limits.model';
+import { DEFAULT_QUIZ_LIMITS, parseQuizLimits } from '../models/quiz-limits.model';
 import { DEFAULT_QUIZ_SCORING, parseAnswerPoints, parseQuizScoring } from './quiz-scoring.util';
 
 const QUIZ_JSON = 'quiz.json';
 
-export async function parseQuizZip(file: ArrayBuffer): Promise<QuizCreateDTO> {
+export interface ParsedQuizZip { quiz: QuizCreateDTO; rankingVersionId: string | null; }
+export async function parseQuizZip(file: ArrayBuffer): Promise<ParsedQuizZip> {
   const zip = await JSZip.loadAsync(file);
   const jsonEntry = zip.file(QUIZ_JSON) ?? zip.file('quiz-template.json');
 
@@ -16,13 +17,14 @@ export async function parseQuizZip(file: ArrayBuffer): Promise<QuizCreateDTO> {
   const rawJson = await jsonEntry.async('string');
   const parsed = JSON.parse(rawJson) as unknown;
   const quiz = normalizeQuiz(parsed);
+  const rankingVersionId = isRecord(parsed) && isRecord(parsed['_ranking']) && typeof parsed['_ranking']['versionId'] === 'string' ? parsed['_ranking']['versionId'] : null;
   const imageFiles = zip.folder('images');
 
   if (!imageFiles) {
-    return quiz;
+    return { quiz, rankingVersionId };
   }
 
-  return {
+  return { quiz: {
     ...quiz,
     questions: await Promise.all(
       quiz.questions.map(async (question, index) => {
@@ -44,15 +46,16 @@ export async function parseQuizZip(file: ArrayBuffer): Promise<QuizCreateDTO> {
         };
       }),
     ),
-  };
+  }, rankingVersionId };
 }
 
-export async function buildQuizZip(quiz: QuizCreateDTO): Promise<Blob> {
+export async function buildQuizZip(quiz: QuizCreateDTO, instructions?: readonly string[]): Promise<Blob> {
   const zip = new JSZip();
   const exportQuiz = {
+    ...(instructions?.length ? { _instrukcja: instructions } : {}),
     title: quiz.title,
     scoring: quiz.scoring ?? { ...DEFAULT_QUIZ_SCORING },
-    limits: quiz.limits ?? { ...UNLIMITED_QUIZ_LIMITS },
+    limits: quiz.limits ?? { ...DEFAULT_QUIZ_LIMITS },
     questions: quiz.questions.map((question, index) => ({
       content: question.content,
       image: question.image ? `image${index + 1}.jpg` : null,
@@ -89,11 +92,6 @@ export function normalizeQuiz(value: unknown): QuizCreateDTO {
 
   const questions = value['questions'].map((question, questionIndex) => normalizeQuestion(question, questionIndex));
   const limits = parseQuizLimits(value['limits']);
-  const limitsError = quizLimitsError(limits, questions.length);
-
-  if (limitsError) {
-    throw new Error(limitsError);
-  }
 
   return {
     title: value['title'].trim(),

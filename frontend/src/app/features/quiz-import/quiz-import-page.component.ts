@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
-import { UNLIMITED_QUIZ_LIMITS } from '../../core/models/quiz-limits.model';
+import { DEFAULT_QUIZ_LIMITS } from '../../core/models/quiz-limits.model';
 import { QuizCreateDTO } from '../../core/models/quiz.model';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { buildQuizZip, normalizeQuiz, parseQuizZip } from '../../core/utils/quiz-zip.util';
@@ -14,9 +14,9 @@ const QUIZ_TEMPLATE: QuizCreateDTO = {
     allowNegativeScore: false,
     pointsPerCorrect: 1,
     incorrectPenalty: 1,
-    penaltyMode: 'points',
+    penaltyMode: 'fraction',
   },
-  limits: { ...UNLIMITED_QUIZ_LIMITS },
+  limits: { ...DEFAULT_QUIZ_LIMITS },
   questions: [
     {
       content: 'Która odpowiedź jest poprawna?',
@@ -35,6 +35,19 @@ const QUIZ_TEMPLATE: QuizCreateDTO = {
   ],
 };
 
+const TEMPLATE_INSTRUCTIONS = [
+  'To pole jest tylko opisem i można je usunąć.',
+  'image zawiera wyłącznie nazwę pliku z folderu images/, np. "obraz.jpg", albo null. Archiwum powinno zawierać: quiz.json oraz images/obraz.jpg.',
+  'mode: default = wspólne zasady punktacji; custom = punkty ustawione przy każdej odpowiedzi.',
+  'Dla default penaltyMode może być: fraction, points albo percent.',
+  'fraction odpowiada opcji „Domyślne punkty”; aplikacja zawsze używa +1 oraz -1.',
+  'Dla fraction wartości pointsPerCorrect i incorrectPenalty są ignorowane.',
+  'points: każda poprawna daje pointsPerCorrect, a błędna odejmuje incorrectPenalty.',
+  'percent: incorrectPenalty to procent kary; np. pointsPerCorrect: 2 i incorrectPenalty: 25 oznacza +2 za poprawną oraz -0,5 za błędną odpowiedź.',
+  'allowNegativeScore: true pozwala, aby ujemny wynik pytania obniżył wynik quizu.',
+  'Dla custom liczy się jedno pole points przy każdej odpowiedzi; np. { "text": "Warszawa", "correct": true, "points": 2 } albo { "text": "Kraków", "correct": false, "points": -1 }. Pozostałe ustawienia punktacji nie wpływają na wynik.',
+] as const;
+
 @Component({
   selector: 'app-quiz-import-page',
   standalone: true,
@@ -49,6 +62,7 @@ export class QuizImportPageComponent {
   readonly selectedFileName = signal('');
   readonly activeTab = signal<'file' | 'code'>('code');
   readonly importedQuiz = signal<QuizCreateDTO | null>(null);
+  readonly importedRankingVersionId = signal<string | null>(null);
   readonly validationError = signal('');
   readonly importError = signal('');
   readonly isReadingFile = signal(false);
@@ -59,6 +73,7 @@ export class QuizImportPageComponent {
   readonly isCodeImporting = signal(false);
   readonly templateJson = JSON.stringify(
     {
+      _instrukcja: TEMPLATE_INSTRUCTIONS,
       title: QUIZ_TEMPLATE.title,
       scoring: QUIZ_TEMPLATE.scoring,
       limits: QUIZ_TEMPLATE.limits,
@@ -120,7 +135,7 @@ export class QuizImportPageComponent {
   }
 
   async downloadTemplate(): Promise<void> {
-    const blob = await buildQuizZip(QUIZ_TEMPLATE);
+    const blob = await buildQuizZip(QUIZ_TEMPLATE, TEMPLATE_INSTRUCTIONS);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
 
@@ -153,7 +168,7 @@ export class QuizImportPageComponent {
     this.importError.set('');
 
     this.quizApiService
-      .importQuiz(quiz)
+      .importArchiveQuiz(quiz, this.importedRankingVersionId())
       .pipe(finalize(() => this.isImporting.set(false)))
       .subscribe({
         next: (createdQuiz) => {
@@ -216,10 +231,13 @@ export class QuizImportPageComponent {
     try {
       if (lowerName.endsWith('.zip')) {
         const buffer = await file.arrayBuffer();
-        this.importedQuiz.set(await parseQuizZip(buffer));
+        const parsed = await parseQuizZip(buffer);
+        this.importedQuiz.set(parsed.quiz);
+        this.importedRankingVersionId.set(parsed.rankingVersionId);
       } else {
         const rawJson = await file.text();
         this.importedQuiz.set(this.parseJsonQuiz(rawJson));
+        this.importedRankingVersionId.set(null);
       }
     } catch (error) {
       this.importedQuiz.set(null);
