@@ -206,20 +206,28 @@
       }
 
       <aside class="question-navigator" aria-label="Nawigacja po pytaniach">
-        <div class="question-navigator-grid">
-          @for (question of questions(); track question.runId; let index = $index) {
-            <button
-              class="question-navigator-tile squircle"
-              type="button"
-              [class.current]="index === currentIndex()"
-              [class.correct]="isQuestionFullyCorrect(question)"
-              [class.incorrect]="isQuestionChecked(question) && !isQuestionFullyCorrect(question)"
-              [attr.aria-current]="index === currentIndex() ? 'step' : null"
-              [attr.aria-label]="'Przejdź do pytania ' + (index + 1)"
-              (click)="goToQuestion(index)">
-              {{ index + 1 }}
-            </button>
-          }
+        <div class="question-navigator-content">
+          <div class="question-navigator-legend" aria-label="Legenda wyników pytań">
+            <span><i class="legend-marker incorrect" aria-hidden="true"></i>0%–49%</span>
+            <span><i class="legend-marker partial" aria-hidden="true"></i>50%–99%</span>
+            <span><i class="legend-marker correct" aria-hidden="true"></i>100%</span>
+          </div>
+          <div class="question-navigator-grid">
+            @for (question of questions(); track question.runId; let index = $index) {
+              <button
+                class="question-navigator-tile squircle"
+                type="button"
+                [class.current]="index === currentIndex()"
+                [class.correct]="isQuestionFullyCorrect(question)"
+                [class.partial]="isQuestionChecked(question) && questionScorePercentage(question) >= 50 && questionScorePercentage(question) < 100"
+                [class.incorrect]="isQuestionChecked(question) && questionScorePercentage(question) < 50"
+                [attr.aria-current]="index === currentIndex() ? 'step' : null"
+                [attr.aria-label]="'Przejdź do pytania ' + (index + 1)"
+                (click)="goToQuestion(index)">
+                {{ index + 1 }}
+              </button>
+            }
+          </div>
         </div>
       </aside>
     </div>

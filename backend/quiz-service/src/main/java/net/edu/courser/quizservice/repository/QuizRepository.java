@@ -14,6 +14,8 @@ public interface QuizRepository extends JpaRepository<Quiz, Long> {
 
     Optional<Quiz> findByIdAndOwnerUserId(Long id, Long ownerUserId);
 
+    Optional<Quiz> findByOwnerUserIdAndRankingVersion_Id(Long ownerUserId, java.util.UUID rankingVersionId);
+
     @EntityGraph(attributePaths = {
             "questions"
     })
