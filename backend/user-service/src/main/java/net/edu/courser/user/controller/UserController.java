@@ -19,7 +19,8 @@ import net.edu.courser.user.entity.QuizResult;
 import net.edu.courser.user.entity.User;
 import net.edu.courser.user.security.JwtClaims;
 import net.edu.courser.user.security.JwtService;
-import net.edu.courser.user.service.QuizResultService;
+import net.edu.courser.user.service.UserStatisticsService;
+import net.edu.courser.user.dto.CompleteStatisticsRequest;
 import net.edu.courser.user.service.UserService;
 import net.edu.courser.user.service.RefreshSessionService;
 
@@ -32,7 +33,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
-    private final QuizResultService quizResultService;
+    private final UserStatisticsService userStatisticsService;
     private final JwtService jwtService;
     private final RefreshSessionService refreshSessionService;
 
@@ -181,50 +182,6 @@ public class UserController {
         return ResponseEntity.ok(userService.getLeaderboard().stream().map(this::toProfileResponse).toList());
     }
 
-    @PostMapping("/{id}/quiz-results")
-    public ResponseEntity<?> saveQuizResult(
-            @PathVariable Long id,
-            @RequestBody SaveQuizResultRequest request,
-            @AuthenticationPrincipal JwtClaims claims
-    ) {
-        try {
-            ensureCanAccessUser(id, claims);
-            QuizResult saved = quizResultService.saveResult(id, request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(java.util.Collections.singletonMap("error", e.getMessage()));
-        }
-    }
-
-    @PostMapping("/me/quiz-results")
-    public ResponseEntity<?> saveCurrentUserQuizResult(
-            @AuthenticationPrincipal JwtClaims claims,
-            @RequestBody SaveQuizResultRequest request
-    ) {
-        try {
-            QuizResult saved = quizResultService.saveResult(claims.userId(), request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(java.util.Collections.singletonMap("error", e.getMessage()));
-        }
-    }
-
-    @PostMapping("/me/quiz-attempts")
-    public ResponseEntity<?> saveCurrentUserCompletedQuizAttempt(
-            @AuthenticationPrincipal JwtClaims claims,
-            @RequestBody CompleteQuizAttemptRequest request
-    ) {
-        try {
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(quizResultService.saveCompletedAttempt(claims.userId(), request));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(java.util.Collections.singletonMap("error", e.getMessage()));
-        }
-    }
-
     @GetMapping("/{id}/quiz-results/best")
     public ResponseEntity<?> getBestQuizScores(
             @PathVariable Long id,
@@ -232,7 +189,7 @@ public class UserController {
     ) {
         try {
             ensureCanAccessUser(id, claims);
-            List<BestQuizScoreResponse> scores = quizResultService.getBestScoresByUser(id);
+            List<BestQuizScoreResponse> scores = userStatisticsService.bestScores(id);
             return ResponseEntity.ok(scores);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -243,7 +200,7 @@ public class UserController {
     @GetMapping("/me/quiz-results/best")
     public ResponseEntity<?> getCurrentUserBestQuizScores(@AuthenticationPrincipal JwtClaims claims) {
         try {
-            List<BestQuizScoreResponse> scores = quizResultService.getBestScoresByUser(claims.userId());
+            List<BestQuizScoreResponse> scores = userStatisticsService.bestScores(claims.userId());
             return ResponseEntity.ok(scores);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -257,11 +214,23 @@ public class UserController {
             @RequestParam Long quizId
     ) {
         try {
-            return ResponseEntity.ok(quizResultService.getCompletedAttemptsCount(claims.userId(), quizId));
+            return ResponseEntity.ok(userStatisticsService.count(claims.userId(), quizId));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(java.util.Collections.singletonMap("error", e.getMessage()));
         }
+    }
+
+    @PostMapping("/me/statistics/completions")
+    public ResponseEntity<Void> completeStatistics(@AuthenticationPrincipal JwtClaims claims,
+                                                   @RequestBody CompleteStatisticsRequest request) {
+        userStatisticsService.complete(claims.userId(), request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/me/statistics/daily")
+    public List<UserStatisticsService.DailyStatistics> getDailyStatistics(@AuthenticationPrincipal JwtClaims claims) {
+        return userStatisticsService.daily(claims.userId());
     }
 
     private void ensureCanAccessUser(Long userId, JwtClaims claims) {

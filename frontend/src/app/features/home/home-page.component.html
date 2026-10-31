@@ -1,25 +1,48 @@
-<section class="welcome-tile squircle fade-in">
-  <h1>Witaj z powrotem</h1>
-  <p>Wybierz quiz z panelu bocznego i kontynuuj naukę w swoim tempie.</p>
-  <div class="home-actions">
-    <button class="primary-button squircle" type="button" (click)="requestCreateQuiz()">Utwórz</button>
-    <a class="primary-button squircle" routerLink="/quizzes/import">Importuj</a>
-  </div>
-</section>
-
-@if (showAuthPrompt()) {
-  <div class="confirm-overlay">
-    <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
-      <p>Żeby utworzyć quiz, musisz się zalogować.</p>
-
-      <div class="confirm-actions">
-        <button class="secondary-button squircle" type="button" (click)="cancelAuthPrompt()">
-          Anuluj
-        </button>
-        <button class="primary-button squircle" type="button" (click)="goToLogin()">
-          Zaloguj
-        </button>
+@if (!auth.isLoggedIn()) {
+  <section class="welcome squircle fade-in">
+    <span class="eyebrow">Twoje miejsce do nauki</span>
+    <h1>Witaj w Courser</h1>
+    <p>Zaloguj się, aby śledzić swoje postępy i zobaczyć statystyki nauki.</p>
+    <a class="primary-button squircle login" routerLink="/login">Zaloguj się</a>
+  </section>
+} @else {
+  <section class="dashboard fade-in">
+    <header class="dashboard-header">
+      <div><span class="eyebrow">Twoje postępy</span><h1>Witaj, {{ auth.user()?.username }}!</h1><p>Każde rozwiązane pytanie to krok do przodu.</p></div>
+    </header>
+    <nav class="periods" aria-label="Okres statystyk">
+      @for (item of periods; track item.id) {
+        <button type="button" [class.active]="period() === item.id" [attr.aria-pressed]="period() === item.id" (click)="period.set(item.id)">{{ item.label }}</button>
+      }
+    </nav>
+    @if (loading()) { <p class="notice" role="status">Ładowanie statystyk…</p> }
+    @else if (error()) { <div class="notice" role="alert">Nie udało się pobrać statystyk. <button type="button" (click)="load()">Spróbuj ponownie</button></div> }
+    @else {
+      <div class="cards">
+        <article class="stat-card"><span class="card-icon">✓</span><span>Rozwiązane pytania</span><strong>{{ format(totals().questions) }}</strong><small>Sprawdzone w ukończonych quizach</small></article>
+        <article class="stat-card"><span class="card-icon">◈</span><span>Rozwiązane quizy</span><strong>{{ format(totals().quizzes) }}</strong><small>Wszystkie ukończone podejścia</small></article>
+        <article class="stat-card"><span class="card-icon">◎</span><span>Średnia skuteczność</span><strong>{{ totals().count ? format(totals().sum / totals().count / 100) + '%' : '—' }}</strong><small>{{ totals().count ? 'Średnia z ' + totals().count + ' wyników' : 'Brak wyników w tym okresie' }}</small></article>
       </div>
-    </div>
-  </div>
+      <section class="chart-card" aria-label="Wykres postępów">
+        <div class="chart-header"><div><span class="eyebrow">Twoja aktywność</span><h2>Postępy w czasie</h2><p>Wybierz, co chcesz zobaczyć na wykresie.</p></div>
+          <div class="metric-switch" aria-label="Dane na wykresie">@for (item of metrics; track item.id) { <button type="button" [class.active]="metric() === item.id" [attr.aria-pressed]="metric() === item.id" (click)="metric.set(item.id)">{{ item.label }}</button> }</div>
+        </div>
+        @if (period() === 'today') {
+          <div class="today-value"><strong>{{ format(value(buckets()[0])) }}{{ metric() === 'effectiveness' && value(buckets()[0]) !== null ? '%' : '' }}</strong><span>Wynik za dzisiaj</span></div>
+        } @else {
+          <div class="chart-scale">Skala: {{ hasNegative() ? "−" + format(chartMax()) + " do " : "0 do " }}{{ format(chartMax()) }}{{ metric() === "effectiveness" ? "%" : "" }}</div>
+          <div class="chart-scroll"><div class="chart" [class.negative]="hasNegative()" [style.--columns]="buckets().length">
+            @for (bucket of buckets(); track $index) {
+              <div class="bar-column" [attr.aria-label]="bucket.label + ': ' + format(value(bucket)) + (metric() === 'effectiveness' && value(bucket) !== null ? '%' : '')" [title]="bucket.label + ': ' + format(value(bucket)) + (metric() === 'effectiveness' && value(bucket) !== null ? '%' : '')">
+                <div class="bar-area"><div class="bar" [class.below]="(value(bucket) ?? 0) < 0" [class.zero]="value(bucket) === 0" [style.height.%]="barHeight(bucket)"></div></div><span>{{ bucket.label }}</span>
+              </div>
+            }
+          </div></div>
+          <p class="chart-note">{{ metric() === 'effectiveness' ? 'Kreska na osi oznacza 0%, brak słupka — brak wyniku.' : 'Liczba dotyczy ukończonych podejść.' }}</p>
+        }
+        @if (!totals().quizzes) { <p class="empty">Brak ukończonych quizów w wybranym okresie. Rozwiąż quiz, aby zobaczyć swoje postępy.</p> }
+      </section>
+      <p class="footnote">Statystyki są zbierane od momentu uruchomienia tej funkcji. Tryb nauki nie wpływa na skuteczność.</p>
+    }
+  </section>
 }

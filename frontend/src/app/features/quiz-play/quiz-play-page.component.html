@@ -164,13 +164,14 @@
             <p>Czas: {{ rankingDurationText(ranking.durationMs) }}</p>
           }
 
-          @if (isLoggedIn() && !isStudyMode()) {
+          @if (isLoggedIn()) {
             @if (resultSaveError()) {
               <p class="result-status error">{{ resultSaveError() }}</p>
-            } @else if (resultSaved()) {
-              <p class="result-status success">Wynik został zapisany.</p>
+              <button type="button" class="secondary-button squircle" (click)="retrySave()">Spróbuj zapisać ponownie</button>
+            } @else if (resultSaveConfirmed()) {
+              <p class="result-status success">Postępy zostały zapisane.</p>
             } @else {
-              <p class="result-status">Zapisywanie wyniku...</p>
+              <p class="result-status">Zapisywanie postępów...</p>
             }
           }
 

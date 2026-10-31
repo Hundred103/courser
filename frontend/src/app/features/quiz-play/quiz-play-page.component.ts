@@ -112,7 +112,7 @@ export class QuizPlayPageComponent {
   readonly currentIndex = signal(0);
   readonly resultReady = signal(false);
   readonly resultSaved = signal(false);
-  readonly completedAttemptRecorded = signal(false);
+  readonly resultSaveConfirmed = signal(false);
   readonly resultSaveError = signal<string | null>(null);
   readonly showIncompleteConfirm = signal(false);
   readonly showExitConfirm = signal(false);
@@ -220,26 +220,22 @@ export class QuizPlayPageComponent {
         return;
       }
 
-      if (this.isStudyMode()) {
-        if (!this.completedAttemptRecorded()) {
-          this.completedAttemptRecorded.set(true);
-          this.recordCompletedAttempt(quiz.id);
-        }
-        return;
-      }
-
-      if (quiz.rankingEnabled && this.rankingAttemptId()) this.finishRanking(quiz.id);
+      if (!this.isStudyMode() && quiz.rankingEnabled && this.rankingAttemptId()) this.finishRanking(quiz.id);
 
       this.resultSaved.set(true);
       this.resultSaveError.set(null);
       const scaledMax = Math.max(0, this.quizScoreService.toScaledScore(this.maxScore()));
-      let scaledScore = this.quizScoreService.toScaledScore(this.score());
-
-      if (scaledScore > scaledMax) {
-        scaledScore = scaledMax;
-      }
-
-      this.persistScore(quiz.id, scaledScore, scaledMax);
+      const scaledScore = Math.min(scaledMax, this.quizScoreService.toScaledScore(this.score()));
+      this.quizScoreService.completeQuiz({
+        requestId: this.completionRequestId,
+        quizId: quiz.id,
+        checkedQuestions: this.checkedQuestions().size,
+        studyMode: this.isStudyMode(),
+        score: this.isStudyMode() ? null : scaledScore,
+        maxScore: this.isStudyMode() ? null : scaledMax,
+        effectivenessHundredths: this.isStudyMode() ? null : Math.round(Number(this.scorePercent().replace(',', '.')) * 100),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      }).subscribe({ next: () => this.resultSaveConfirmed.set(true), error: (error) => this.handleSaveError(error) });
     });
   }
 
@@ -329,13 +325,14 @@ export class QuizPlayPageComponent {
   }
 
   private resetQuizProgress(): void {
+    this.completionRequestId = this.newCompletionRequestId();
     this.selectedAnswers.set({});
     this.submittedAnswers.set({});
     this.checkedQuestions.set(new Set());
     this.currentIndex.set(0);
     this.resultReady.set(false);
     this.resultSaved.set(false);
-    this.completedAttemptRecorded.set(false);
+    this.resultSaveConfirmed.set(false);
     this.resultSaveError.set(null);
     this.showIncompleteConfirm.set(false);
     this.showExitConfirm.set(false);
@@ -348,7 +345,16 @@ export class QuizPlayPageComponent {
     this.stopRankingTimers();
   }
 
+  private newCompletionRequestId(): string {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
   private nextQuestionRunId = 1;
+  private completionRequestId = this.newCompletionRequestId();
 
   private prepareQuestions(questions: QuestionPlayDTO[], randomQuestions: boolean): QuizQuestionInstance[] {
     const questionsWithRandomAnswers = questions.map((question, rankingQuestionIndex) => ({
@@ -468,18 +474,6 @@ export class QuizPlayPageComponent {
     return offsets[placement];
   }
 
-  private persistScore(quizId: number, score: number, maxScore: number): void {
-    this.quizScoreService
-      .saveQuizResult({
-        quizId,
-        score,
-        maxScore,
-      })
-      .subscribe({
-        error: (error) => this.handleSaveError(error),
-      });
-  }
-
   private startRanking(quizId: number): void {
     this.quizApiService.startRankingAttempt(quizId).subscribe({
       next: ({ attemptId }) => {
@@ -563,14 +557,14 @@ export class QuizPlayPageComponent {
     }
   }
 
-  private recordCompletedAttempt(quizId: number): void {
-    this.quizScoreService.recordCompletedAttempt(quizId).subscribe();
+  retrySave(): void {
+    this.resultSaveError.set(null);
+    this.resultSaved.set(false);
   }
 
   private handleSaveError(error: unknown): void {
     const message = this.readErrorMessage(error);
 
-    this.resultSaved.set(false);
     this.resultSaveError.set(message);
   }
 
