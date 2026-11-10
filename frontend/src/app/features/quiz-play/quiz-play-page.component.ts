@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, HostListener, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -192,6 +192,11 @@ export class QuizPlayPageComponent {
       !this.currentQuestionChecked()
     );
   });
+  readonly canScheduleCurrentQuestion = computed(() => {
+    const question = this.currentQuestion();
+    return !!question && this.isStudyMode() && !this.resultReady() && this.currentQuestionChecked() &&
+      !this.isLastQuestion() && !this.studyPlacements()[question.runId];
+  });
   readonly scoring = computed(() => normalizeQuizScoring(this.quiz()?.scoring));
   readonly score = computed(() => {
     const submittedAnswers = this.submittedAnswers();
@@ -333,6 +338,53 @@ export class QuizPlayPageComponent {
     this.activeSelectedQuestionId.set(question.runId);
     this.showIncompleteConfirm.set(false);
     this.showExitConfirm.set(false);
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  handleKeyboardShortcut(event: KeyboardEvent): void {
+    if (
+      event.repeat || event.ctrlKey || event.altKey || event.metaKey ||
+      this.isLoading() || !!this.errorMessage() || this.resultReady() ||
+      this.showIncompleteConfirm() || this.showExitConfirm()
+    ) {
+      return;
+    }
+
+    const question = this.currentQuestion();
+    const key = event.key.toLowerCase();
+
+    if (/^[1-9]$/.test(key) && question && !this.currentQuestionChecked()) {
+      const answer = question.answers[Number(key) - 1];
+      if (answer) {
+        event.preventDefault();
+        this.selectAnswer(question, answer);
+      }
+      return;
+    }
+
+    if (event.key === ' ' && this.canCheckCurrentQuestion()) {
+      event.preventDefault();
+      this.checkCurrentQuestion();
+      return;
+    }
+
+    if (key === 'a' && this.canGoPrevious()) {
+      event.preventDefault();
+      this.goPrevious();
+      return;
+    }
+
+    if (key === 'd' && this.canGoNext()) {
+      event.preventDefault();
+      this.goNext();
+      return;
+    }
+
+    const placement = ({ q: 'soon', w: 'middle', e: 'nearEnd', r: 'end' } as const)[key as 'q' | 'w' | 'e' | 'r'];
+    if (placement && this.canScheduleCurrentQuestion()) {
+      event.preventDefault();
+      this.scheduleCurrentQuestion(placement);
+    }
   }
 
   checkCurrentQuestion(): void {
@@ -674,12 +726,8 @@ export class QuizPlayPageComponent {
     const question = this.currentQuestion();
 
     if (
-      !this.isStudyMode() ||
-      this.resultReady() ||
-      !question ||
-      !this.currentQuestionChecked() ||
-      this.isLastQuestion() ||
-      this.studyPlacements()[question.runId]
+      !this.canScheduleCurrentQuestion() ||
+      !question
     ) {
       return;
     }
