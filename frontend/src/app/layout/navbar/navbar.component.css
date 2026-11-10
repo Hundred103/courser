@@ -74,22 +74,39 @@
 .setting-field label, .setting-label { display: inline-flex; align-items: center; gap: .55rem; color: #f5f5f8; font-size: .95rem; font-weight: 800; }
 .setting-icon { width: 1.25rem; height: 1.25rem; fill: var(--accent-bright); }
 .setting-field input, .accent-picker { width: 100%; min-height: 46px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 13px; color: var(--text-main); background: rgba(255, 255, 255, .055); font: inherit; }
-.setting-field input, .accent-picker { grid-column: 2; }
+.setting-field input, .accent-picker-area { grid-column: 2; }
 .setting-field input { padding: .7rem .8rem; }
 .setting-field input:focus { outline: none; border-color: rgba(var(--accent-rgb), .68); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .14); }
+.accent-picker-area { position: relative; }
 .accent-picker { display: flex; align-items: center; gap: .65rem; padding: .55rem .75rem; cursor: pointer; text-align: left; }
 .accent-picker:hover { border-color: rgba(var(--accent-rgb), .58); }
 .accent-swatch { width: 1.25rem; height: 1.25rem; flex: 0 0 auto; border: 1px solid rgba(255, 255, 255, .35); border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); }
 .chevron { width: 1.25rem; height: 1.25rem; margin-left: auto; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
-.accent-options { display: grid; grid-column: 2; gap: .3rem; padding: .4rem; border: 1px solid rgba(255, 255, 255, .14); border-radius: 14px; background: rgba(17, 18, 22, .96); }
+.accent-options {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + .55rem);
+  right: 0;
+  display: grid;
+  width: min(270px, 100%);
+  gap: .3rem;
+  padding: .4rem;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 14px;
+  background: rgba(31, 32, 37, .98);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .42);
+}
 .accent-options button { display: flex; align-items: center; gap: .65rem; padding: .55rem .65rem; border: 1px solid transparent; border-radius: 10px; color: var(--text-main); background: transparent; font: inherit; text-align: left; cursor: pointer; }
-.accent-options button:hover, .accent-options button.selected { border-color: rgba(var(--accent-rgb), .42); background: rgba(var(--accent-rgb), .12); }
+.accent-options button:hover { border-color: rgba(var(--accent-rgb), .42); background: rgba(var(--accent-rgb), .12); }
+.accent-options button.selected { background: rgba(255, 255, 255, .055); }
+.accent-option-check { width: 1.2rem; height: 1.2rem; margin-left: auto; fill: none; stroke: var(--text-main); stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.2; }
 .settings-error { margin: -.45rem 0 0; color: var(--error-text); font-size: .85rem; }
 .settings-actions { display: flex; justify-content: center; gap: .75rem; margin-top: .2rem; }
 
 @media (max-width: 560px) {
   .setting-field { grid-template-columns: 1fr; gap: .6rem; }
-  .setting-field input, .accent-picker, .accent-options { grid-column: 1; }
+  .setting-field input, .accent-picker-area { grid-column: 1; }
+  .accent-options { width: 100%; }
 }
 
 @media (max-width: 768px) {

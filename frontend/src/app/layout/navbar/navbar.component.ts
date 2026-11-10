@@ -84,6 +84,14 @@ export class NavbarComponent {
     this.saveSettings();
   }
 
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const target = event.target as Element | null;
+    if (this.accentListOpen() && !target?.closest('.accent-picker-area')) {
+      this.accentListOpen.set(false);
+    }
+  }
+
   logout(): void {
     this.authService.logout();
     this.router.navigate(['/']);

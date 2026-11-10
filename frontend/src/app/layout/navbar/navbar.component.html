@@ -45,20 +45,26 @@
           <svg class="setting-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18h1.25a1.75 1.75 0 0 0 0-3.5h-.76a1.24 1.24 0 0 1 0-2.48H15a6 6 0 0 0 0-12h-3Zm-4 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3-4.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 1.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm1 4.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z" /></svg>
           Kolor akcentujący
         </span>
-        <button class="accent-picker" type="button" [attr.aria-expanded]="accentListOpen()" (click)="accentListOpen.set(!accentListOpen())" [disabled]="settingsSaving()">
-          <span class="accent-swatch" [style.background]="selectedAccent().value"></span>
-          <span>{{ selectedAccent().label }}</span>
-          <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
-        </button>
-        @if (accentListOpen()) {
-          <div class="accent-options" role="listbox" aria-label="Wybierz kolor akcentujący">
-            @for (option of accentOptions; track option.id) {
-              <button type="button" role="option" [attr.aria-selected]="settingsAccent === option.id" [class.selected]="settingsAccent === option.id" (click)="selectAccent(option.id)" [disabled]="settingsSaving()">
-                <span class="accent-swatch" [style.background]="option.value"></span>{{ option.label }}
-              </button>
-            }
-          </div>
-        }
+        <div class="accent-picker-area">
+          <button class="accent-picker" type="button" [attr.aria-expanded]="accentListOpen()" (click)="accentListOpen.set(!accentListOpen())" [disabled]="settingsSaving()">
+            <span class="accent-swatch" [style.background]="selectedAccent().value"></span>
+            <span>{{ selectedAccent().label }}</span>
+            <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </button>
+          @if (accentListOpen()) {
+            <div class="accent-options" role="listbox" aria-label="Wybierz kolor akcentujący">
+              @for (option of accentOptions; track option.id) {
+                <button type="button" role="option" [attr.aria-selected]="settingsAccent === option.id" [class.selected]="settingsAccent === option.id" (click)="selectAccent(option.id)" [disabled]="settingsSaving()">
+                  <span class="accent-swatch" [style.background]="option.value"></span>
+                  <span>{{ option.label }}</span>
+                  @if (settingsAccent === option.id) {
+                    <svg class="accent-option-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.2 4.2L19 6.5" /></svg>
+                  }
+                </button>
+              }
+            </div>
+          }
+        </div>
       </div>
 
       @if (settingsError(); as error) { <p class="settings-error" role="alert">{{ error }}</p> }
