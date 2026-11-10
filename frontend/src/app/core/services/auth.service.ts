@@ -126,8 +126,18 @@ export class AuthService {
   }
 
   private clearAuthState(): void {
+    const userId = this.currentUser()?.id;
+    if (userId != null) this.clearPlaySessionsForUser(userId);
     this.currentUser.set(null);
     localStorage.removeItem(STORAGE_KEY);
+  }
+
+  private clearPlaySessionsForUser(userId: number): void {
+    const prefix = `courser.quiz-play.v1.${userId}.`;
+    for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+      const key = sessionStorage.key(index);
+      if (key?.startsWith(prefix)) sessionStorage.removeItem(key);
+    }
   }
 
   isAuthenticated(): boolean {

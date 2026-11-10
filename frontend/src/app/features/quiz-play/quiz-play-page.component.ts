@@ -21,6 +21,7 @@ type QuizState =
 interface QuizRunOptions {
   randomQuestionOrder: boolean | null;
   studyMode: boolean | null;
+  playSessionId: string | null;
 }
 
 type StudyPlacement = 'soon' | 'middle' | 'nearEnd' | 'end';
@@ -29,6 +30,32 @@ interface QuizQuestionInstance extends QuestionPlayDTO {
   readonly runId: number;
   readonly rankingQuestionIndex: number;
   readonly rankingAnswerIndexes: Record<number, number>;
+}
+
+interface QuizPlaySessionSnapshot {
+  version: 1;
+  quizId: number;
+  playSessionId: string;
+  randomQuestionOrder: boolean;
+  studyMode: boolean;
+  questions: Array<{
+    runId: number;
+    questionId: number;
+    answerIds: number[];
+  }>;
+  selectedAnswers: Record<number, number[]>;
+  submittedAnswers: Record<number, number[]>;
+  checkedQuestionRunIds: number[];
+  currentIndex: number;
+  activeSelectedQuestionId: number | null;
+  studyPlacements: Record<number, StudyPlacement>;
+  lastCheckedQuestionRunId: number | null;
+  nextQuestionRunId: number;
+  rankingAttemptId: string | null;
+  resultReady: boolean;
+  resultSaveConfirmed: boolean;
+  completionRequestId: string;
+  rankingResult: RankingFinishDTO | null;
 }
 
 @Component({
@@ -45,7 +72,7 @@ export class QuizPlayPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private currentQuizId: number | null = null;
-  private currentRandomQuestions: boolean | null = null;
+  private currentPlaySessionId: string | null = null;
   private exitDecision: ((canLeave: boolean) => void) | null = null;
   private exitDecisionPromise: Promise<boolean> | null = null;
 
@@ -95,12 +122,14 @@ export class QuizPlayPageComponent {
       map((params): QuizRunOptions => ({
         randomQuestionOrder: this.readOptionalBoolean(params.get('randomQuestionOrder')),
         studyMode: this.readOptionalBoolean(params.get('studyMode')),
+        playSessionId: params.get('playSession'),
       })),
     ),
     {
       initialValue: {
         randomQuestionOrder: null,
         studyMode: null,
+        playSessionId: null,
       } satisfies QuizRunOptions,
     },
   );
@@ -122,6 +151,7 @@ export class QuizPlayPageComponent {
   readonly rankingAttemptId = signal<string | null>(null);
   readonly rankingResult = signal<RankingFinishDTO | null>(null);
   readonly rankingSeconds = signal(0);
+  private readonly playSessionActive = signal(false);
   readonly confettiPieces = Array.from({ length: 36 }, (_, index) => index);
   private rankingTimer: ReturnType<typeof setInterval> | null = null;
   private rankingDeadlineTimer: ReturnType<typeof setTimeout> | null = null;
@@ -187,19 +217,63 @@ export class QuizPlayPageComponent {
       if (!quiz) {
         this.questions.set([]);
         this.currentQuizId = null;
-        this.currentRandomQuestions = null;
+        this.currentPlaySessionId = null;
+        this.playSessionActive.set(false);
         return;
       }
 
-      if (quiz.id !== this.currentQuizId) {
+      const playSessionId = this.getOrCreatePlaySessionId();
+      if (quiz.id !== this.currentQuizId || playSessionId !== this.currentPlaySessionId) {
         this.currentQuizId = quiz.id;
-        this.currentRandomQuestions = null;
+        this.currentPlaySessionId = playSessionId;
         const configuredRandomQuestions = normalizeQuizLimits(quiz.limits).randomQuestionOrder;
         const randomQuestions = this.runOptions().randomQuestionOrder ?? configuredRandomQuestions;
-        this.questions.set(this.prepareQuestions(quiz.questions, randomQuestions));
+        const studyMode = this.runOptions().studyMode === true;
+        this.playSessionActive.set(false);
         this.resetQuizProgress();
-        if (quiz.rankingEnabled && this.authService.isLoggedIn() && this.runOptions().studyMode !== true && quiz.id > 0) this.startRanking(quiz.id);
+
+        const restored = this.restorePlaySession(quiz, playSessionId, randomQuestions, studyMode);
+        if (!restored) {
+          this.nextQuestionRunId = 1;
+          this.questions.set(this.prepareQuestions(quiz.questions, randomQuestions));
+        }
+
+        this.playSessionActive.set(true);
+        if (this.resultReady() && !studyMode && quiz.rankingEnabled && this.rankingAttemptId() && !this.rankingResult()) {
+          this.finishRanking(quiz.id);
+        } else if (!this.resultReady() && quiz.rankingEnabled && this.authService.isLoggedIn() && !studyMode && quiz.id > 0) {
+          this.startRanking(quiz.id, playSessionId);
+        }
       }
+    });
+
+    effect(() => {
+      const quiz = this.quiz();
+      const active = this.playSessionActive();
+      const sessionId = this.currentPlaySessionId;
+      const options = this.runOptions();
+      const resultReady = this.resultReady();
+
+      if (!active || !quiz || !sessionId) {
+        return;
+      }
+
+      // Odczyt sygnałów sprawia, że stan jest utrwalany po każdej interakcji
+      // użytkownika, ale bez osobnego zapisu dla każdego przycisku.
+      this.questions();
+      this.selectedAnswers();
+      this.submittedAnswers();
+      this.checkedQuestions();
+      this.currentIndex();
+      this.activeSelectedQuestionId();
+      this.studyPlacements();
+      this.lastCheckedQuestionRunId();
+      this.rankingAttemptId();
+      this.resultSaved();
+      this.resultSaveConfirmed();
+      this.resultSaveError();
+      this.rankingResult();
+      this.savePlaySession(quiz, sessionId, options);
     });
 
     effect(() => {
@@ -292,7 +366,7 @@ export class QuizPlayPageComponent {
   }
 
   requestExitQuiz(): void {
-    this.goBack();
+    this.goBack(false);
   }
 
   cancelExitQuiz(): void {
@@ -302,11 +376,14 @@ export class QuizPlayPageComponent {
 
   confirmExitQuiz(): void {
     this.showExitConfirm.set(false);
+    const quiz = this.quiz();
+    if (quiz && this.currentPlaySessionId) this.clearPlaySession(quiz.id, this.currentPlaySessionId);
     this.resolveExitDecision(true);
   }
 
   canDeactivate(): boolean | Promise<boolean> {
     if (this.canLeaveQuiz()) {
+      this.discardPlaySession();
       return true;
     }
 
@@ -343,6 +420,189 @@ export class QuizPlayPageComponent {
     this.rankingResult.set(null);
     this.rankingSeconds.set(0);
     this.stopRankingTimers();
+  }
+
+  private getOrCreatePlaySessionId(): string {
+    const requestedId = this.runOptions().playSessionId;
+    if (requestedId && this.isUuid(requestedId)) {
+      return requestedId;
+    }
+
+    const playSessionId = crypto.randomUUID();
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { playSession: playSessionId },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+    return playSessionId;
+  }
+
+  private playSessionStorageKey(quizId: number, playSessionId: string): string {
+    const userId = this.authService.user()?.id ?? 'guest';
+    return `courser.quiz-play.v1.${userId}.${quizId}.${playSessionId}`;
+  }
+
+  private savePlaySession(quiz: QuizPlayDTO, playSessionId: string, options: QuizRunOptions): void {
+    const questions = this.questions();
+    const snapshot: QuizPlaySessionSnapshot = {
+      version: 1,
+      quizId: quiz.id,
+      playSessionId,
+      randomQuestionOrder: options.randomQuestionOrder ?? normalizeQuizLimits(quiz.limits).randomQuestionOrder,
+      studyMode: options.studyMode === true,
+      questions: questions.map((question) => ({
+        runId: question.runId,
+        questionId: question.id,
+        answerIds: question.answers.map((answer) => answer.id),
+      })),
+      selectedAnswers: this.selectedAnswers(),
+      submittedAnswers: this.submittedAnswers(),
+      checkedQuestionRunIds: [...this.checkedQuestions()],
+      currentIndex: this.currentIndex(),
+      activeSelectedQuestionId: this.activeSelectedQuestionId(),
+      studyPlacements: this.studyPlacements(),
+      lastCheckedQuestionRunId: this.lastCheckedQuestionRunId(),
+      nextQuestionRunId: this.nextQuestionRunId,
+      rankingAttemptId: this.rankingAttemptId(),
+      resultReady: this.resultReady(),
+      resultSaveConfirmed: this.resultSaveConfirmed(),
+      completionRequestId: this.completionRequestId,
+      rankingResult: this.rankingResult(),
+    };
+
+    try {
+      sessionStorage.setItem(this.playSessionStorageKey(quiz.id, playSessionId), JSON.stringify(snapshot));
+    } catch {
+      // Brak miejsca w sessionStorage nie może blokować rozwiązywania quizu.
+    }
+  }
+
+  private restorePlaySession(
+    quiz: QuizPlayDTO,
+    playSessionId: string,
+    randomQuestionOrder: boolean,
+    studyMode: boolean,
+  ): boolean {
+    const raw = sessionStorage.getItem(this.playSessionStorageKey(quiz.id, playSessionId));
+    if (!raw) {
+      return false;
+    }
+
+    try {
+      const snapshot = JSON.parse(raw) as QuizPlaySessionSnapshot;
+      if (
+        snapshot.version !== 1 ||
+        snapshot.quizId !== quiz.id ||
+        snapshot.playSessionId !== playSessionId ||
+        snapshot.randomQuestionOrder !== randomQuestionOrder ||
+        snapshot.studyMode !== studyMode ||
+        !Array.isArray(snapshot.questions) ||
+        snapshot.questions.length === 0 ||
+        typeof snapshot.resultReady !== 'boolean' ||
+        typeof snapshot.resultSaveConfirmed !== 'boolean' ||
+        !this.isUuid(snapshot.completionRequestId)
+      ) {
+        throw new Error('Nieprawidłowy zapis sesji.');
+      }
+
+      const sourceQuestions = new Map(quiz.questions.map((question, index) => [question.id, { question, index }]));
+      const runIds = new Set<number>();
+      const restoredQuestions: QuizQuestionInstance[] = snapshot.questions.map((storedQuestion) => {
+        if (!Number.isInteger(storedQuestion.runId) || storedQuestion.runId < 1 || runIds.has(storedQuestion.runId)) {
+          throw new Error('Nieprawidłowy identyfikator pytania.');
+        }
+        runIds.add(storedQuestion.runId);
+
+        const source = sourceQuestions.get(storedQuestion.questionId);
+        if (!source || !Array.isArray(storedQuestion.answerIds) || storedQuestion.answerIds.length !== source.question.answers.length) {
+          throw new Error('Pytanie nie pasuje do quizu.');
+        }
+        const sourceAnswers = new Map(source.question.answers.map((answer) => [answer.id, answer]));
+        const restoredAnswers = storedQuestion.answerIds.map((answerId) => {
+          const answer = sourceAnswers.get(answerId);
+          if (!answer) throw new Error('Odpowiedź nie pasuje do pytania.');
+          return answer;
+        });
+        if (new Set(storedQuestion.answerIds).size !== storedQuestion.answerIds.length) {
+          throw new Error('Powielona odpowiedź.');
+        }
+
+        return {
+          ...source.question,
+          runId: storedQuestion.runId,
+          answers: restoredAnswers,
+          rankingQuestionIndex: source.index,
+          rankingAnswerIndexes: Object.fromEntries(source.question.answers.map((answer, index) => [answer.id, index])),
+        };
+      });
+
+      const validAnswerMap = (value: Record<number, number[]>): Record<number, number[]> => {
+        const result: Record<number, number[]> = {};
+        for (const [runIdText, answerIds] of Object.entries(value ?? {})) {
+          const runId = Number(runIdText);
+          const question = restoredQuestions.find((candidate) => candidate.runId === runId);
+          if (!question || !Array.isArray(answerIds) || answerIds.some((answerId) => !question.answers.some((answer) => answer.id === answerId))) {
+            throw new Error('Nieprawidłowe zaznaczenie odpowiedzi.');
+          }
+          result[runId] = [...new Set(answerIds)];
+        }
+        return result;
+      };
+
+      const checkedRunIds = Array.isArray(snapshot.checkedQuestionRunIds) ? snapshot.checkedQuestionRunIds : [];
+      if (checkedRunIds.some((runId) => !runIds.has(runId))) throw new Error('Nieprawidłowy stan pytania.');
+      if (!Number.isInteger(snapshot.currentIndex) || snapshot.currentIndex < 0 || snapshot.currentIndex >= restoredQuestions.length) {
+        throw new Error('Nieprawidłowa pozycja w quizie.');
+      }
+
+      this.questions.set(restoredQuestions);
+      this.selectedAnswers.set(validAnswerMap(snapshot.selectedAnswers));
+      this.submittedAnswers.set(validAnswerMap(snapshot.submittedAnswers));
+      this.checkedQuestions.set(new Set(checkedRunIds));
+      this.currentIndex.set(snapshot.currentIndex);
+      this.activeSelectedQuestionId.set(runIds.has(snapshot.activeSelectedQuestionId ?? -1) ? snapshot.activeSelectedQuestionId : null);
+      this.studyPlacements.set(snapshot.studyPlacements ?? {});
+      this.lastCheckedQuestionRunId.set(runIds.has(snapshot.lastCheckedQuestionRunId ?? -1) ? snapshot.lastCheckedQuestionRunId : null);
+      this.nextQuestionRunId = Math.max(
+        ...restoredQuestions.map((question) => question.runId + 1),
+        Number.isInteger(snapshot.nextQuestionRunId) ? snapshot.nextQuestionRunId : 1,
+      );
+      this.rankingAttemptId.set(typeof snapshot.rankingAttemptId === 'string' ? snapshot.rankingAttemptId : null);
+      this.resultReady.set(snapshot.resultReady);
+      // Potwierdzonego zapisu nigdy nie wysyłamy drugi raz. Jeżeli odświeżenie
+      // nastąpiło podczas żądania, pozostawiamy false i bezpiecznie ponawiamy
+      // ten sam requestId (backend obsługuje go idempotentnie).
+      this.resultSaved.set(snapshot.resultSaveConfirmed);
+      this.resultSaveConfirmed.set(snapshot.resultSaveConfirmed);
+      this.completionRequestId = snapshot.completionRequestId;
+      this.rankingResult.set(this.isRankingFinishResult(snapshot.rankingResult) ? snapshot.rankingResult : null);
+      return true;
+    } catch {
+      this.clearPlaySession(quiz.id, playSessionId);
+      return false;
+    }
+  }
+
+  private clearPlaySession(quizId: number, playSessionId: string): void {
+    sessionStorage.removeItem(this.playSessionStorageKey(quizId, playSessionId));
+  }
+
+  private discardPlaySession(): void {
+    const quiz = this.quiz();
+    if (quiz && this.currentPlaySessionId) this.clearPlaySession(quiz.id, this.currentPlaySessionId);
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
+
+  private isRankingFinishResult(value: unknown): value is RankingFinishDTO {
+    if (!value || typeof value !== 'object') return false;
+    const result = value as Partial<RankingFinishDTO>;
+    return Number.isFinite(result.scoreScaled) && Number.isFinite(result.maxScoreScaled) &&
+      Number.isFinite(result.durationMs) && typeof result.outsideTopFive === 'boolean' &&
+      (result.position === null || Number.isInteger(result.position)) && Array.isArray(result.leaderboard);
   }
 
   private newCompletionRequestId(): string {
@@ -474,19 +734,20 @@ export class QuizPlayPageComponent {
     return offsets[placement];
   }
 
-  private startRanking(quizId: number): void {
-    this.quizApiService.startRankingAttempt(quizId).subscribe({
-      next: ({ attemptId }) => {
+  private startRanking(quizId: number, playSessionId: string): void {
+    this.quizApiService.startRankingAttempt(quizId, playSessionId).subscribe({
+      next: ({ attemptId, elapsedMs }) => {
         this.rankingAttemptId.set(attemptId);
-        this.rankingStartedAt = Date.now();
+        this.rankingStartedAt = Date.now() - elapsedMs;
         this.rankingTimer = setInterval(() => {
           const elapsedMs = Date.now() - this.rankingStartedAt;
           this.rankingSeconds.set(Math.min(Math.floor(elapsedMs / 1000), QuizPlayPageComponent.MAX_RANKING_DURATION_MS / 1000));
           if (elapsedMs >= QuizPlayPageComponent.MAX_RANKING_DURATION_MS) this.finishQuizDueToRankingTimeLimit();
         }, 250);
+        this.rankingSeconds.set(Math.min(Math.floor(elapsedMs / 1000), QuizPlayPageComponent.MAX_RANKING_DURATION_MS / 1000));
         this.rankingDeadlineTimer = setTimeout(
           () => this.finishQuizDueToRankingTimeLimit(),
-          QuizPlayPageComponent.MAX_RANKING_DURATION_MS,
+          Math.max(0, QuizPlayPageComponent.MAX_RANKING_DURATION_MS - elapsedMs),
         );
       },
     });
@@ -642,7 +903,8 @@ export class QuizPlayPageComponent {
     return this.showAnswerFeedback() && this.isSubmittedAnswer(question, answer) && answer.correct;
   }
 
-  goBack(): void {
+  goBack(clearSession = true): void {
+    if (clearSession) this.discardPlaySession();
     this.router.navigateByUrl('/');
   }
 

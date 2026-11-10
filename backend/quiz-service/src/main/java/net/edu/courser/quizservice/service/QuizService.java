@@ -262,11 +262,25 @@ public class QuizService {
     }
 
     @Transactional
-    public RankingAttemptStartDTO startRankingAttempt(Long id, Long ownerUserId) {
+    public RankingAttemptStartDTO startRankingAttempt(Long id, Long ownerUserId, UUID clientSessionId) {
         Quiz quiz = findByIdAndOwnerUserId(id, ownerUserId);
         if (quiz.getRankingVersion() == null) throw new IllegalStateException("Quiz nie należy do rankingu.");
-        QuizRankingAttempt attempt = rankingAttemptRepository.save(QuizRankingAttempt.builder().rankingVersion(quiz.getRankingVersion()).userId(ownerUserId).build());
-        return new RankingAttemptStartDTO(attempt.getId());
+        if (clientSessionId == null) throw new IllegalArgumentException("Brakuje identyfikatora sesji rozwiązywania.");
+
+        QuizRankingAttempt attempt = rankingAttemptRepository
+                .findByRankingVersionIdAndUserIdAndClientSessionIdAndStatus(
+                        quiz.getRankingVersion().getId(), ownerUserId, clientSessionId, "STARTED")
+                .orElseGet(() -> rankingAttemptRepository.save(QuizRankingAttempt.builder()
+                        .rankingVersion(quiz.getRankingVersion())
+                        .userId(ownerUserId)
+                        .clientSessionId(clientSessionId)
+                        .build()));
+
+        long elapsedMs = Math.min(
+                MAX_RANKING_DURATION.toMillis(),
+                Math.max(0, Duration.between(attempt.getStartedAt(), LocalDateTime.now()).toMillis())
+        );
+        return new RankingAttemptStartDTO(attempt.getId(), elapsedMs);
     }
 
     @Transactional(readOnly = true)
@@ -302,7 +316,19 @@ public class QuizService {
     public RankingFinishDTO finishRankingAttempt(Long id, UUID attemptId, Long userId, RankingFinishRequestDTO request) {
         Quiz quiz = findByIdAndOwnerUserId(id, userId);
         QuizRankingAttempt attempt = rankingAttemptRepository.findById(attemptId).orElseThrow(() -> new EntityNotFoundException("Podejście rankingowe nie istnieje."));
-        if (!attempt.getUserId().equals(userId) || !attempt.getRankingVersion().getId().equals(quiz.getRankingVersion().getId()) || !"STARTED".equals(attempt.getStatus())) throw new IllegalStateException("Niepoprawne podejście rankingowe.");
+        if (!attempt.getUserId().equals(userId) || !attempt.getRankingVersion().getId().equals(quiz.getRankingVersion().getId())) throw new IllegalStateException("Niepoprawne podejście rankingowe.");
+        if ("FINISHED".equals(attempt.getStatus())) {
+            if (attempt.getScoreScaled() == null || attempt.getMaxScoreScaled() == null || attempt.getDurationMs() == null || attempt.getOutsideTopFive() == null) {
+                throw new IllegalStateException("Niekompletne zakończone podejście rankingowe.");
+            }
+            List<QuizRankingEntry> finishedEntries = rankingEntryRepository.findByRankingVersion(attempt.getRankingVersion());
+            finishedEntries.sort(this::compareEntries);
+            return new RankingFinishDTO(
+                    attempt.getScoreScaled(), attempt.getMaxScoreScaled(), attempt.getDurationMs(),
+                    attempt.getPosition(), attempt.getOutsideTopFive(), toEntryDtos(finishedEntries)
+            );
+        }
+        if (!"STARTED".equals(attempt.getStatus())) throw new IllegalStateException("Niepoprawne podejście rankingowe.");
         QuizCreateDTO snapshot = readSnapshot(attempt.getRankingVersion());
         int max = Math.max(0, (int)Math.round(snapshot.questions().stream().mapToDouble(q -> maxQuestionScore(q, snapshot.scoring())).sum() * 100));
         Map<Integer, List<Integer>> submitted = request.answers() == null ? Map.of() : request.answers().stream().collect(java.util.stream.Collectors.toMap(RankingAnswerDTO::questionIndex, a -> a.answerIndexes() == null ? List.of() : a.answerIndexes(), (a,b)->a));
@@ -344,6 +370,12 @@ public class QuizService {
         while(entries.size()>5) { rankingEntryRepository.delete(entries.remove(entries.size()-1)); }
         entries = rankingEntryRepository.findByRankingVersion(version); entries.sort(this::compareEntries);
         Integer position=null; for(int i=0;i<entries.size();i++) if(entries.get(i).getUserId().equals(userId)) position=i+1;
+        attempt.setScoreScaled(scaled);
+        attempt.setMaxScoreScaled(max);
+        attempt.setDurationMs(duration);
+        attempt.setPosition(position);
+        attempt.setOutsideTopFive(position == null);
+        rankingAttemptRepository.save(attempt);
         return new RankingFinishDTO(scaled,max,duration,position,position==null,toEntryDtos(entries));
     }
 

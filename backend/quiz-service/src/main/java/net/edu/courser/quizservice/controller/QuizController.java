@@ -113,8 +113,12 @@ public class QuizController {
     }
 
     @PostMapping("/{id}/ranking-attempts")
-    public RankingAttemptStartDTO startRankingAttempt(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
-        return quizService.startRankingAttempt(id, userId);
+    public RankingAttemptStartDTO startRankingAttempt(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestBody RankingAttemptStartRequestDTO dto
+    ) {
+        return quizService.startRankingAttempt(id, userId, dto.clientSessionId());
     }
 
     @GetMapping("/{id}/ranking-position")

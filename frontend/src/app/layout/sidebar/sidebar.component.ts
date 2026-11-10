@@ -515,8 +515,13 @@ export class SidebarComponent {
       queryParams: {
         randomQuestionOrder: this.startRandomQuestionOrder(),
         studyMode: this.startStudyMode(),
+        playSession: this.newPlaySessionId(),
       },
     });
+  }
+
+  private newPlaySessionId(): string {
+    return crypto.randomUUID();
   }
 
   updateStartRandomQuestionOrder(event: Event): void {
@@ -551,7 +556,7 @@ export class SidebarComponent {
           this.localQuizzes.update((quizzes) => quizzes.filter((currentQuiz) => currentQuiz.id !== quiz.id));
           this.quizPendingDelete.set(null);
 
-          if (this.router.url === `/quizzes/${quiz.id}/play` || this.router.url === `/quizzes/${quiz.id}/edit`) {
+          if (this.router.url.startsWith(`/quizzes/${quiz.id}/play`) || this.router.url.startsWith(`/quizzes/${quiz.id}/edit`)) {
             void this.router.navigate(['/']);
           }
         },
