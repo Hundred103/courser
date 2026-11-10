@@ -6,6 +6,7 @@ import { DailyStatistics, QuizScoreService } from '../../core/services/quiz-scor
 type Period = 'today' | 'week' | 'month' | 'year' | 'all';
 type Metric = 'questions' | 'quizzes' | 'effectiveness';
 interface Bucket { label: string; quizzes: number; questions: number; sum: number; count: number; }
+interface ChartScale { min: number; max: number; ticks: readonly number[]; intervals: number; hasNegative: boolean; }
 
 @Component({
   selector: 'app-home-page', standalone: true, imports: [RouterLink],
@@ -33,8 +34,7 @@ export class HomePageComponent {
     quizzes: total.quizzes + b.quizzes, questions: total.questions + b.questions,
     sum: total.sum + b.sum, count: total.count + b.count,
   }), { quizzes: 0, questions: 0, sum: 0, count: 0 }));
-  readonly chartMax = computed(() => Math.max(1, ...this.buckets().map(b => Math.abs(this.value(b) ?? 0))));
-  readonly hasNegative = computed(() => this.buckets().some(b => (this.value(b) ?? 0) < 0));
+  readonly chartScale = computed(() => this.createChartScale(this.buckets().map(bucket => this.value(bucket))));
 
   constructor() {
     effect(() => {
@@ -61,7 +61,67 @@ export class HomePageComponent {
     return new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 2 }).format(value);
   }
   barHeight(bucket: Bucket): number {
-    return Math.abs(this.value(bucket) ?? 0) / this.chartMax() * (this.hasNegative() ? 48 : 92);
+    const value = this.value(bucket);
+    const scale = this.chartScale();
+
+    if (value === null) return 0;
+
+    return scale.hasNegative
+      ? Math.abs(value) / (scale.max - scale.min) * 100
+      : value / scale.max * 100;
+  }
+  tickPosition(tick: number): number {
+    const scale = this.chartScale();
+    return (tick - scale.min) / (scale.max - scale.min) * 100;
+  }
+  formatAxisTick(value: number): string {
+    const maximumFractionDigits = this.metric() === 'effectiveness' ? 2 : 0;
+    const text = new Intl.NumberFormat('pl-PL', { maximumFractionDigits }).format(value);
+    return this.metric() === 'effectiveness' ? `${text}%` : text;
+  }
+  private createChartScale(values: Array<number | null>): ChartScale {
+    const numbers = values.filter((value): value is number => value !== null && Number.isFinite(value));
+
+    if (this.metric() === 'effectiveness' && numbers.some(value => value < 0)) {
+      const extent = Math.max(...numbers.map(value => Math.abs(value)));
+      const step = this.niceStep(extent / 2, false, 0.01);
+      const maximum = this.roundScaleValue(Math.ceil(extent / step) * step);
+      return this.scale(-maximum, maximum, step, true);
+    }
+
+    if (this.metric() === 'effectiveness') {
+      const maximum = Math.max(0, ...numbers);
+      if (maximum === 0) return { min: 0, max: 100, ticks: [0, 25, 50, 75, 100], intervals: 4, hasNegative: false };
+      const step = this.niceStep(maximum / 4, false, 0.01);
+      return this.scale(0, this.roundScaleValue(Math.ceil(maximum / step) * step), step, false);
+    }
+
+    const maximum = Math.max(0, ...numbers);
+    if (maximum <= 4) {
+      const wholeMaximum = Math.max(1, Math.ceil(maximum));
+      return this.scale(0, wholeMaximum, 1, false);
+    }
+
+    const step = this.niceStep(maximum / 4, true, 1);
+    return this.scale(0, Math.ceil(maximum / step) * step, step, false);
+  }
+  private scale(minimum: number, maximum: number, step: number, hasNegative: boolean): ChartScale {
+    const intervals = Math.max(1, Math.round((maximum - minimum) / step));
+    const ticks = Array.from({ length: intervals + 1 }, (_, index) =>
+      this.roundScaleValue(minimum + index * step),
+    );
+    return { min: minimum, max: maximum, ticks, intervals, hasNegative };
+  }
+  private niceStep(roughStep: number, wholeNumbers: boolean, minimumStep: number): number {
+    const safeRoughStep = Math.max(roughStep, minimumStep);
+    const magnitude = 10 ** Math.floor(Math.log10(safeRoughStep));
+    const multipliers = wholeNumbers ? [1, 2, 5, 10] : [1, 2, 2.5, 5, 10];
+    const step = multipliers.map(multiplier => multiplier * magnitude).find(candidate => candidate >= safeRoughStep)
+      ?? 10 * magnitude;
+    return Math.max(minimumStep, step);
+  }
+  private roundScaleValue(value: number): number {
+    return Math.round(value * 1_000_000) / 1_000_000;
   }
   private buildBuckets(data: DailyStatistics[], period: Period): Bucket[] {
     const now = new Date(); now.setHours(0, 0, 0, 0);
