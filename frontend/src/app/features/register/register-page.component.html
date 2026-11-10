@@ -38,7 +38,29 @@
 
       <label class="field">
         <span>Hasło</span>
-        <input type="password" name="password" [(ngModel)]="model.password" required [disabled]="loading()" />
+        <div class="password-input">
+          <input
+            [type]="passwordVisible() ? 'text' : 'password'"
+            name="password"
+            [(ngModel)]="model.password"
+            (ngModelChange)="onPasswordChange('password', $event)"
+            required
+            [disabled]="loading()" />
+          @if (model.password) {
+            <button
+              class="password-visibility-button"
+              type="button"
+              [disabled]="loading()"
+              [attr.aria-label]="passwordVisible() ? 'Ukryj hasło' : 'Pokaż hasło'"
+              (click)="togglePasswordVisibility('password')">
+              @if (passwordVisible()) {
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.6"/></svg>
+              } @else {
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3 21 21M10.2 6.3A10.8 10.8 0 0 1 12 6c6.1 0 9.5 6 9.5 6a16.7 16.7 0 0 1-3.1 3.8M6.4 6.4A16.7 16.7 0 0 0 2.5 12s3.4 6 9.5 6a10.8 10.8 0 0 0 3.6-.6"/><path d="M9.8 9.8a3.1 3.1 0 0 0 4.4 4.4"/></svg>
+              }
+            </button>
+          }
+        </div>
       </label>
 
       @if (model.password || submitAttempted()) {
@@ -60,13 +82,30 @@
 
       <label class="field">
         <span>Powtórz hasło</span>
-        <input
-          type="password"
-          name="passwordConfirm"
-          [(ngModel)]="model.passwordConfirm"
-          required
-          [disabled]="loading()"
-          [class.error]="submitAttempted() && !passwordsMatch()" />
+        <div class="password-input">
+          <input
+            [type]="passwordConfirmVisible() ? 'text' : 'password'"
+            name="passwordConfirm"
+            [(ngModel)]="model.passwordConfirm"
+            (ngModelChange)="onPasswordChange('passwordConfirm', $event)"
+            required
+            [disabled]="loading()"
+            [class.error]="submitAttempted() && !passwordsMatch()" />
+          @if (model.passwordConfirm) {
+            <button
+              class="password-visibility-button"
+              type="button"
+              [disabled]="loading()"
+              [attr.aria-label]="passwordConfirmVisible() ? 'Ukryj hasło' : 'Pokaż hasło'"
+              (click)="togglePasswordVisibility('passwordConfirm')">
+              @if (passwordConfirmVisible()) {
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.6"/></svg>
+              } @else {
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3 21 21M10.2 6.3A10.8 10.8 0 0 1 12 6c6.1 0 9.5 6 9.5 6a16.7 16.7 0 0 1-3.1 3.8M6.4 6.4A16.7 16.7 0 0 0 2.5 12s3.4 6 9.5 6a10.8 10.8 0 0 0 3.6-.6"/><path d="M9.8 9.8a3.1 3.1 0 0 0 4.4 4.4"/></svg>
+              }
+            </button>
+          }
+        </div>
       </label>
 
       @if (model.passwordConfirm || submitAttempted()) {

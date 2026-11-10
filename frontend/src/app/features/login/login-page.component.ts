@@ -18,6 +18,15 @@ export class LoginPageComponent {
   model = { email: '', password: '' };
   readonly error = signal<string | null>(null);
   readonly loading = signal(false);
+  readonly passwordVisible = signal(false);
+
+  togglePasswordVisibility(): void {
+    this.passwordVisible.update((visible) => !visible);
+  }
+
+  onPasswordChange(password: string): void {
+    if (!password) this.passwordVisible.set(false);
+  }
 
   onSubmit(): void {
     if (!this.model.email || !this.model.password) {

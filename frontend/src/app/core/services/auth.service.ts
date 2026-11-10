@@ -3,6 +3,7 @@ import { HttpBackend, HttpClient } from '@angular/common/http';
 import { Observable, catchError, finalize, forkJoin, map, of, shareReplay, tap } from 'rxjs';
 import { environment } from '../../../environment';
 import { GuestQuizStorageService } from './guest-quiz-storage.service';
+import { AccentColor, DEFAULT_ACCENT_COLOR, isAccentColor } from '../models/theme.model';
 
 export interface LoginRequest {
   email: string;
@@ -19,6 +20,7 @@ export interface AuthResponse {
   id: number;
   email: string;
   username: string;
+  accentColor: AccentColor;
   token: string;
   message: string;
 }
@@ -65,8 +67,15 @@ export class AuthService {
   }
 
   setCurrentUser(user: AuthResponse): void {
-    this.currentUser.set(user);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    const normalizedUser = { ...user, accentColor: isAccentColor(user.accentColor) ? user.accentColor : DEFAULT_ACCENT_COLOR };
+    this.currentUser.set(normalizedUser);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedUser));
+  }
+
+  updateSettings(username: string, accentColor: AccentColor): Observable<AuthResponse> {
+    return this.http.put<AuthResponse>(`${this.apiUrl}/me/settings`, { username, accentColor }).pipe(
+      tap((user) => this.setCurrentUser(user)),
+    );
   }
 
   migrateGuestQuizzesToUser(user: AuthResponse): Observable<unknown[]> {
@@ -117,8 +126,18 @@ export class AuthService {
   }
 
   private clearAuthState(): void {
+    const userId = this.currentUser()?.id;
+    if (userId != null) this.clearPlaySessionsForUser(userId);
     this.currentUser.set(null);
     localStorage.removeItem(STORAGE_KEY);
+  }
+
+  private clearPlaySessionsForUser(userId: number): void {
+    const prefix = `courser.quiz-play.v1.${userId}.`;
+    for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+      const key = sessionStorage.key(index);
+      if (key?.startsWith(prefix)) sessionStorage.removeItem(key);
+    }
   }
 
   isAuthenticated(): boolean {
@@ -143,7 +162,7 @@ export class AuthService {
         return null;
       }
 
-      return user;
+      return { ...user, accentColor: isAccentColor(user.accentColor) ? user.accentColor : DEFAULT_ACCENT_COLOR };
     } catch {
       localStorage.removeItem(STORAGE_KEY);
       return null;

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
-import { BestQuizScore, SaveQuizResultRequest } from '../models/quiz-score.model';
+import { BestQuizScore } from '../models/quiz-score.model';
 import { environment } from '../../../environment';
 
 @Injectable({
@@ -14,10 +14,14 @@ export class QuizScoreService {
   private readonly refreshTick = signal(0);
   readonly scoresVersion = this.refreshTick.asReadonly();
 
-  saveQuizResult(request: SaveQuizResultRequest): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/me/quiz-results`, request).pipe(
+  completeQuiz(request: CompleteQuizStatistics): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/me/statistics/completions`, request).pipe(
       tap(() => this.requestRefresh()),
     );
+  }
+
+  getDailyStatistics(): Observable<DailyStatistics[]> {
+    return this.http.get<DailyStatistics[]>(`${this.apiUrl}/me/statistics/daily`);
   }
 
   getBestScores(): Observable<BestQuizScore[]> {
@@ -28,12 +32,6 @@ export class QuizScoreService {
     return this.http.get<number>(`${this.apiUrl}/me/quiz-attempts/count`, {
       params: { quizId },
     });
-  }
-
-  recordCompletedAttempt(quizId: number): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/me/quiz-attempts`, { quizId }).pipe(
-      tap(() => this.requestRefresh()),
-    );
   }
 
   requestRefresh(): void {
@@ -57,4 +55,23 @@ export class QuizScoreService {
     const formattedMax = Number.isInteger(maxPoints) ? maxPoints.toString() : maxPoints.toFixed(2).replace(/0+$/, '').replace('.', ',');
     return `${formatted}/${formattedMax}`;
   }
+}
+
+export interface CompleteQuizStatistics {
+  requestId: string;
+  quizId: number;
+  checkedQuestions: number;
+  studyMode: boolean;
+  score: number | null;
+  maxScore: number | null;
+  effectivenessHundredths: number | null;
+  timeZone: string;
+}
+
+export interface DailyStatistics {
+  date: string;
+  completedQuizzes: number;
+  checkedQuestions: number;
+  effectivenessSum: number;
+  effectivenessCount: number;
 }

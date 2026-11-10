@@ -19,6 +19,22 @@ export class RegisterPageComponent {
   readonly error = signal<string | null>(null);
   readonly loading = signal(false);
   readonly submitAttempted = signal(false);
+  readonly passwordVisible = signal(false);
+  readonly passwordConfirmVisible = signal(false);
+
+  togglePasswordVisibility(field: 'password' | 'passwordConfirm'): void {
+    if (field === 'password') {
+      this.passwordVisible.update((visible) => !visible);
+      return;
+    }
+    this.passwordConfirmVisible.update((visible) => !visible);
+  }
+
+  onPasswordChange(field: 'password' | 'passwordConfirm', value: string): void {
+    if (value) return;
+    if (field === 'password') this.passwordVisible.set(false);
+    else this.passwordConfirmVisible.set(false);
+  }
 
   onSubmit(): void {
     this.submitAttempted.set(true);

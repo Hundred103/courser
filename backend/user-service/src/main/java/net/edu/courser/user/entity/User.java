@@ -23,6 +23,10 @@ public class User {
     @Column(unique = true, nullable = false)
     private String username;
 
+    @Builder.Default
+    @Column(name = "accent_color", nullable = false)
+    private String accentColor = "coral";
+
     @Column(nullable = false)
     private String password;
 
