@@ -15,6 +15,7 @@ import net.edu.courser.user.dto.LoginResponse;
 import net.edu.courser.user.dto.RegisterRequest;
 import net.edu.courser.user.dto.SaveQuizResultRequest;
 import net.edu.courser.user.dto.UserProfileResponse;
+import net.edu.courser.user.dto.UpdateUserSettingsRequest;
 import net.edu.courser.user.entity.QuizResult;
 import net.edu.courser.user.entity.User;
 import net.edu.courser.user.security.JwtClaims;
@@ -91,6 +92,7 @@ public class UserController {
                     .id(created.getId())
                     .email(created.getEmail())
                     .username(created.getUsername())
+                    .accentColor(created.getAccentColor())
                     .token(jwtService.createToken(created))
                     .message("Rejestracja powiodła się")
                     .build();
@@ -113,6 +115,7 @@ public class UserController {
                     .id(user.getId())
                     .email(user.getEmail())
                     .username(user.getUsername())
+                    .accentColor(user.getAccentColor())
                     .token(jwtService.createToken(user))
                     .message("Zalogowano pomyślnie")
                     .build();
@@ -135,6 +138,7 @@ public class UserController {
                     .id(user.getId())
                     .email(user.getEmail())
                     .username(user.getUsername())
+                    .accentColor(user.getAccentColor())
                     .token(jwtService.createToken(user))
                     .message("Sesja odświeżona")
                     .build();
@@ -154,6 +158,28 @@ public class UserController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, clearRefreshCookie().toString())
                 .build();
+    }
+
+    @PutMapping("/me/settings")
+    public ResponseEntity<?> updateCurrentUserSettings(
+            @AuthenticationPrincipal JwtClaims claims,
+            @RequestBody UpdateUserSettingsRequest request
+    ) {
+        try {
+            User user = userService.updateSettings(claims.userId(), request.getUsername(), request.getAccentColor());
+            LoginResponse response = LoginResponse.builder()
+                    .id(user.getId())
+                    .email(user.getEmail())
+                    .username(user.getUsername())
+                    .accentColor(user.getAccentColor())
+                    .token(jwtService.createToken(user))
+                    .message("Ustawienia zapisane")
+                    .build();
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException exception) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(java.util.Collections.singletonMap("error", exception.getMessage()));
+        }
     }
 
     @PutMapping("/{id}")

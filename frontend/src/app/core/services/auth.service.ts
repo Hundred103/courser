@@ -3,6 +3,7 @@ import { HttpBackend, HttpClient } from '@angular/common/http';
 import { Observable, catchError, finalize, forkJoin, map, of, shareReplay, tap } from 'rxjs';
 import { environment } from '../../../environment';
 import { GuestQuizStorageService } from './guest-quiz-storage.service';
+import { AccentColor, DEFAULT_ACCENT_COLOR, isAccentColor } from '../models/theme.model';
 
 export interface LoginRequest {
   email: string;
@@ -19,6 +20,7 @@ export interface AuthResponse {
   id: number;
   email: string;
   username: string;
+  accentColor: AccentColor;
   token: string;
   message: string;
 }
@@ -65,8 +67,15 @@ export class AuthService {
   }
 
   setCurrentUser(user: AuthResponse): void {
-    this.currentUser.set(user);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    const normalizedUser = { ...user, accentColor: isAccentColor(user.accentColor) ? user.accentColor : DEFAULT_ACCENT_COLOR };
+    this.currentUser.set(normalizedUser);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedUser));
+  }
+
+  updateSettings(username: string, accentColor: AccentColor): Observable<AuthResponse> {
+    return this.http.put<AuthResponse>(`${this.apiUrl}/me/settings`, { username, accentColor }).pipe(
+      tap((user) => this.setCurrentUser(user)),
+    );
   }
 
   migrateGuestQuizzesToUser(user: AuthResponse): Observable<unknown[]> {
@@ -143,7 +152,7 @@ export class AuthService {
         return null;
       }
 
-      return user;
+      return { ...user, accentColor: isAccentColor(user.accentColor) ? user.accentColor : DEFAULT_ACCENT_COLOR };
     } catch {
       localStorage.removeItem(STORAGE_KEY);
       return null;

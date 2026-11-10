@@ -228,8 +228,8 @@
 
 .scoring-number:focus,
 .points-input:focus {
-  border-color: rgba(255, 107, 53, 0.5);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.12);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
 }
 
 .field-label {
@@ -254,8 +254,8 @@
 .title-input:focus,
 .question-input:focus,
 .answer-input:focus {
-  border-color: rgba(255, 107, 53, 0.5);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.12);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
 }
 
 .title-input {
@@ -397,11 +397,11 @@
   width: 2.25rem;
   height: 2.25rem;
   place-items: center;
-  border: 1px solid rgba(255, 107, 53, 0.34);
+  border: 1px solid rgba(var(--accent-rgb), 0.34);
   border-radius: 999px;
   color: var(--text-accent);
   font-weight: 900;
-  background: rgba(255, 107, 53, 0.1);
+  background: rgba(var(--accent-rgb), 0.1);
 }
 
 .answer-input {
@@ -554,18 +554,18 @@
   gap: 0.85rem;
   width: min(460px, 100%);
   padding: 1.1rem;
-  border: 1px solid rgba(255, 184, 77, 0.5);
+  border: 1px solid rgba(var(--accent-rgb), 0.5);
   background:
     linear-gradient(
       135deg,
-      rgba(255, 184, 77, 0.13),
+      rgba(var(--accent-rgb), 0.13),
       rgba(75, 29, 115, 0.18)
     );
 }
 
 .confirm-banner p {
   margin: 0;
-  color: #fff3d6;
+  color: var(--accent-pale);
   font-size: 1.25rem;
   font-weight: 800;
   line-height: 1.45;

@@ -1,7 +1,7 @@
 :host { display: block; }
 .dashboard { display: grid; gap: 1.5rem; max-width: 1440px; margin: 0 auto; }
 .dashboard-header { padding: .6rem .15rem 2rem; }
-.eyebrow { display: block; color: #ff9a70; font-size: .72rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; margin-bottom: .6rem; }
+.eyebrow { display: block; color: var(--accent-bright); font-size: .72rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; margin-bottom: .6rem; }
 h1, h2, p { margin: 0; }
 h1 { color: var(--text-title); font-size: clamp(2rem, 4vw, 3.2rem); letter-spacing: -.04em; line-height: 1.1; }
 h2 { color: var(--text-title); font-size: 1.35rem; margin-bottom: .45rem; }
@@ -11,7 +11,8 @@ p { color: var(--text-soft); line-height: 1.55; }
 .periods button, .metric-switch button { cursor: pointer; color: var(--text-soft); border: 1px solid transparent; background: transparent; border-radius: 12px; padding: .65rem 1rem; font: inherit; font-size: .86rem; font-weight: 700; }
 .periods { width: fit-content; padding: .3rem; border: 1px solid var(--edge); border-radius: 16px; background: rgba(255,255,255,.025); }
 .periods button:hover, .metric-switch button:hover { color: white; }
-.periods button.active, .metric-switch button.active { color: #fff3ed; border-color: rgba(255,137,87,.28); background: rgba(255,107,53,.14); }
+.periods button.active { color: var(--accent-pale); border-color: rgba(var(--accent-rgb), .45); background: rgba(var(--accent-rgb), .14); }
+.metric-switch button.active, .metric-switch button.effectiveness-button.active { color: #fff3ed; border-color: rgba(255,137,87,.28); background: rgba(255,107,53,.14); }
 .metric-switch button.questions-button.active { color: #edfff3; border-color: rgba(81,203,128,.48); background: rgba(55,173,99,.2); }
 .metric-switch button.quizzes-button.active { color: #edf7ff; border-color: rgba(94,165,236,.5); background: rgba(49,111,181,.25); }
 .cards { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1rem; }
@@ -19,9 +20,10 @@ p { color: var(--text-soft); line-height: 1.55; }
 .stat-card { min-height: 185px; padding: 1.3rem; display: grid; align-content: start; gap: .45rem; color: var(--text-soft); font-size: .9rem; }
 .stat-card strong { color: white; font-size: clamp(2rem,3vw,2.8rem); line-height: 1.1; letter-spacing: -.04em; }
 .stat-card small { font-size: .75rem; color: #9999a3; }
-.card-icon { display: grid; place-items: center; width: 36px; height: 36px; margin-bottom: .45rem; border-radius: 11px; color: #ffae89; background: rgba(255,107,53,.13); font-size: 1.2rem; }
+.card-icon { display: grid; place-items: center; width: 36px; height: 36px; margin-bottom: .45rem; border-radius: 11px; color: var(--accent-bright); background: rgba(var(--accent-rgb), .13); font-size: 1.2rem; }
 .questions-card .card-icon { color: #75dc98; background: rgba(58,172,96,.18); }
 .quizzes-card .card-icon { color: #75b9f4; background: rgba(52,112,184,.25); }
+.effectiveness-card .card-icon { color: #ffae89; background: rgba(255,107,53,.13); }
 .chart-card { padding: 1.5rem; }
 .chart-header { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .chart-header p, .chart-note { font-size: .83rem; }
@@ -45,9 +47,9 @@ p { color: var(--text-soft); line-height: 1.55; }
 .negative .bar.below .bar-value { top: calc(100% + .25rem); bottom: auto; }
 .chart-note { margin-top: 1rem; color: #9696a1; }
 .empty, .notice { padding: 1rem; margin-top: 1rem; border-radius: 14px; background: rgba(255,255,255,.04); font-size: .9rem; }
-.notice button { cursor: pointer; color: #ffae89; background: none; border: 0; font: inherit; text-decoration: underline; }
+.notice button { cursor: pointer; color: var(--accent-bright); background: none; border: 0; font: inherit; text-decoration: underline; }
 .today-value { display: grid; gap: .35rem; justify-items: center; padding: 3rem 1rem; color: var(--text-soft); }
-.today-value strong { font-size: 3rem; color: #ffae89; }
+.today-value strong { font-size: 3rem; color: var(--accent-bright); }
 .footnote { color: #92929c; font-size: .75rem; }
 .welcome { padding: clamp(1.5rem,4vw,3rem); min-height: 280px; display: grid; align-content: center; justify-items: start; gap: .7rem; }
 .welcome p { max-width: 540px; }

@@ -91,7 +91,7 @@ h2 {
   color: var(--text-accent);
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-shadow: 0 0 10px rgba(255, 107, 53, 0.4);
+  text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.4);
 }
 
 .quiz-best-score {
@@ -125,7 +125,7 @@ h2 {
 .quiz-title-input {
   min-width: 0;
   width: 100%;
-  border: 1px solid rgba(255, 107, 53, 0.45);
+  border: 1px solid rgba(var(--accent-rgb), 0.45);
   border-radius: 12px;
   padding: 0.58rem 0.65rem;
   color: var(--text-main);
@@ -134,7 +134,7 @@ h2 {
   font-weight: 900;
   background: rgba(255, 255, 255, 0.06);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.08);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.08);
 }
 
 .quiz-title-input:disabled {
@@ -271,18 +271,18 @@ h2 {
   gap: 0.85rem;
   width: min(460px, 100%);
   padding: 1.1rem;
-  border: 1px solid rgba(255, 184, 77, 0.5);
+  border: 1px solid rgba(var(--accent-rgb), 0.5);
   background:
     linear-gradient(
       135deg,
-      rgba(255, 184, 77, 0.13),
+      rgba(var(--accent-rgb), 0.13),
       rgba(75, 29, 115, 0.18)
     );
 }
 
 .confirm-banner p {
   margin: 0;
-  color: #fff3d6;
+  color: var(--accent-pale);
   font-size: 1.25rem;
   font-weight: 800;
   line-height: 1.45;
@@ -346,23 +346,23 @@ h2 {
 }
 
 .share-expiration-option:hover:not(:disabled) {
-  border-color: rgba(255, 184, 77, 0.46);
-  background: rgba(255, 184, 77, 0.08);
+  border-color: rgba(var(--accent-rgb), 0.46);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .share-expiration-option:focus-visible {
-  border-color: rgba(255, 184, 77, 0.7);
-  box-shadow: 0 0 0 3px rgba(255, 184, 77, 0.14);
+  border-color: rgba(var(--accent-rgb), 0.7);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.14);
 }
 
 .share-expiration-option.active {
-  border-color: rgba(255, 184, 77, 0.76);
+  border-color: rgba(var(--accent-rgb), 0.76);
   color: var(--text-title);
   background:
     linear-gradient(
       135deg,
-      rgba(255, 184, 77, 0.2),
-      rgba(255, 107, 53, 0.12)
+      rgba(var(--accent-rgb), 0.2),
+      rgba(var(--accent-rgb), 0.12)
     );
 }
 

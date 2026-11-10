@@ -4,15 +4,13 @@
   </a>
 
   <nav class="topbar-actions">
-    <button
-      class="secondary-button squircle"
-      type="button"
-      (click)="onSettingsClick()">
-      Ustawienia
-    </button>
-
     @if (isLoggedIn()) {
-      <span class="user-badge squircle">{{ user()!.username }}</span>
+      <button
+        class="secondary-button squircle"
+        type="button"
+        (click)="onSettingsClick()">
+        Ustawienia
+      </button>
       <button
         class="secondary-button squircle"
         type="button"
@@ -23,8 +21,52 @@
       <a
         class="secondary-button squircle"
         routerLink="/login">
-        Zaloguj
+        Zaloguj się
       </a>
     }
   </nav>
 </header>
+
+@if (settingsOpen()) {
+  <div class="settings-overlay">
+    <form class="settings-modal squircle" role="dialog" aria-modal="true" aria-labelledby="settings-title" (ngSubmit)="saveSettings()">
+      <header class="settings-modal-header"><h2 id="settings-title">Ustawienia</h2></header>
+
+      <div class="setting-field">
+        <label for="settings-username">
+          <svg class="setting-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4.42 0-8 2.01-8 4.5V20h16v-1.5c0-2.49-3.58-4.5-8-4.5Z" /></svg>
+          Nazwa użytkownika
+        </label>
+        <input id="settings-username" name="settings-username" type="text" [(ngModel)]="settingsUsername" [disabled]="settingsSaving()" autocomplete="username" />
+      </div>
+
+      <div class="setting-field accent-field">
+        <span class="setting-label">
+          <svg class="setting-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18h1.25a1.75 1.75 0 0 0 0-3.5h-.76a1.24 1.24 0 0 1 0-2.48H15a6 6 0 0 0 0-12h-3Zm-4 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3-4.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 1.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm1 4.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z" /></svg>
+          Kolor akcentujący
+        </span>
+        <button class="accent-picker" type="button" [attr.aria-expanded]="accentListOpen()" (click)="accentListOpen.set(!accentListOpen())" [disabled]="settingsSaving()">
+          <span class="accent-swatch" [style.background]="selectedAccent().value"></span>
+          <span>{{ selectedAccent().label }}</span>
+          <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+        </button>
+        @if (accentListOpen()) {
+          <div class="accent-options" role="listbox" aria-label="Wybierz kolor akcentujący">
+            @for (option of accentOptions; track option.id) {
+              <button type="button" role="option" [attr.aria-selected]="settingsAccent === option.id" [class.selected]="settingsAccent === option.id" (click)="selectAccent(option.id)" [disabled]="settingsSaving()">
+                <span class="accent-swatch" [style.background]="option.value"></span>{{ option.label }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      @if (settingsError(); as error) { <p class="settings-error" role="alert">{{ error }}</p> }
+
+      <div class="settings-actions">
+        <button class="secondary-button squircle" type="button" (click)="cancelSettings()" [disabled]="settingsSaving()">Anuluj</button>
+        <button class="primary-button squircle" type="submit" [disabled]="settingsSaving()">{{ settingsSaving() ? 'Zapisywanie…' : 'Zapisz' }}</button>
+      </div>
+    </form>
+  </div>
+}

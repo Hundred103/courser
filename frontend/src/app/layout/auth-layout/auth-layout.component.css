@@ -14,7 +14,7 @@
   background:
     radial-gradient(
       circle at 18% 18%,
-      rgba(255, 107, 53, 0.24),
+      rgba(var(--accent-rgb), 0.24),
       transparent 30%
     ),
     radial-gradient(
@@ -61,13 +61,13 @@
   top: 25%;
   left: 50%;
   z-index: -1;
-  color: rgba(255, 230, 222, 0.08);
+  color: rgba(var(--accent-rgb), 0.08);
   font-size: clamp(6rem, 22vw, 22rem);
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1.08;
   text-shadow:
-    0 0 24px rgba(255, 107, 53, 0.22),
+    0 0 24px rgba(var(--accent-rgb), 0.22),
     0 0 54px rgba(75, 29, 115, 0.28);
   transform: translate(-50%, -58%) scaleX(1.08) scaleY(1.06);
   filter: blur(2px);

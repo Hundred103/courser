@@ -6,7 +6,7 @@
       </button>
       @if (isEditMode()) {
         <button
-          class="undo-button secondary-button squircle"
+          class="undo-button primary-button squircle"
           type="button"
           [disabled]="!canUndoChanges()"
           (click)="undoChanges()"
@@ -422,7 +422,7 @@
             Anuluj
           </button>
           <button class="primary-button squircle" type="button" (click)="goToLogin()">
-            Zaloguj
+            Zaloguj się
           </button>
         </div>
       </div>
