@@ -90,8 +90,8 @@ h2 {
 .import-tabs button.active,
 .import-tabs button[aria-selected='true'] {
   color: var(--text-title);
-  background: linear-gradient(135deg, rgba(255, 184, 77, 0.16), rgba(255, 107, 53, 0.14));
-  box-shadow: 0 0 18px rgba(255, 107, 53, 0.12);
+  background: linear-gradient(135deg, rgba(255, 184, 77, 0.16), rgba(var(--accent-rgb), 0.14));
+  box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.12);
 }
 
 .import-grid {
@@ -168,9 +168,9 @@ h2 {
 
 .drop-zone:hover,
 .upload-area.dragging .drop-zone {
-  border-color: rgba(255, 107, 53, 0.8);
-  background: rgba(255, 107, 53, 0.1);
-  box-shadow: 0 0 24px rgba(255, 107, 53, 0.14);
+  border-color: rgba(var(--accent-rgb), 0.8);
+  background: rgba(var(--accent-rgb), 0.1);
+  box-shadow: 0 0 24px rgba(var(--accent-rgb), 0.14);
 }
 
 .upload-icon {
@@ -178,10 +178,10 @@ h2 {
   width: 4rem;
   height: 4rem;
   place-items: center;
-  border: 1px solid rgba(255, 107, 53, 0.45);
+  border: 1px solid rgba(var(--accent-rgb), 0.45);
   border-radius: 18px;
   color: var(--text-accent);
-  background: rgba(255, 107, 53, 0.1);
+  background: rgba(var(--accent-rgb), 0.1);
 }
 
 .drop-zone strong {

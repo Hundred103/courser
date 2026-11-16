@@ -6,6 +6,18 @@
     @if (quiz()?.rankingEnabled && isLoggedIn() && !isStudyMode() && !resultReady()) {
       <p class="ranking-timer top-ranking-timer">Czas: {{ rankingTimeText() }}</p>
     }
+    @if (quiz() && !resultReady()) {
+      <div class="top-right-info">
+        <p class="keyboard-shortcuts" aria-label="Skróty klawiaturowe">
+          <span><kbd>1–9</kbd> odpowiedzi</span>
+          <span><kbd>Spacja</kbd> sprawdź</span>
+          <span><kbd>A</kbd>/<kbd>D</kbd> strzałki</span>
+          @if (isStudyMode()) {
+            <span><kbd>Q</kbd>/<kbd>W</kbd>/<kbd>E</kbd>/<kbd>R</kbd> dodaj</span>
+          }
+        </p>
+      </div>
+    }
   </div>
 
   @if (isLoading()) {
@@ -164,13 +176,14 @@
             <p>Czas: {{ rankingDurationText(ranking.durationMs) }}</p>
           }
 
-          @if (isLoggedIn() && !isStudyMode()) {
+          @if (isLoggedIn()) {
             @if (resultSaveError()) {
               <p class="result-status error">{{ resultSaveError() }}</p>
-            } @else if (resultSaved()) {
-              <p class="result-status success">Wynik został zapisany.</p>
+              <button type="button" class="secondary-button squircle" (click)="retrySave()">Spróbuj zapisać ponownie</button>
+            } @else if (resultSaveConfirmed()) {
+              <p class="result-status success">Postępy zostały zapisane.</p>
             } @else {
-              <p class="result-status">Zapisywanie wyniku...</p>
+              <p class="result-status">Zapisywanie postępów...</p>
             }
           }
 

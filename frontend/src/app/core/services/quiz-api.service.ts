@@ -155,8 +155,8 @@ export class QuizApiService {
     return this.http.get(`${this.apiUrl}/${id}/export`, { responseType: 'blob' });
   }
 
-  startRankingAttempt(id: number): Observable<{ attemptId: string }> {
-    return this.http.post<{ attemptId: string }>(`${this.apiUrl}/${id}/ranking-attempts`, {});
+  startRankingAttempt(id: number, clientSessionId: string): Observable<{ attemptId: string; elapsedMs: number }> {
+    return this.http.post<{ attemptId: string; elapsedMs: number }>(`${this.apiUrl}/${id}/ranking-attempts`, { clientSessionId });
   }
 
   finishRankingAttempt(id: number, attemptId: string, answers: { questionIndex: number; answerIndexes: number[] }[]): Observable<RankingFinishDTO> {

@@ -11,11 +11,14 @@ import net.edu.courser.user.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UserService {
+
+    private static final Set<String> ACCENT_COLORS = Set.of("coral", "blue", "green", "violet", "turquoise", "pink");
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -34,8 +37,9 @@ public class UserService {
 
     @Transactional
     public User createUser(User user) {
+        String username = validateUsername(user.getUsername());
         boolean emailTaken = userRepository.existsByEmail(user.getEmail());
-        boolean usernameTaken = userRepository.existsByUsername(user.getUsername());
+        boolean usernameTaken = userRepository.existsByUsername(username);
 
         if (emailTaken && usernameTaken) {
             throw new RuntimeException("Podany email oraz nazwa użytkownika są zajęte");
@@ -47,6 +51,8 @@ public class UserService {
             throw new RuntimeException("Podana nazwa użytkownika jest zajęta");
         }
 
+        user.setUsername(username);
+        user.setAccentColor("coral");
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRole(UserRole.STUDENT);
         return userRepository.save(user);
@@ -77,6 +83,24 @@ public class UserService {
     }
 
     @Transactional
+    public User updateSettings(Long id, String requestedUsername, String requestedAccentColor) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Nie znaleziono użytkownika."));
+        String username = validateUsername(requestedUsername);
+
+        if (!username.equals(user.getUsername()) && userRepository.existsByUsername(username)) {
+            throw new RuntimeException("Podana nazwa użytkownika jest zajęta");
+        }
+        if (!ACCENT_COLORS.contains(requestedAccentColor)) {
+            throw new RuntimeException("Nieprawidłowy kolor akcentujący.");
+        }
+
+        user.setUsername(username);
+        user.setAccentColor(requestedAccentColor);
+        return userRepository.save(user);
+    }
+
+    @Transactional
     public void updateUserScore(Long userId, int additionalScore) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -96,5 +120,19 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
+    }
+
+    private String validateUsername(String requestedUsername) {
+        String username = requestedUsername == null ? "" : requestedUsername.trim();
+        if (username.isEmpty()) {
+            throw new RuntimeException("Podaj nazwę użytkownika.");
+        }
+        if (username.matches(".*\\s.*")) {
+            throw new RuntimeException("Nazwa użytkownika musi być jednym ciągiem bez spacji.");
+        }
+        if (!username.matches("[A-Za-z0-9]+")) {
+            throw new RuntimeException("Użyj tylko liter bez polskich znaków i cyfr.");
+        }
+        return username;
     }
 }

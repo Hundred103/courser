@@ -9,7 +9,7 @@
   background:
     radial-gradient(
       circle at 15% 10%,
-      rgba(255, 107, 53, 0.2),
+      rgba(var(--accent-rgb), 0.2),
       transparent 34%
     ),
     radial-gradient(
