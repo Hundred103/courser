@@ -6,7 +6,7 @@ import { DEFAULT_QUIZ_LIMITS, QuizLimits, normalizeQuizLimits } from '../../core
 import { QuizCreateDTO, QuizPlayDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
-import { compressImageFile, toImageSrc } from '../../core/utils/image-compression.util';
+import { readImageFile, toImageSrc } from '../../core/utils/image-compression.util';
 import { normalizeQuizScoring, QuizScoring } from '../../core/utils/quiz-scoring.util';
 
 const NEW_QUIZ_SCORING: QuizScoring = {
@@ -403,16 +403,11 @@ export class QuizCreatePageComponent implements OnDestroy {
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
-      this.saveError.set('Wybierz plik graficzny.');
-      return;
-    }
-
     try {
-      const image = await compressImageFile(file);
+      const image = await readImageFile(file);
       this.requestRankingCopyForAction(() => this.setQuestionImage(currentQuestion.id, image));
-    } catch {
-      this.saveError.set('Nie udało się przetworzyć obrazu.');
+    } catch (error) {
+      this.saveError.set(error instanceof Error ? error.message : 'Nie udało się wczytać obrazu.');
     }
   }
 

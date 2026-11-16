@@ -32,6 +32,20 @@ services:
       --contexts=seed
       update
 
+  media:
+    image: nginx:1.27-alpine
+    container_name: courser-media
+    volumes:
+      - courser-media-data:/usr/share/nginx/html
+      - ./media/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -q ok"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   quiz-service:
     build:
       context: ./backend/quiz-service
@@ -40,14 +54,20 @@ services:
     depends_on:
       liquibase:
         condition: service_completed_successfully
+      media:
+        condition: service_started
     expose:
       - "8081"
+    volumes:
+      - courser-media-data:/var/courser-media
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
       SPRING_DATASOURCE_USERNAME: courseruser
       SPRING_DATASOURCE_PASSWORD: courserpassword
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SERVER_PORT: 8081
+      APP_MEDIA_STORAGE_PATH: /var/courser-media
+      APP_MEDIA_PUBLIC_BASE_URL: /media
 
   user-service:
     build:
@@ -89,9 +109,12 @@ services:
     container_name: courser-frontend
     depends_on:
       - gateway
+      - media
     ports:
       - "4200:80"
 
 volumes:
   courser-postgres-data:
     name: courser-postgres-data
+  courser-media-data:
+    name: courser-media-data

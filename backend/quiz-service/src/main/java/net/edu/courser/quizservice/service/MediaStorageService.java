@@ -1,0 +1,271 @@
+package net.edu.courser.quizservice.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+@Service
+public class MediaStorageService {
+    public static final long MAX_IMAGE_BYTES = 16L * 1024L * 1024L;
+
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "image/bmp"
+    );
+
+    private static final Map<String, String> EXTENSION_BY_CONTENT_TYPE = Map.of(
+            "image/jpeg", "jpg",
+            "image/png", "png",
+            "image/gif", "gif",
+            "image/webp", "webp",
+            "image/bmp", "bmp"
+    );
+
+    private final Path storageRoot;
+    private final String publicBaseUrl;
+
+    public MediaStorageService(
+            @Value("${app.media.storage-path:/var/courser-media}") String storagePath,
+            @Value("${app.media.public-base-url:/media}") String publicBaseUrl
+    ) {
+        this.storageRoot = Path.of(storagePath).toAbsolutePath().normalize();
+        this.publicBaseUrl = publicBaseUrl.endsWith("/")
+                ? publicBaseUrl.substring(0, publicBaseUrl.length() - 1)
+                : publicBaseUrl;
+        try {
+            Files.createDirectories(this.storageRoot);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not create media storage directory", exception);
+        }
+    }
+
+    public StoredMedia store(byte[] bytes, String contentTypeHint, String originalFilename) {
+        if (bytes == null || bytes.length == 0) {
+            throw new IllegalArgumentException("Plik obrazu jest pusty.");
+        }
+        if (bytes.length > MAX_IMAGE_BYTES) {
+            throw new IllegalArgumentException("Obraz może mieć maksymalnie 16 MB.");
+        }
+
+        String contentType = resolveContentType(bytes, contentTypeHint, originalFilename);
+        String extension = EXTENSION_BY_CONTENT_TYPE.get(contentType);
+        String hash = sha256(bytes);
+        String key = hash + "." + extension;
+        Path target = storageRoot.resolve(key).normalize();
+
+        if (!target.startsWith(storageRoot)) {
+            throw new IllegalArgumentException("Nieprawidłowa ścieżka mediów.");
+        }
+
+        try {
+            if (!Files.exists(target)) {
+                Files.write(target, bytes);
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("Nie udało się zapisać obrazu.", exception);
+        }
+
+        return new StoredMedia(key, publicUrl(key), contentType, originalFilename(key, originalFilename));
+    }
+
+    public byte[] read(String key) {
+        Path path = resolveExisting(key);
+        try {
+            return Files.readAllBytes(path);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Nie udało się odczytać obrazu.", exception);
+        }
+    }
+
+    public boolean exists(String key) {
+        if (key == null || key.isBlank()) {
+            return false;
+        }
+        try {
+            resolveExisting(key);
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    public String publicUrl(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        String normalized = normalizeKey(key);
+        return publicBaseUrl + "/" + normalized;
+    }
+
+    public String extractKey(String imageReference) {
+        if (imageReference == null || imageReference.isBlank()) {
+            return null;
+        }
+
+        String value = imageReference.trim();
+        if (value.startsWith("data:")) {
+            return null;
+        }
+
+        String candidate;
+        String marker = publicBaseUrl + "/";
+        if (value.startsWith(marker)) {
+            candidate = value.substring(marker.length());
+        } else if (value.startsWith("/media/")) {
+            candidate = value.substring("/media/".length());
+        } else if (value.contains("/")) {
+            candidate = value.substring(value.lastIndexOf('/') + 1);
+        } else if (looksLikeMediaKey(value)) {
+            candidate = value;
+        } else {
+            return null;
+        }
+
+        return normalizeKey(candidate);
+    }
+
+    public boolean isMediaReference(String imageReference) {
+        if (imageReference == null || imageReference.isBlank() || imageReference.startsWith("data:")) {
+            return false;
+        }
+        try {
+            String key = extractKey(imageReference);
+            return key != null && exists(key);
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    private boolean looksLikeMediaKey(String value) {
+        String lower = value.toLowerCase(Locale.ROOT).replace(".jpeg", ".jpg");
+        return lower.matches("^[a-f0-9]{64}\\.(jpg|png|gif|webp|bmp)$");
+    }
+
+    private Path resolveExisting(String key) {
+        String normalized = normalizeKey(key);
+        Path path = storageRoot.resolve(normalized).normalize();
+        if (!path.startsWith(storageRoot) || !Files.isRegularFile(path)) {
+            throw new IllegalArgumentException("Nie znaleziono pliku multimediów.");
+        }
+        return path;
+    }
+
+    private String normalizeKey(String key) {
+        String normalized = key.trim().replace('\\', '/');
+        if (normalized.contains("/") || normalized.contains("..")) {
+            throw new IllegalArgumentException("Nieprawidłowy klucz multimediów.");
+        }
+        String lower = normalized.toLowerCase(Locale.ROOT).replace(".jpeg", ".jpg");
+        if (!lower.matches("^[a-f0-9]{64}\\.(jpg|png|gif|webp|bmp)$")) {
+            throw new IllegalArgumentException("Nieprawidłowy klucz multimediów.");
+        }
+        return lower;
+    }
+
+    private String resolveContentType(byte[] bytes, String contentTypeHint, String originalFilename) {
+        String detected = detectContentType(bytes);
+        if (detected != null) {
+            return detected;
+        }
+
+        String hinted = normalizeContentType(contentTypeHint);
+        if (hinted != null) {
+            return hinted;
+        }
+
+        String fromName = contentTypeFromFilename(originalFilename);
+        if (fromName != null) {
+            return fromName;
+        }
+
+        throw new IllegalArgumentException("Nieobsługiwany format obrazu. Dozwolone: JPEG, PNG, GIF, WebP, BMP.");
+    }
+
+    private String detectContentType(byte[] bytes) {
+        if (bytes.length >= 3 && (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xD8 && (bytes[2] & 0xFF) == 0xFF) {
+            return "image/jpeg";
+        }
+        if (bytes.length >= 8
+                && bytes[0] == (byte) 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47
+                && bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A) {
+            return "image/png";
+        }
+        if (bytes.length >= 6
+                && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F'
+                && bytes[3] == '8' && (bytes[4] == '7' || bytes[4] == '9') && bytes[5] == 'a') {
+            return "image/gif";
+        }
+        if (bytes.length >= 12
+                && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
+                && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P') {
+            return "image/webp";
+        }
+        if (bytes.length >= 2 && bytes[0] == 'B' && bytes[1] == 'M') {
+            return "image/bmp";
+        }
+        return null;
+    }
+
+    private String normalizeContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return null;
+        }
+        String normalized = contentType.trim().toLowerCase(Locale.ROOT);
+        if (normalized.contains(";")) {
+            normalized = normalized.substring(0, normalized.indexOf(';')).trim();
+        }
+        if ("image/jpg".equals(normalized)) {
+            normalized = "image/jpeg";
+        }
+        return ALLOWED_CONTENT_TYPES.contains(normalized) ? normalized : null;
+    }
+
+    private String contentTypeFromFilename(String filename) {
+        if (filename == null || !filename.contains(".")) {
+            return null;
+        }
+        String extension = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+        return switch (extension) {
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "bmp" -> "image/bmp";
+            default -> null;
+        };
+    }
+
+    private String originalFilename(String key, String originalFilename) {
+        String extension = key.contains(".") ? key.substring(key.lastIndexOf('.')) : "";
+        if (originalFilename != null && !originalFilename.isBlank()) {
+            String cleaned = Path.of(originalFilename).getFileName().toString().trim();
+            if (!cleaned.isBlank()) {
+                return cleaned.contains(".") ? cleaned : cleaned + extension;
+            }
+        }
+        return key;
+    }
+
+    private String sha256(byte[] bytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(bytes));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
+    public record StoredMedia(String key, String url, String contentType, String filename) {}
+}

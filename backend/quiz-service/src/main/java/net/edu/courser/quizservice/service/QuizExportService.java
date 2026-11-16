@@ -20,9 +20,11 @@ public class QuizExportService {
     private static final String QUIZ_JSON = "quiz.json";
 
     private final ObjectMapper objectMapper;
+    private final MediaStorageService mediaStorageService;
 
-    public QuizExportService(ObjectMapper objectMapper) {
+    public QuizExportService(ObjectMapper objectMapper, MediaStorageService mediaStorageService) {
         this.objectMapper = objectMapper;
+        this.mediaStorageService = mediaStorageService;
     }
 
     private ObjectNode scoringNode(Quiz quiz) {
@@ -60,11 +62,8 @@ public class QuizExportService {
             ObjectNode questionNode = questionsNode.addObject();
             questionNode.put("content", question.getContent());
 
-            if (question.getImageData() != null && question.getImageData().length > 0) {
-                String filename = question.getImageFilename() != null
-                        ? question.getImageFilename()
-                        : "image" + (index + 1) + ".jpg";
-                questionNode.put("image", filename);
+            if (question.getImageKey() != null && !question.getImageKey().isBlank()) {
+                questionNode.put("image", exportFilename(question, index));
             } else {
                 questionNode.putNull("image");
             }
@@ -91,15 +90,13 @@ public class QuizExportService {
             for (int index = 0; index < questions.size(); index++) {
                 Question question = questions.get(index);
 
-                if (question.getImageData() == null || question.getImageData().length == 0) {
+                if (question.getImageKey() == null || question.getImageKey().isBlank()) {
                     continue;
                 }
 
-                String filename = question.getImageFilename() != null
-                        ? question.getImageFilename()
-                        : "image" + (index + 1) + ".jpg";
+                String filename = exportFilename(question, index);
                 zip.putNextEntry(new ZipEntry("images/" + filename));
-                zip.write(question.getImageData());
+                zip.write(mediaStorageService.read(question.getImageKey()));
                 zip.closeEntry();
             }
 
@@ -108,5 +105,17 @@ public class QuizExportService {
         } catch (IOException exception) {
             throw new IllegalStateException("Could not export quiz", exception);
         }
+    }
+
+    private String exportFilename(Question question, int index) {
+        if (question.getImageFilename() != null && !question.getImageFilename().isBlank()
+                && !question.getImageFilename().contains("/")) {
+            return question.getImageFilename();
+        }
+        String key = question.getImageKey();
+        if (key != null && key.contains(".")) {
+            return "image" + (index + 1) + key.substring(key.lastIndexOf('.'));
+        }
+        return "image" + (index + 1) + ".jpg";
     }
 }

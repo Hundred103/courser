@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { QuizCreateDTO } from '../models/quiz.model';
 import { DEFAULT_QUIZ_LIMITS, parseQuizLimits } from '../models/quiz-limits.model';
 import { DEFAULT_QUIZ_SCORING, parseAnswerPoints, parseQuizScoring } from './quiz-scoring.util';
+import { base64ToUint8Array, extensionFromImageReference } from './image-compression.util';
 
 const QUIZ_JSON = 'quiz.json';
 
@@ -39,10 +40,11 @@ export async function parseQuizZip(file: ArrayBuffer): Promise<ParsedQuizZip> {
           throw new Error(`Nie znaleziono obrazu ${question.image} dla pytania ${index + 1}.`);
         }
 
-        const base64 = await imageEntry.async('base64');
+        const bytes = await imageEntry.async('uint8array');
+        const mime = detectMimeType(bytes) ?? mimeFromFilename(question.image) ?? 'application/octet-stream';
         return {
           ...question,
-          image: base64,
+          image: `data:${mime};base64,${uint8ToBase64(bytes)}`,
         };
       }),
     ),
@@ -51,6 +53,16 @@ export async function parseQuizZip(file: ArrayBuffer): Promise<ParsedQuizZip> {
 
 export async function buildQuizZip(quiz: QuizCreateDTO, instructions?: readonly string[]): Promise<Blob> {
   const zip = new JSZip();
+  const resolvedImages = await Promise.all(
+    quiz.questions.map(async (question, index) => {
+      if (!question.image) {
+        return null;
+      }
+
+      return resolveImageForZip(question.image, index);
+    }),
+  );
+
   const exportQuiz = {
     ...(instructions?.length ? { _instrukcja: instructions } : {}),
     title: quiz.title,
@@ -58,20 +70,18 @@ export async function buildQuizZip(quiz: QuizCreateDTO, instructions?: readonly 
     limits: quiz.limits ?? { ...DEFAULT_QUIZ_LIMITS },
     questions: quiz.questions.map((question, index) => ({
       content: question.content,
-      image: question.image ? `image${index + 1}.jpg` : null,
+      image: resolvedImages[index]?.filename ?? null,
       answers: question.answers.map((answer) => exportAnswer(answer)),
     })),
   };
 
   zip.file(QUIZ_JSON, JSON.stringify(exportQuiz, null, 2));
 
-  quiz.questions.forEach((question, index) => {
-    if (!question.image) {
+  resolvedImages.forEach((entry) => {
+    if (!entry) {
       return;
     }
-
-    const bytes = base64ToUint8Array(question.image);
-    zip.file(`images/image${index + 1}.jpg`, bytes);
+    zip.file(`images/${entry.filename}`, entry.bytes);
   });
 
   return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 9 } });
@@ -180,14 +190,86 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function base64ToUint8Array(base64: string): Uint8Array {
-  const payload = base64.includes(',') ? base64.split(',')[1] : base64;
-  const binary = atob(payload);
-  const bytes = new Uint8Array(binary.length);
+async function resolveImageForZip(
+  image: string,
+  index: number,
+): Promise<{ filename: string; bytes: Uint8Array }> {
+  const extension = extensionFromImageReference(image);
+  const filename = `image${index + 1}.${extension}`;
 
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
+  if (image.startsWith('/media/') || image.startsWith('http://') || image.startsWith('https://')) {
+    const response = await fetch(image);
+    if (!response.ok) {
+      throw new Error(`Nie udało się pobrać obrazu pytania ${index + 1}.`);
+    }
+    return { filename, bytes: new Uint8Array(await response.arrayBuffer()) };
   }
 
-  return bytes;
+  return { filename, bytes: base64ToUint8Array(image) };
+}
+
+function mimeFromFilename(filename: string): string | null {
+  const extension = filename.includes('.')
+    ? filename.substring(filename.lastIndexOf('.') + 1).toLowerCase()
+    : '';
+  switch (extension) {
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'bmp':
+      return 'image/bmp';
+    default:
+      return null;
+  }
+}
+
+function detectMimeType(bytes: Uint8Array): string | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return 'image/jpeg';
+  }
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return 'image/png';
+  }
+  if (
+    bytes.length >= 6
+    && bytes[0] === 0x47
+    && bytes[1] === 0x49
+    && bytes[2] === 0x46
+    && bytes[3] === 0x38
+    && (bytes[4] === 0x37 || bytes[4] === 0x39)
+    && bytes[5] === 0x61
+  ) {
+    return 'image/gif';
+  }
+  if (
+    bytes.length >= 12
+    && bytes[0] === 0x52
+    && bytes[1] === 0x49
+    && bytes[2] === 0x46
+    && bytes[3] === 0x46
+    && bytes[8] === 0x57
+    && bytes[9] === 0x45
+    && bytes[10] === 0x42
+    && bytes[11] === 0x50
+  ) {
+    return 'image/webp';
+  }
+  if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) {
+    return 'image/bmp';
+  }
+  return null;
+}
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
 }

@@ -1,10 +1,11 @@
 package net.edu.courser.quizservice.dto;
 import net.edu.courser.quizservice.entity.Answer;
 import net.edu.courser.quizservice.entity.*;
-import net.edu.courser.quizservice.service.ImageCompressor;
+import net.edu.courser.quizservice.service.MediaStorageService;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.Base64;
 import java.util.List;
 
 
@@ -13,10 +14,10 @@ import java.util.List;
 public class MapperDTO {
     private static final double MAX_SCORE_VALUE = 99.99d;
 
-    private final ImageCompressor imageCompressor;
+    private final MediaStorageService mediaStorageService;
 
-    public MapperDTO(ImageCompressor imageCompressor) {
-        this.imageCompressor = imageCompressor;
+    public MapperDTO(MediaStorageService mediaStorageService) {
+        this.mediaStorageService = mediaStorageService;
     }
 
     public QuizRawDTO toQuizRawDTO (Quiz quiz) {
@@ -46,7 +47,7 @@ public class MapperDTO {
                         .stream()
                         .map(this::toAnswerPlayDTO)
                         .toList(),
-                imageCompressor.toBase64(question.getImageData())
+                mediaStorageService.publicUrl(question.getImageKey())
         );
     }
     private AnswerPlayDTO toAnswerPlayDTO(Answer answer) {
@@ -212,15 +213,58 @@ public class MapperDTO {
         return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString().replace('.', ',');
     }
 
-    public void applyImage(Question question, String imageBase64, int index) {
-        if (imageBase64 == null || imageBase64.isBlank()) {
+    public void applyImage(Question question, String imageReference, int index) {
+        if (imageReference == null || imageReference.isBlank()) {
             question.setImageFilename(null);
-            question.setImageData(null);
+            question.setImageKey(null);
             return;
         }
 
-        byte[] compressed = imageCompressor.compressFromBase64(imageBase64);
-        question.setImageFilename("image" + (index + 1) + ".jpg");
-        question.setImageData(compressed);
+        String trimmed = imageReference.trim();
+
+        // Already stored in media — only keep the shared key (no duplicate file).
+        if (!trimmed.startsWith("data:")) {
+            if (mediaStorageService.isMediaReference(trimmed)) {
+                String key = mediaStorageService.extractKey(trimmed);
+                question.setImageKey(key);
+                if (question.getImageFilename() == null || question.getImageFilename().isBlank()) {
+                    question.setImageFilename(key);
+                }
+                return;
+            }
+
+            if (trimmed.startsWith("/media/") || trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+                throw new IllegalArgumentException("Nie znaleziono pliku multimediów.");
+            }
+        }
+
+        byte[] bytes = decodeImagePayload(trimmed);
+        String contentTypeHint = contentTypeFromDataUrl(trimmed);
+        MediaStorageService.StoredMedia stored = mediaStorageService.store(
+                bytes,
+                contentTypeHint,
+                "image" + (index + 1)
+        );
+        question.setImageKey(stored.key());
+        question.setImageFilename(stored.filename());
+    }
+
+    private byte[] decodeImagePayload(String imageReference) {
+        String payload = imageReference.contains(",")
+                ? imageReference.substring(imageReference.indexOf(',') + 1)
+                : imageReference;
+
+        try {
+            return Base64.getDecoder().decode(payload);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Nieprawidłowe dane obrazu.", exception);
+        }
+    }
+
+    private String contentTypeFromDataUrl(String imageReference) {
+        if (!imageReference.startsWith("data:") || !imageReference.contains(";")) {
+            return null;
+        }
+        return imageReference.substring("data:".length(), imageReference.indexOf(';')).trim();
     }
 }

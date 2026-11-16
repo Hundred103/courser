@@ -2,8 +2,6 @@ package net.edu.courser.quizservice.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
-import java.util.Set;
-import java.util.HashSet;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -26,16 +24,14 @@ public class Question {
     private Quiz quiz;
     @Builder.Default
     @OneToMany(mappedBy = "question", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    //private Set<Answer> answers = new HashSet<>();
     @OrderBy("id ASC")
     private List<Answer> answers = new ArrayList<>();
     @Column(columnDefinition = "TEXT")
     private String content;
     @Column(name = "image_filename")
     private String imageFilename;
-    @Basic(fetch = FetchType.LAZY)
-    @Column(name = "image_data", columnDefinition = "bytea")
-    private byte[] imageData;
+    @Column(name = "image_key", length = 160)
+    private String imageKey;
 
     public void addAnswer(Answer answer) {
         answers.add(answer);

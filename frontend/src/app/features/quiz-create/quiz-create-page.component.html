@@ -93,7 +93,12 @@
             <span>Obraz pytania</span>
             <label class="secondary-button add-answer-button squircle image-upload-button">
               {{ question.image ? 'Zmień obraz' : 'Dodaj obraz' }}
-              <input type="file" accept="image/*" hidden (change)="selectQuestionImage($event)" />
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,.jpg,.jpeg,.png,.gif,.webp,.bmp"
+                hidden
+                (change)="selectQuestionImage($event)"
+              />
             </label>
           </div>
 
@@ -111,7 +116,7 @@
               </button>
             </figure>
           } @else {
-            <p class="image-hint">Opcjonalnie. Akceptowane do 4K (3840×2160 px), zapisywane jako skompresowany JPEG do 800×600 px.</p>
+            <p class="image-hint">Opcjonalnie. JPEG, PNG, GIF, WebP lub BMP do 16 MB — bez kompresji, wyświetlane w skali okna pytania.</p>
           }
         </div>
 
