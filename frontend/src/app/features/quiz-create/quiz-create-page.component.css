@@ -333,7 +333,8 @@
 .question-image-preview img {
   display: block;
   width: 100%;
-  max-height: 280px;
+  height: auto;
+  max-height: min(60vh, 480px);
   object-fit: contain;
   background: rgba(255, 255, 255, 0.02);
 }

@@ -97,7 +97,7 @@ jobs:
           [ "$(docker inspect -f '{{ .State.ExitCode }}' "$liquibase_id")" = "0" ] || { echo "Liquibase failed"; docker compose logs liquibase; exit 1; }
 
           # All long-running services must be running.
-          for svc in postgres quiz-service user-service gateway frontend; do
+          for svc in postgres media quiz-service user-service gateway frontend; do
             id="$(docker compose ps -q "$svc")"
             [ -n "$id" ] || { echo "Service $svc container not found"; docker compose ps -a; exit 1; }
             status="$(docker inspect -f '{{ .State.Status }}' "$id")"

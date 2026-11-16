@@ -36,7 +36,7 @@ public class QuizService {
     private final QuestionRepository questionRepository;
     private final QuizShareCodeRepository quizShareCodeRepository;
     private final MapperDTO mapperDTO;
-    private final ImageCompressor imageCompressor;
+    private final MediaStorageService mediaStorageService;
     private final QuizExportService quizExportService;
     private final QuizRankingVersionRepository rankingVersionRepository;
     private final QuizRankingAttemptRepository rankingAttemptRepository;
@@ -49,7 +49,7 @@ public class QuizService {
             QuestionRepository questionRepository,
             QuizShareCodeRepository quizShareCodeRepository,
             MapperDTO mapperDTO,
-            ImageCompressor imageCompressor,
+            MediaStorageService mediaStorageService,
             QuizExportService quizExportService,
             QuizRankingVersionRepository rankingVersionRepository,
             QuizRankingAttemptRepository rankingAttemptRepository,
@@ -61,7 +61,7 @@ public class QuizService {
         this.questionRepository = questionRepository;
         this.quizShareCodeRepository = quizShareCodeRepository;
         this.mapperDTO = mapperDTO;
-        this.imageCompressor = imageCompressor;
+        this.mediaStorageService = mediaStorageService;
         this.quizExportService = quizExportService;
         this.rankingVersionRepository = rankingVersionRepository;
         this.rankingAttemptRepository = rankingAttemptRepository;
@@ -385,7 +385,7 @@ public class QuizService {
                 question.getAnswers().stream()
                         .map(answer -> new AnswerCreateDTO(answer.getContent(), answer.isCorrect(), answer.getPoints()))
                         .toList(),
-                imageCompressor.toBase64(question.getImageData())
+                mediaStorageService.publicUrl(question.getImageKey())
         );
     }
 
@@ -406,7 +406,7 @@ public class QuizService {
             Question copiedQuestion = Question.builder()
                     .content(sourceQuestion.getContent())
                     .imageFilename(sourceQuestion.getImageFilename())
-                    .imageData(sourceQuestion.getImageData())
+                    .imageKey(sourceQuestion.getImageKey())
                     .build();
 
             sourceQuestion.getAnswers().forEach(sourceAnswer -> {

@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: gateway
+  codec:
+    max-in-memory-size: 30MB
   cloud:
     gateway:
       routes:
