@@ -32,6 +32,7 @@ Katalog wyjściowy: `out/`
 |------|-----------|
 | `01_system_architecture.png` | Kontenery / serwisy — baza u góry, dane w dół |
 | `02_database_schema.png` | Schemat ER `courserdb` po migracjach 001–017 (kurza stopka, PK/FK/UQ, NOT NULL, ON DELETE) |
+| `02_database_schema_16x9.png` | Ten sam schemat w układzie poziomym 16:9 (slajd prezentacji) |
 | `03_quiz_ranking_lifecycle.png` | Operacje QuizService: kiedy powstaje kopia quizu / nowa wersja rankingu |
 | `04_user_usecases.png` | Przypadki użycia UML (aktorzy, «include» / «extend») |
 | `05_class_diagram.png` | Diagram klas UML: encje JPA, enumy, model statystyk JDBC (kompozycje, krotności) |

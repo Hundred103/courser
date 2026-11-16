@@ -672,7 +672,8 @@ def domain_cluster(name: str, title: str, color: str, tint: str, body: str) -> s
   }}'''
 
 
-def database_schema() -> str:
+def database_schema(*, landscape: bool = False) -> str:
+    """landscape=True: wariant poziomy 16:9 (prezentacja)."""
     ic = make_icons()
     T = lambda key, color, tint: dict(accent=C[color], tint=C[tint], icon=ic[f"table_{key}"])  # noqa: E731
 
@@ -834,9 +835,9 @@ def database_schema() -> str:
 digraph DatabaseSchema {{
   graph [
     {graph_attrs(
-        rankdir="LR",
+        rankdir="TB" if landscape else "LR",
         concentrate="true",
-        ranksep="1.1",
+        ranksep="0.9" if landscape else "1.1",
         nodesep="0.35",
         splines="spline",
         pad="0.5",
@@ -1482,10 +1483,28 @@ digraph ClassDiagram {{
 '''
 
 
+def pad_to_aspect(path: Path, ratio: float) -> None:
+    """Dopełnia obraz tłem do zadanych proporcji (bez skalowania treści)."""
+    from PIL import Image
+
+    img = Image.open(path)
+    w, h = img.size
+    new_w, new_h = (w, round(w / ratio)) if w / h > ratio else (round(h * ratio), h)
+    if (new_w, new_h) == (w, h):
+        return
+    canvas = Image.new(img.mode, (new_w, new_h), _hex(C["bg"]) + ((255,) if img.mode == "RGBA" else ()))
+    canvas.paste(img, ((new_w - w) // 2, (new_h - h) // 2))
+    canvas.save(path, dpi=img.info.get("dpi", (180, 180)))
+
+
+# Wyjście o stałych proporcjach (np. slajd prezentacji).
+ASPECT = {"02_database_schema_16x9": 16 / 9}
+
 # name -> (factory, graphviz engine)
 GENERATORS = {
     "01_system_architecture": (system_architecture, "dot"),
     "02_database_schema": (database_schema, "dot"),
+    "02_database_schema_16x9": (lambda: database_schema(landscape=True), "dot"),
     "03_quiz_ranking_lifecycle": (lifecycle, "dot"),
     "04_user_usecases": (usecases, "neato"),
     "05_class_diagram": (class_diagram, "dot"),
@@ -1517,6 +1536,8 @@ def main() -> None:
             dot_path.parent.mkdir(parents=True, exist_ok=True)
             dot_path.write_text(source, encoding="utf-8")
         render(dot_bin, source, args.out / f"{name}.png", engine=engine)
+        if name in ASPECT:
+            pad_to_aspect(args.out / f"{name}.png", ASPECT[name])
 
     print("Gotowe.")
 
