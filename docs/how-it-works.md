@@ -242,7 +242,7 @@ That's why `update()` and `importArchive()` first rebuild the quiz, which turns 
 9. Leaderboard rules (`compareEntries()`): a better score *percentage* ranks higher; on a tie the faster run wins, then the earlier one.
    - Each user has **one** entry per version, and a worse run never overwrites a better one.
    - Only the **top 5** are kept (`quiz_ranking_entries`); the rest are deleted.
-10. The answer is saved on the attempt, so asking again returns the same result. The play page shows it ("Nie znalazłeś się w Top 5", medals). The details page (`frontend/features/quiz-details/quiz-details-page.component.ts`) shows the leaderboard later with `GET /api/quizzes/{id}/ranking`. The sidebar shows a medal from the `rankingPosition` field already returned by the quiz list.
+10. The answer is saved on the attempt, so asking again returns the same result. On a ranked run the result box waits for that reply and shows the **server** score / skuteczność (not the browser’s live grade), then medals / “Nie znalazłeś się w Top 5”. The details page (`frontend/features/quiz-details/quiz-details-page.component.ts`) shows the leaderboard later with `GET /api/quizzes/{id}/ranking`. The sidebar shows a medal from the `rankingPosition` field already returned by the quiz list.
 
 ---
 

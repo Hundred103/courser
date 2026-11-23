@@ -28,6 +28,8 @@ export class AuthService {
   /** Bumps when the logged-in identity changes (login / logout / account switch), not on token refresh. */
   private readonly sessionGeneration = signal(0);
   private refreshInFlight$: Observable<boolean> | null = null;
+  /** Blocks refresh while logout is revoking the cookie (avoids 401→refresh restoring the session). */
+  private refreshSuppressed = false;
 
   readonly user = this.currentUser.asReadonly();
   readonly isLoggedIn = computed(() => this.currentUser() !== null);
@@ -75,27 +77,45 @@ export class AuthService {
   }
 
   logout(revokeRefreshSession = true): void {
-    if (revokeRefreshSession) {
-      this.http.post<void>(`${this.apiUrl}/logout`, {}, { withCredentials: true }).subscribe({ error: () => undefined });
+    this.refreshSuppressed = true;
+    this.refreshInFlight$ = null;
+    this.clearAuthState();
+
+    if (!revokeRefreshSession) {
+      this.refreshSuppressed = false;
+      return;
     }
 
-    this.clearAuthState();
+    this.http.post<void>(`${this.apiUrl}/logout`, {}, { withCredentials: true }).subscribe({
+      next: () => {
+        this.refreshSuppressed = false;
+      },
+      error: () => {
+        this.refreshSuppressed = false;
+      },
+    });
   }
 
   // false = 401/403 only; network/5xx rethrow (don't logout on blip).
   refreshAccessToken(): Observable<boolean> {
+    if (this.refreshSuppressed) {
+      return of(false);
+    }
+
     if (this.refreshInFlight$) {
       return this.refreshInFlight$;
     }
 
     this.refreshInFlight$ = this.sessionHttp.post<AuthResponse>(`${this.apiUrl}/refresh`, {}, { withCredentials: true }).pipe(
-      tap((user) => this.setCurrentUser(user)),
-      map(() => true),
+      tap((user) => {
+        if (!this.refreshSuppressed) this.setCurrentUser(user);
+      }),
+      map(() => !this.refreshSuppressed),
       catchError((error: unknown) => {
         if (!(error instanceof HttpErrorResponse) || (error.status !== 401 && error.status !== 403)) {
           return throwError(() => error);
         }
-        this.clearAuthState();
+        if (!this.refreshSuppressed) this.clearAuthState();
         return of(false);
       }),
       finalize(() => this.refreshInFlight$ = null),

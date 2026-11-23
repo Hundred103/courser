@@ -4,7 +4,7 @@
       <h1>Utwórz konto</h1>
     </div>
 
-    <form (ngSubmit)="onSubmit()" #f="ngForm" novalidate>
+    <form (ngSubmit)="onSubmit()" #f="ngForm" novalidate autocomplete="on">
       @if (error()) {
         <div class="error-message">{{ error() }}</div>
       }
@@ -15,6 +15,11 @@
           name="email"
           [(ngModel)]="model.email"
           type="email"
+          autocomplete="email"
+          inputmode="email"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
           required
           [disabled]="loading()"
           [class.error]="emailError()" />
@@ -26,8 +31,13 @@
       <label class="field">
         <span>Nazwa użytkownika</span>
         <input
-          name="username"
+          name="nickname"
           [(ngModel)]="model.username"
+          type="text"
+          autocomplete="nickname"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
           required
           [disabled]="loading()"
           [class.error]="usernameError()" />
@@ -44,6 +54,7 @@
             name="password"
             [(ngModel)]="model.password"
             (ngModelChange)="onPasswordChange('password', $event)"
+            autocomplete="new-password"
             required
             [disabled]="loading()" />
           @if (model.password) {
@@ -88,6 +99,7 @@
             name="passwordConfirm"
             [(ngModel)]="model.passwordConfirm"
             (ngModelChange)="onPasswordChange('passwordConfirm', $event)"
+            autocomplete="new-password"
             required
             [disabled]="loading()"
             [class.error]="submitAttempted() && !passwordsMatch()" />

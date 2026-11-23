@@ -211,9 +211,36 @@ export class QuizPlayPageComponent {
   readonly maxScore = computed(() =>
     this.questions().reduce((total, question) => total + questionMaxScore(question.answers, this.scoring()), 0),
   );
-  readonly formattedScore = computed(() => this.formatScore(this.score()));
-  readonly formattedMaxScore = computed(() => this.formatScore(this.maxScore()));
-  readonly scorePercent = computed(() => this.formatPercentage(this.score(), this.maxScore()));
+  /** Ranked finish: show server score only (avoids TS/Java scoring drift on the medal screen). */
+  readonly awaitingServerScore = computed(
+    () =>
+      this.resultReady() &&
+      !this.isStudyMode() &&
+      this.quiz()?.rankingEnabled === true &&
+      (this.quiz()?.id ?? 0) > 0 &&
+      this.isLoggedIn() &&
+      !!this.rankingAttemptId() &&
+      !this.rankingResult() &&
+      !this.rankingError(),
+  );
+  readonly formattedScore = computed(() => {
+    const ranking = this.rankingResult();
+    if (ranking) return this.formatScore(ranking.scoreScaled / 100);
+    if (this.awaitingServerScore()) return '…';
+    return this.formatScore(this.score());
+  });
+  readonly formattedMaxScore = computed(() => {
+    const ranking = this.rankingResult();
+    if (ranking) return this.formatScore(ranking.maxScoreScaled / 100);
+    if (this.awaitingServerScore()) return '…';
+    return this.formatScore(this.maxScore());
+  });
+  readonly scorePercent = computed(() => {
+    const ranking = this.rankingResult();
+    if (ranking) return this.formatPercentage(ranking.scoreScaled, ranking.maxScoreScaled);
+    if (this.awaitingServerScore()) return '…';
+    return this.formatPercentage(this.score(), this.maxScore());
+  });
 
   constructor() {
     effect(() => {
@@ -303,7 +330,25 @@ export class QuizPlayPageComponent {
         return;
       }
 
-      if (!this.isStudyMode() && quiz.rankingEnabled && this.rankingAttemptId()) this.finishRanking(quiz.id);
+      const ranked = !this.isStudyMode() && quiz.rankingEnabled === true && !!this.rankingAttemptId();
+      if (ranked) {
+        this.finishRanking(quiz.id);
+        // Prefer server score for stats; wait until finish succeeds or fails.
+        this.rankingResult();
+        this.rankingError();
+        if (!this.rankingResult() && !this.rankingError()) {
+          return;
+        }
+      }
+
+      const ranking = this.rankingResult();
+      const effectivenessHundredths = this.isStudyMode()
+        ? null
+        : ranking
+          ? ranking.maxScoreScaled === 0
+            ? 0
+            : Math.round((ranking.scoreScaled / ranking.maxScoreScaled) * 10_000)
+          : Math.round(Number(this.formatPercentage(this.score(), this.maxScore()).replace(',', '.')) * 100);
 
       this.resultSaved.set(true);
       this.resultSaveError.set(null);
@@ -312,7 +357,7 @@ export class QuizPlayPageComponent {
         quizId: quiz.id,
         checkedQuestions: this.checkedQuestions().size,
         studyMode: this.isStudyMode(),
-        effectivenessHundredths: this.isStudyMode() ? null : Math.round(Number(this.scorePercent().replace(',', '.')) * 100),
+        effectivenessHundredths,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       }).subscribe({ next: () => this.resultSaveConfirmed.set(true), error: (error) => this.handleSaveError(error) });
     });
