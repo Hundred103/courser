@@ -1,98 +1,74 @@
 package net.edu.courser.user.service;
 
 import lombok.RequiredArgsConstructor;
+import net.edu.courser.user.exception.AuthenticationFailedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import net.edu.courser.user.entity.User;
-import net.edu.courser.user.entity.UserRole;
 import net.edu.courser.user.repository.UserRepository;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Set;
 
+/** Validation → IllegalArgumentException (400). */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UserService {
 
     private static final Set<String> ACCENT_COLORS = Set.of("coral", "blue", "green", "violet", "turquoise", "pink");
+    private static final String INVALID_CREDENTIALS = "Nieprawidłowy email lub hasło";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
-    }
-
-    public Optional<User> getUserById(Long id) {
-        return userRepository.findById(id);
-    }
-
-    public Optional<User> getUserByUsername(String username) {
-        return userRepository.findByUsername(username);
-    }
-
     @Transactional
-    public User createUser(User user) {
-        String username = validateUsername(user.getUsername());
-        boolean emailTaken = userRepository.existsByEmail(user.getEmail());
-        boolean usernameTaken = userRepository.existsByUsername(username);
+    public User register(String requestedEmail, String requestedUsername, String password) {
+        String email = validateEmail(requestedEmail);
+        String username = validateUsername(requestedUsername);
+        validatePassword(password);
+        boolean emailTaken = userRepository.existsByEmailIgnoreCase(email);
+        boolean usernameTaken = userRepository.existsByUsernameIgnoreCase(username);
 
         if (emailTaken && usernameTaken) {
-            throw new RuntimeException("Podany email oraz nazwa użytkownika są zajęte");
+            throw new IllegalArgumentException("Podany email oraz nazwa użytkownika są zajęte");
         }
         if (emailTaken) {
-            throw new RuntimeException("Podany email jest zajęty");
+            throw new IllegalArgumentException("Podany email jest zajęty");
         }
         if (usernameTaken) {
-            throw new RuntimeException("Podana nazwa użytkownika jest zajęta");
+            throw new IllegalArgumentException("Podana nazwa użytkownika jest zajęta");
         }
 
-        user.setUsername(username);
-        user.setAccentColor("coral");
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setRole(UserRole.STUDENT);
-        return userRepository.save(user);
+        return userRepository.save(User.builder()
+                .email(email)
+                .username(username)
+                .password(passwordEncoder.encode(password))
+                .build());
     }
 
-    @Transactional
     public User login(String email, String password) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Nieprawidłowy email lub hasło"));
-
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Nieprawidłowy email lub hasło");
-        }
-
-        updateLastLogin(user.getId());
-        return user;
-    }
-
-    @Transactional
-    public User updateUser(Long id, User userDetails) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
-
-        user.setUsername(userDetails.getUsername());
-        user.setEmail(userDetails.getEmail());
-
-        return userRepository.save(user);
+        if (email == null || password == null) throw new AuthenticationFailedException(INVALID_CREDENTIALS);
+        // Legacy mixed-case emails: password check selects the match.
+        return userRepository.findAllByEmailIgnoreCase(email.trim()).stream()
+                .filter(candidate -> passwordEncoder.matches(password, candidate.getPassword()))
+                .findFirst()
+                .orElseThrow(() -> new AuthenticationFailedException(INVALID_CREDENTIALS));
     }
 
     @Transactional
     public User updateSettings(Long id, String requestedUsername, String requestedAccentColor) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Nie znaleziono użytkownika."));
+                .orElseThrow(() -> new AuthenticationFailedException("Sesja wygasła. Zaloguj się ponownie."));
         String username = validateUsername(requestedUsername);
 
-        if (!username.equals(user.getUsername()) && userRepository.existsByUsername(username)) {
-            throw new RuntimeException("Podana nazwa użytkownika jest zajęta");
+        if (!username.equalsIgnoreCase(user.getUsername()) && userRepository.existsByUsernameIgnoreCase(username)) {
+            throw new IllegalArgumentException("Podana nazwa użytkownika jest zajęta");
         }
         if (!ACCENT_COLORS.contains(requestedAccentColor)) {
-            throw new RuntimeException("Nieprawidłowy kolor akcentujący.");
+            throw new IllegalArgumentException("Nieprawidłowy kolor akcentujący.");
         }
 
         user.setUsername(username);
@@ -100,38 +76,45 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    @Transactional
-    public void updateUserScore(Long userId, int additionalScore) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        user.setTotalScore(user.getTotalScore() + additionalScore);
-        user.setQuizzesCompleted(user.getQuizzesCompleted() + 1);
-        userRepository.save(user);
+    private String validateEmail(String requestedEmail) {
+        String email = requestedEmail == null ? "" : requestedEmail.trim().toLowerCase(Locale.ROOT);
+        if (email.isEmpty()) {
+            throw new IllegalArgumentException("Podaj adres e-mail.");
+        }
+        if (email.length() > 255 || !email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}")) {
+            throw new IllegalArgumentException("Adres e-mail musi mieć poprawny format, np. nazwa@domena.pl.");
+        }
+        return email;
     }
 
-    public List<User> getLeaderboard() {
-        return userRepository.findTopByTotalScore();
-    }
-
-    @Transactional
-    public void updateLastLogin(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        user.setLastLogin(LocalDateTime.now());
-        userRepository.save(user);
+    private void validatePassword(String password) {
+        if (password == null || password.length() < 8) {
+            throw new IllegalArgumentException("Hasło musi mieć co najmniej 8 znaków.");
+        }
+        if (!password.matches(".*\\d.*")) {
+            throw new IllegalArgumentException("Hasło musi zawierać cyfrę.");
+        }
+        if (!password.matches(".*[^A-Za-z0-9].*")) {
+            throw new IllegalArgumentException("Hasło musi zawierać znak specjalny.");
+        }
+        if (password.getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new IllegalArgumentException("Hasło może mieć najwyżej 72 bajty.");
+        }
     }
 
     private String validateUsername(String requestedUsername) {
         String username = requestedUsername == null ? "" : requestedUsername.trim();
         if (username.isEmpty()) {
-            throw new RuntimeException("Podaj nazwę użytkownika.");
+            throw new IllegalArgumentException("Podaj nazwę użytkownika.");
         }
         if (username.matches(".*\\s.*")) {
-            throw new RuntimeException("Nazwa użytkownika musi być jednym ciągiem bez spacji.");
+            throw new IllegalArgumentException("Nazwa użytkownika musi być jednym ciągiem bez spacji.");
         }
         if (!username.matches("[A-Za-z0-9]+")) {
-            throw new RuntimeException("Użyj tylko liter bez polskich znaków i cyfr.");
+            throw new IllegalArgumentException("Użyj tylko liter bez polskich znaków i cyfr.");
+        }
+        if (username.length() > 255) {
+            throw new IllegalArgumentException("Nazwa użytkownika może mieć najwyżej 255 znaków.");
         }
         return username;
     }

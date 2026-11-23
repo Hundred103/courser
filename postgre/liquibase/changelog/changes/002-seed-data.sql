@@ -1,6 +1,8 @@
 --liquibase formatted sql
 
---changeset courser:010-seed-users context:seed
+-- Retained for history only. Do not run: columns and tables this seed writes were
+-- removed in 018. Demo data for the current schema is in 019-seed-demo-data.sql.
+--changeset courser:010-seed-users context:seed-legacy
 INSERT INTO users (id, created_at, email, last_login, password, quizzes_completed, role, total_score, username)
 VALUES (
     1,
@@ -14,13 +16,13 @@ VALUES (
     'szymon'
 );
 
---changeset courser:011-seed-quizzes context:seed
+--changeset courser:011-seed-quizzes context:seed-legacy
 INSERT INTO quizzes (id, title, owner_user_id) VALUES
     (1, 'Geografia', 1),
     (2, 'Informatyka', 1),
     (23, 'Historia', 1);
 
---changeset courser:012-seed-questions context:seed
+--changeset courser:012-seed-questions context:seed-legacy
 INSERT INTO questions (id, content, quiz_id, question_order, image_data, image_filename) VALUES
     (1, 'Jaka jest stolica Polski?', 1, 0, NULL, NULL),
     (2, 'Który kontynent jest największy?', 1, 1, NULL, NULL),
@@ -48,7 +50,7 @@ INSERT INTO questions (id, content, quiz_id, question_order, image_data, image_f
     (56, 'W którym roku Polska odzyskała niepodległość?', 23, 3, NULL, NULL),
     (57, 'Kto był pierwszym koronowanym królem Polski?', 23, 4, NULL, NULL);
 
---changeset courser:013-seed-answers context:seed
+--changeset courser:013-seed-answers context:seed-legacy
 INSERT INTO answers (id, content, correct, question_id, answer_order) VALUES
     (1, 'Kraków', false, 1, 0),
     (2, 'Warszawa', true, 1, 1),
@@ -149,11 +151,11 @@ INSERT INTO answers (id, content, correct, question_id, answer_order) VALUES
     (141, 'Kazimierz Wielki', false, 57, 1),
     (142, 'Władysław Jagiełło', false, 57, 2);
 
---changeset courser:014-seed-quiz-results context:seed
+--changeset courser:014-seed-quiz-results context:seed-legacy
 INSERT INTO quiz_results (id, completed_at, max_score, quiz_id, score, user_id)
 VALUES (1, '2026-06-21 20:47:18.833618', 500, 23, 33, 1);
 
---changeset courser:015-reset-sequences context:seed
+--changeset courser:015-reset-sequences context:seed-legacy
 SELECT setval('answers_id_seq', 142, true);
 SELECT setval('questions_id_seq', 57, true);
 SELECT setval('quiz_results_id_seq', 1, true);

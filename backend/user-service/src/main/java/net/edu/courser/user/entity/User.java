@@ -3,14 +3,17 @@ package net.edu.courser.user.entity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
+/** No @Data: a generated toString() would print the password hash. */
 @Entity
 @Table(name = "users")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -33,25 +36,12 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private UserRole role;
-
-    private Integer totalScore;
-
-    private Integer quizzesCompleted;
-
+    /** Audit only; nothing reads it. */
     @Column(name = "created_at")
     private LocalDateTime createdAt;
-
-    @Column(name = "last_login")
-    private LocalDateTime lastLogin;
 
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
-        if (totalScore == null) totalScore = 0;
-        if (quizzesCompleted == null) quizzesCompleted = 0;
-        if (role == null) role = UserRole.STUDENT;
     }
 }

@@ -94,14 +94,14 @@ h2 {
   text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.4);
 }
 
-.quiz-best-score {
+.quiz-ranking-position {
   color: var(--text-soft);
   font-size: 0.82rem;
   font-weight: 700;
   line-height: 1.2;
 }
 
-.quiz-best-score.quiz-rank-medal {
+.quiz-ranking-position.quiz-rank-medal {
   display: inline-block;
   font-size: 1.22rem;
   line-height: 1.1;

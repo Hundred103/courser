@@ -187,6 +187,10 @@
             }
           }
 
+          @if (rankingError() && !rankingResult()) {
+            <p class="result-status error">{{ rankingError() }}</p>
+          }
+
           @if (rankingResult(); as ranking) {
             <section class="ranking-box" aria-label="Ranking quizu">
               <div class="ranking-heading">

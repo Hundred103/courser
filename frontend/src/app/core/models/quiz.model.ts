@@ -5,7 +5,9 @@ import { QuizScoring } from '../utils/quiz-scoring.util';
 export interface QuizRawDTO {
   id: number;
   title: string;
-  rankingProtected?: boolean;
+  questionCount: number;
+  limits?: QuizLimits | null;
+  rankingPosition?: number | null;
 }
 
 export interface QuizPlayDTO {

@@ -2,7 +2,8 @@
 
 -- Demonstration activity for the seeded Szymon account. Empty dates deliberately
 -- have no row: the dashboard interprets them as days without activity (zero).
---changeset courser:029-seed-szymon-statistics context:seed
+-- Retained for history only. Replaced by 019-seed-demo-data.sql (example@email.com).
+--changeset courser:029-seed-szymon-statistics context:seed-legacy
 WITH calendar AS (
     SELECT
         day::date AS activity_date,

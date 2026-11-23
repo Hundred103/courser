@@ -93,7 +93,9 @@ export class NavbarComponent {
   }
 
   logout(): void {
-    this.authService.logout();
-    this.router.navigate(['/']);
+    // Navigate away first so play/editor leave guards can still keep the session.
+    void this.router.navigate(['/']).then((navigated) => {
+      if (navigated !== false) this.authService.logout();
+    });
   }
 }

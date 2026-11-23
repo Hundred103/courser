@@ -1,17 +1,22 @@
+x-database-credentials: &database-credentials
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+  SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+  SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+
 services:
   postgres:
     image: postgres:16
     container_name: courser-postgres
     environment:
-      POSTGRES_DB: courserdb
-      POSTGRES_USER: courseruser
-      POSTGRES_PASSWORD: courserpassword
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - courser-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U courseruser -d courserdb"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -24,12 +29,13 @@ services:
         condition: service_healthy
     volumes:
       - ./postgre/liquibase/changelog:/liquibase/changelog
+    environment:
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      LIQUIBASE_COMMAND_USERNAME: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      LIQUIBASE_COMMAND_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     command: >
       --changelog-file=changelog/db.changelog-master.xml
-      --url=jdbc:postgresql://postgres:5432/courserdb
-      --username=courseruser
-      --password=courserpassword
-      --contexts=seed
+      --contexts=${LIQUIBASE_CONTEXTS:-!seed}
       update
 
   media:
@@ -54,20 +60,12 @@ services:
     depends_on:
       liquibase:
         condition: service_completed_successfully
-      media:
-        condition: service_started
     expose:
       - "8081"
     volumes:
       - courser-media-data:/var/courser-media
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
-      SPRING_DATASOURCE_USERNAME: courseruser
-      SPRING_DATASOURCE_PASSWORD: courserpassword
-      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
-      SERVER_PORT: 8081
-      APP_MEDIA_STORAGE_PATH: /var/courser-media
-      APP_MEDIA_PUBLIC_BASE_URL: /media
+      <<: *database-credentials
 
   user-service:
     build:
@@ -80,12 +78,9 @@ services:
     expose:
       - "8082"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
-      SPRING_DATASOURCE_USERNAME: courseruser
-      SPRING_DATASOURCE_PASSWORD: courserpassword
-      SPRING_PROFILES_ACTIVE: docker
-      SERVER_PORT: 8082
-      APP_JWT_SECRET: courser-local-development-secret-change-me
+      <<: *database-credentials
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in .env}
+      APP_REFRESH_COOKIE_SECURE: ${APP_REFRESH_COOKIE_SECURE:-false}
 
   gateway:
     build:
@@ -96,11 +91,11 @@ services:
       - quiz-service
       - user-service
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       QUIZ_SERVICE_URL: http://quiz-service:8081
       USER_SERVICE_URL: http://user-service:8082
-      APP_JWT_SECRET: courser-local-development-secret-change-me
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in .env}
 
   frontend:
     build:
@@ -111,7 +106,7 @@ services:
       - gateway
       - media
     ports:
-      - "4200:80"
+      - "${FRONTEND_PORT:-4200}:80"
 
 volumes:
   courser-postgres-data:

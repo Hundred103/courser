@@ -1,12 +1,8 @@
 package net.edu.courser.quizservice.entity;
 import jakarta.persistence.*;
 import lombok.*;
-import java.util.Set;
-import java.util.HashSet;
 import java.util.List;
 import java.util.ArrayList;
-
-
 
 @Getter
 @Setter
@@ -21,11 +17,11 @@ public class Quiz {
     private Long id;
     @Builder.Default
     @OneToMany(mappedBy = "quiz", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    //private Set<Question> questions = new HashSet<>();
     @OrderBy("id ASC")
     private List<Question> questions = new ArrayList<>();
+    @Column(nullable = false)
     private String title;
-    @Column(name = "owner_user_id")
+    @Column(name = "owner_user_id", nullable = false)
     private Long ownerUserId;
     @Enumerated(EnumType.STRING)
     @Column(name = "scoring_mode", nullable = false)
@@ -57,10 +53,5 @@ public class Quiz {
     public void addQuestion(Question question) {
         questions.add(question);
         question.setQuiz(this);
-    }
-
-    public void removeQuestion(Question question) {
-        questions.remove(question);
-        question.setQuiz(null);
     }
 }

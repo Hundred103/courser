@@ -1,121 +1,78 @@
 package net.edu.courser.quizservice.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.RequiredArgsConstructor;
+import net.edu.courser.quizservice.dto.AnswerCreateDTO;
+import net.edu.courser.quizservice.dto.MapperDTO;
+import net.edu.courser.quizservice.dto.QuestionCreateDTO;
+import net.edu.courser.quizservice.dto.QuizArchiveDTO;
 import org.springframework.stereotype.Service;
-import net.edu.courser.quizservice.entity.PenaltyMode;
 import net.edu.courser.quizservice.entity.Question;
 import net.edu.courser.quizservice.entity.Quiz;
-import net.edu.courser.quizservice.entity.ScoringMode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.IntStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 @Service
+@RequiredArgsConstructor
 public class QuizExportService {
     private static final String QUIZ_JSON = "quiz.json";
 
     private final ObjectMapper objectMapper;
     private final MediaStorageService mediaStorageService;
+    private final MapperDTO mapperDTO;
 
-    public QuizExportService(ObjectMapper objectMapper, MediaStorageService mediaStorageService) {
-        this.objectMapper = objectMapper;
-        this.mediaStorageService = mediaStorageService;
-    }
+    public byte[] exportAsZip(Quiz quiz, List<Question> questions, String rankingVersionId) {
+        QuizArchiveDTO archive = new QuizArchiveDTO(
+                quiz.getTitle(),
+                mapperDTO.toScoringDto(quiz),
+                mapperDTO.toLimitsDto(quiz),
+                new QuizArchiveDTO.RankingReference(rankingVersionId),
+                IntStream.range(0, questions.size()).mapToObj(index -> toArchiveQuestion(questions.get(index), index)).toList()
+        );
 
-    private ObjectNode scoringNode(Quiz quiz) {
-        ScoringMode mode = quiz.getScoringMode() == null ? ScoringMode.DEFAULT : quiz.getScoringMode();
-        PenaltyMode penaltyMode = quiz.getPenaltyMode() == null ? PenaltyMode.FRACTION : quiz.getPenaltyMode();
-        ObjectNode scoring = objectMapper.createObjectNode();
-        scoring.put("mode", mode.name().toLowerCase());
-        scoring.put("allowNegativeScore", quiz.isAllowNegativeScore());
-        scoring.put("pointsPerCorrect", quiz.getPointsPerCorrect());
-        scoring.put("incorrectPenalty", quiz.getIncorrectPenalty());
-        scoring.put("penaltyMode", penaltyMode.name().toLowerCase());
-        return scoring;
-    }
-
-    private ObjectNode limitsNode(Quiz quiz) {
-        ObjectNode limits = objectMapper.createObjectNode();
-        limits.put("randomQuestionOrder", quiz.isRandomQuestionOrder());
-        limits.put("showCorrectAnswers", quiz.isShowCorrectAnswers());
-        return limits;
-    }
-
-    public byte[] exportAsZip(Quiz quiz, List<Question> questions, String rankingVersionId, String rankingContentHash) {
-        ObjectNode root = objectMapper.createObjectNode();
-        root.put("title", quiz.getTitle());
-        root.set("scoring", scoringNode(quiz));
-        root.set("limits", limitsNode(quiz));
-        ObjectNode ranking = root.putObject("_ranking");
-        ranking.put("versionId", rankingVersionId);
-        ranking.put("contentHash", rankingContentHash);
-
-        ArrayNode questionsNode = root.putArray("questions");
-
-        for (int index = 0; index < questions.size(); index++) {
-            Question question = questions.get(index);
-            ObjectNode questionNode = questionsNode.addObject();
-            questionNode.put("content", question.getContent());
-
-            if (question.getImageKey() != null && !question.getImageKey().isBlank()) {
-                questionNode.put("image", exportFilename(question, index));
-            } else {
-                questionNode.putNull("image");
-            }
-
-            ArrayNode answersNode = questionNode.putArray("answers");
-
-            question.getAnswers().forEach(answer -> {
-                ObjectNode answerNode = answersNode.addObject();
-                answerNode.put("content", answer.getContent());
-                answerNode.put("correct", answer.isCorrect());
-
-                if (answer.getPoints() != null) {
-                    answerNode.put("points", answer.getPoints());
-                }
-            });
-        }
-
-        try (ByteArrayOutputStream archive = new ByteArrayOutputStream();
-             ZipOutputStream zip = new ZipOutputStream(archive)) {
+        try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+             ZipOutputStream zip = new ZipOutputStream(bytes)) {
             zip.putNextEntry(new ZipEntry(QUIZ_JSON));
-            zip.write(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(root));
+            zip.write(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(archive));
             zip.closeEntry();
 
             for (int index = 0; index < questions.size(); index++) {
                 Question question = questions.get(index);
-
-                if (question.getImageKey() == null || question.getImageKey().isBlank()) {
-                    continue;
-                }
-
-                String filename = exportFilename(question, index);
-                zip.putNextEntry(new ZipEntry("images/" + filename));
+                if (!hasImage(question)) continue;
+                zip.putNextEntry(new ZipEntry("images/" + exportFilename(question, index)));
                 zip.write(mediaStorageService.read(question.getImageKey()));
                 zip.closeEntry();
             }
 
             zip.finish();
-            return archive.toByteArray();
+            return bytes.toByteArray();
         } catch (IOException exception) {
             throw new IllegalStateException("Could not export quiz", exception);
         }
     }
 
-    private String exportFilename(Question question, int index) {
-        if (question.getImageFilename() != null && !question.getImageFilename().isBlank()
-                && !question.getImageFilename().contains("/")) {
-            return question.getImageFilename();
-        }
+    private QuestionCreateDTO toArchiveQuestion(Question question, int index) {
+        return new QuestionCreateDTO(
+                question.getContent(),
+                question.getAnswers().stream()
+                        .map(answer -> new AnswerCreateDTO(answer.getContent(), answer.isCorrect(), answer.getPoints()))
+                        .toList(),
+                hasImage(question) ? exportFilename(question, index) : null
+        );
+    }
+
+    private static boolean hasImage(Question question) {
+        return question.getImageKey() != null && !question.getImageKey().isBlank();
+    }
+
+    /** imageN.ext by question index (shared keys must stay unique in ZIP). */
+    private static String exportFilename(Question question, int index) {
         String key = question.getImageKey();
-        if (key != null && key.contains(".")) {
-            return "image" + (index + 1) + key.substring(key.lastIndexOf('.'));
-        }
-        return "image" + (index + 1) + ".jpg";
+        return "image" + (index + 1) + key.substring(key.lastIndexOf('.'));
     }
 }

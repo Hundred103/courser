@@ -1,19 +1,3 @@
 package net.edu.courser.user.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class LoginResponse {
-    private Long id;
-    private String email;
-    private String username;
-    private String accentColor;
-    private String token;
-    private String message;
-}
+public record LoginResponse(Long id, String email, String username, String accentColor, String token) {}

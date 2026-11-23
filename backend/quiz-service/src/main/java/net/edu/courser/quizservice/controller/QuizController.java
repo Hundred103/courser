@@ -1,4 +1,5 @@
 package net.edu.courser.quizservice.controller;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -7,72 +8,43 @@ import net.edu.courser.quizservice.dto.*;
 import net.edu.courser.quizservice.entity.*;
 import net.edu.courser.quizservice.service.QuizService;
 import java.util.List;
+import java.util.UUID;
 
-
-
+/** X-User-Id from gateway after JWT validation. */
 @RestController
 @RequestMapping("/quizzes")
+@RequiredArgsConstructor
 public class QuizController {
     private final QuizService quizService;
-    private final MapperDTO mapperDTO;
 
-    public QuizController(QuizService quizService, MapperDTO mapperDTO) {
-        this.quizService = quizService;
-        this.mapperDTO = mapperDTO;
-    }
-
-    //GET /quizzes -> lista quizow
-    @GetMapping  //domyslnie 200 OK
+    @GetMapping
     public List<QuizRawDTO> getAllQuizzes(@RequestHeader("X-User-Id") Long userId) {
-        return quizService.findAllByOwnerUserId(userId)
-                .stream()
-                .map(mapperDTO::toQuizRawDTO)
-                .toList();
+        return quizService.listForOwner(userId);
     }
 
-    //GET /quizzes/id -> pojedynczy quiz z pytaniami i odpowiedziami
     @GetMapping("/{id}")
     public QuizPlayDTO getWholeQuiz(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
         return quizService.getQuizForPlay(id, userId);
     }
 
-    //GET /quizzes/id/raw -> pojedynczy quiz bez zaciagania pytan i odpowiedzi
-    //                    -> (np. zeby wyswietic tylko tytul albo w przyszlosci inne dane - moze sie przydac)
-    @GetMapping("/{id}/raw")
-    public QuizRawDTO getRawQuiz(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
-        Quiz quiz = quizService.findByIdAndOwnerUserId(id, userId);
-        return mapperDTO.toQuizRawDTO(quiz);
-    }
-
     @GetMapping("/{id}/export")
     public ResponseEntity<byte[]> exportQuiz(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
-        Quiz quiz = quizService.findByIdAndOwnerUserId(id, userId);
-        byte[] archive = quizService.exportQuizArchive(id, userId);
-        String filename = sanitizeFilename(quiz.getTitle()) + ".zip";
-
+        QuizService.QuizArchive archive = quizService.exportQuizArchive(id, userId);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + sanitizeFilename(archive.title()) + ".zip\"")
                 .header(HttpHeaders.CONTENT_TYPE, "application/zip")
-                .body(archive);
+                .body(archive.bytes());
     }
 
-    //DELETE /quizzes/id
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteQuiz(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
-        Quiz quiz = quizService.findByIdAndOwnerUserId(id, userId);
-        quizService.delete(quiz);
+        quizService.delete(id, userId);
         return ResponseEntity.noContent().build();
     }
 
-    //POST /quizzes
-    @PostMapping //RequestBody samo zamienia z json na to co chcemy
+    @PostMapping
     public ResponseEntity<QuizRawDTO> createQuiz(@RequestHeader("X-User-Id") Long userId, @RequestBody QuizCreateDTO dto) {
-        Quiz quiz = mapperDTO.toQuizEntity(dto);
-        quiz.setOwnerUserId(userId);
-        Quiz saved = quizService.save(quiz);
-        return ResponseEntity
-                .status(HttpStatus.CREATED) //201
-                .body(mapperDTO.toQuizRawDTO(saved));
+        return created(quizService.create(dto, userId));
     }
 
     @PostMapping("/{id}/share-codes")
@@ -87,20 +59,16 @@ public class QuizController {
     }
 
     @PostMapping("/import-code")
-    public ResponseEntity<QuizRawDTO> importByCode(
-            @RequestHeader("X-User-Id") Long userId,
-            @RequestBody QuizImportByCodeDTO dto
-    ) {
-        Quiz importedQuiz = quizService.importByShareCode(dto.code(), userId);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(mapperDTO.toQuizRawDTO(importedQuiz));
+    public ResponseEntity<QuizRawDTO> importByCode(@RequestHeader("X-User-Id") Long userId, @RequestBody QuizImportByCodeDTO dto) {
+        return created(quizService.importByShareCode(dto.code(), userId));
     }
 
     @PostMapping("/import-archive")
     public ResponseEntity<QuizRawDTO> importArchive(@RequestHeader("X-User-Id") Long userId, @RequestBody QuizArchiveImportDTO dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(mapperDTO.toQuizRawDTO(quizService.importArchive(dto, userId)));
+        return created(quizService.importArchive(dto, userId));
     }
 
+    /** Public guest preview for local store. */
     @PostMapping("/share-code-preview")
     public QuizShareCodePreviewDTO previewByCode(@RequestBody QuizImportByCodeDTO dto) {
         QuizRankingVersion version = quizService.findRankingVersionByShareCode(dto.code());
@@ -108,8 +76,8 @@ public class QuizController {
     }
 
     @PostMapping("/{id}/fork")
-    public ResponseEntity<QuizRawDTO> forkQuiz(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId, @RequestBody QuizCreateDTO dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(mapperDTO.toQuizRawDTO(quizService.fork(id, userId, dto)));
+    public ResponseEntity<QuizRawDTO> forkQuiz(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
+        return created(quizService.fork(id, userId));
     }
 
     @PostMapping("/{id}/ranking-attempts")
@@ -121,48 +89,33 @@ public class QuizController {
         return quizService.startRankingAttempt(id, userId, dto.clientSessionId());
     }
 
-    @GetMapping("/{id}/ranking-position")
-    public RankingPositionDTO getRankingPosition(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
-        return quizService.getRankingPosition(id, userId);
-    }
-
     @GetMapping("/{id}/ranking")
     public RankingLeaderboardDTO getRankingLeaderboard(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId) {
         return quizService.getRankingLeaderboard(id, userId);
     }
 
     @PostMapping("/{id}/ranking-attempts/{attemptId}/finish")
-    public RankingFinishDTO finishRankingAttempt(@PathVariable Long id, @PathVariable java.util.UUID attemptId, @RequestHeader("X-User-Id") Long userId, @RequestBody RankingFinishRequestDTO dto) {
+    public RankingFinishDTO finishRankingAttempt(
+            @PathVariable Long id,
+            @PathVariable UUID attemptId,
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestBody RankingFinishRequestDTO dto
+    ) {
         return quizService.finishRankingAttempt(id, attemptId, userId, dto);
     }
 
-    //PUT /quizzes/id -> zmienia caly quiz wraz z pytaniami i odpowiedziami
-    //                -> (mozliwosc edycji pytan i odpowiedzi quizu)
     @PutMapping("/{id}")
-    public ResponseEntity<QuizRawDTO> updateQuiz(
-            @PathVariable Long id,
-            @RequestHeader("X-User-Id") Long userId,
-            @RequestBody QuizCreateDTO dto
-    ) {
-        Quiz updated = quizService.update(id, userId, dto);
-        return ResponseEntity.ok(
-                mapperDTO.toQuizRawDTO(updated)
-        );
+    public QuizRawDTO updateQuiz(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId, @RequestBody QuizCreateDTO dto) {
+        return quizService.toRawDto(quizService.update(id, userId, dto));
     }
 
-    //PATCH /quizzes/id -> zmienia tylko quiz bez zmieniania pytan i odpowiedzi
-    //                  -> np. guzik przy liscie quizow by zmienic tytul
-    //                  -> (obecnie jest tylko tytul w przyszlosc mozna dodac inne pola)
     @PatchMapping("/{id}")
-    public ResponseEntity<QuizRawDTO> updateQuizTitle(
-            @PathVariable Long id,
-            @RequestHeader("X-User-Id") Long userId,
-            @RequestBody QuizEditTitleDTO dto
-    ) {
-        Quiz updated = quizService.updateTitle(id, userId, dto);
-        return ResponseEntity.ok(
-                mapperDTO.toQuizRawDTO(updated)
-        );
+    public QuizRawDTO updateQuizTitle(@PathVariable Long id, @RequestHeader("X-User-Id") Long userId, @RequestBody QuizEditTitleDTO dto) {
+        return quizService.toRawDto(quizService.updateTitle(id, userId, dto));
+    }
+
+    private ResponseEntity<QuizRawDTO> created(Quiz quiz) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(quizService.toRawDto(quiz));
     }
 
     private String formatShareCode(String code) {

@@ -15,6 +15,8 @@ export interface ScorableAnswer {
   points?: number | null;
 }
 
+const MAX_SCORE_VALUE = 99.99;
+
 export const DEFAULT_QUIZ_SCORING: QuizScoring = {
   mode: 'default',
   allowNegativeScore: false,
@@ -23,30 +25,20 @@ export const DEFAULT_QUIZ_SCORING: QuizScoring = {
   penaltyMode: 'fraction',
 };
 
-/**
- * Default mode with the built-in settings reproduces the original formula:
- * reward = selected correct / all correct, penalty = selected wrong / all wrong,
- * then the question is kept between 0 and 1.
- *
- * fraction — correct picks share pointsPerCorrect, wrong picks share incorrectPenalty.
- * points — each correct pick adds pointsPerCorrect, each wrong pick subtracts incorrectPenalty.
- * percent — each wrong pick subtracts incorrectPenalty percent of the points earned from correct picks.
- *
- * allowNegativeScore keeps a negative question result in the quiz total.
- * When it is off, that question contributes 0. Custom mode sums the points of selected options.
- */
+/** Modes must match QuizService; fraction = share points, points/percent = per pick, custom = sum option points. */
 export function questionMaxScore(answers: readonly ScorableAnswer[], scoring: QuizScoring): number {
   if (scoring.mode === 'custom') {
     return answers.reduce((total, answer) => total + Math.max(0, finiteOrZero(answer.points)), 0);
   }
 
   const pointsPerCorrect = Math.max(0, scoring.pointsPerCorrect);
+  const correctCount = answers.filter((answer) => answer.correct).length;
 
+  // no correct markers → 0 (QuizService.maxQuestionScore).
   if (scoring.penaltyMode === 'fraction') {
-    return pointsPerCorrect;
+    return correctCount === 0 ? 0 : pointsPerCorrect;
   }
 
-  const correctCount = answers.filter((answer) => answer.correct).length;
   return pointsPerCorrect * correctCount;
 }
 
@@ -113,24 +105,21 @@ export function parseQuizScoring(value: unknown): QuizScoring {
   return {
     mode: mode === 'custom' ? 'custom' : 'default',
     allowNegativeScore: allowNegativeScore === true,
-    pointsPerCorrect: readNonNegative(value['pointsPerCorrect'], 1, 'scoring.pointsPerCorrect'),
-    incorrectPenalty: readNonNegative(value['incorrectPenalty'], 1, 'scoring.incorrectPenalty'),
+    pointsPerCorrect: readScore(value['pointsPerCorrect'], 1, 'Pole scoring.pointsPerCorrect', 0, MAX_SCORE_VALUE),
+    incorrectPenalty: readScore(value['incorrectPenalty'], 1, 'Pole scoring.incorrectPenalty', 0, MAX_SCORE_VALUE),
     penaltyMode: normalizedPenaltyMode,
   };
 }
 
-export function parseAnswerPoints(value: unknown, label: string): number | null {
+/** Points limits match editor/MapperDTO (0–99.99 / −99.99–0, 2 decimals). */
+export function parseAnswerPoints(value: unknown, label: string, correct: boolean): number | null {
   if (value === undefined || value === null || value === '') {
     return null;
   }
 
-  const parsed = readFinite(value);
-
-  if (parsed === null) {
-    throw new Error(`${label} musi być liczbą.`);
-  }
-
-  return parsed;
+  return correct
+    ? readScore(value, 0, label, 0, MAX_SCORE_VALUE)
+    : readScore(value, 0, label, -MAX_SCORE_VALUE, 0);
 }
 
 function rawQuestionScore(
@@ -193,18 +182,30 @@ function readEnum<T extends string>(value: unknown, allowed: readonly T[], label
   return match;
 }
 
-function readNonNegative(value: unknown, fallback: number, label: string): number {
+function readScore(value: unknown, fallback: number, label: string, min: number, max: number): number {
   if (value === undefined || value === null || value === '') {
     return fallback;
   }
 
   const parsed = readFinite(value);
 
-  if (parsed === null || parsed < 0) {
-    throw new Error(`Pole ${label} musi być liczbą większą lub równą 0.`);
+  if (parsed === null) {
+    throw new Error(`${label} musi być liczbą.`);
+  }
+
+  if (Math.abs(Math.round(parsed * 100) - parsed * 100) > 1e-9) {
+    throw new Error(`${label} może mieć maksymalnie dwie cyfry po przecinku.`);
+  }
+
+  if (parsed < min || parsed > max) {
+    throw new Error(`${label} musi mieścić się w zakresie ${formatScoreLimit(min)}–${formatScoreLimit(max)}.`);
   }
 
   return parsed;
+}
+
+function formatScoreLimit(value: number): string {
+  return String(value).replace('.', ',');
 }
 
 function nonNegativeOr(value: unknown, fallback: number): number {

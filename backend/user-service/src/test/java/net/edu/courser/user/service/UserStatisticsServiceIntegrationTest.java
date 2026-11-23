@@ -31,7 +31,7 @@ class UserStatisticsServiceIntegrationTest {
         service = new UserStatisticsService(jdbc);
         transaction = new TransactionTemplate(new DataSourceTransactionManager(source));
         String unique = UUID.randomUUID().toString();
-        userId = jdbc.queryForObject("INSERT INTO users(email, username, password, role) VALUES (?, ?, 'x', 'STUDENT') RETURNING id", Long.class, unique + "@test.local", unique);
+        userId = jdbc.queryForObject("INSERT INTO users(email, username, password) VALUES (?, ?, 'x') RETURNING id", Long.class, unique + "@test.local", unique);
         quizId = jdbc.queryForObject("INSERT INTO quizzes(title, owner_user_id) VALUES ('Test', ?) RETURNING id", Long.class, userId);
     }
 
@@ -44,17 +44,16 @@ class UserStatisticsServiceIntegrationTest {
     @Test
     void aggregatesAndDeduplicatesWhileKeepingStatsAfterQuizDeletion() {
         UUID key = UUID.randomUUID();
-        CompleteStatisticsRequest normal = new CompleteStatisticsRequest(key, quizId, 4, false, 800, 1000, 8000, "Europe/Warsaw");
+        CompleteStatisticsRequest normal = new CompleteStatisticsRequest(key, quizId, 4, false, 8000, "Europe/Warsaw");
         complete(normal); complete(normal);
-        complete(new CompleteStatisticsRequest(UUID.randomUUID(), quizId, 3, true, null, null, null, "Europe/Warsaw"));
-        complete(new CompleteStatisticsRequest(UUID.randomUUID(), quizId, 1, false, -200, 1000, -2000, "Europe/Warsaw"));
+        complete(new CompleteStatisticsRequest(UUID.randomUUID(), quizId, 3, true, null, "Europe/Warsaw"));
+        complete(new CompleteStatisticsRequest(UUID.randomUUID(), quizId, 1, false, -2000, "Europe/Warsaw"));
         var daily = service.daily(userId).get(0);
         assertEquals(3, daily.completedQuizzes());
         assertEquals(8, daily.checkedQuestions());
         assertEquals(6000, daily.effectivenessSum());
         assertEquals(2, daily.effectivenessCount());
         assertEquals(3, service.count(userId, quizId));
-        assertEquals(800, service.bestScores(userId).get(0).getScore());
         jdbc.update("DELETE FROM quizzes WHERE id = ?", quizId);
         assertEquals(3, service.daily(userId).get(0).completedQuizzes());
         assertEquals(0, service.count(userId, quizId));
@@ -62,7 +61,7 @@ class UserStatisticsServiceIntegrationTest {
 
     @Test
     void zeroMaximumContributesZeroToAverage() {
-        complete(new CompleteStatisticsRequest(UUID.randomUUID(), quizId, 2, false, 0, 0, 0, "Europe/Warsaw"));
+        complete(new CompleteStatisticsRequest(UUID.randomUUID(), quizId, 2, false, 0, "Europe/Warsaw"));
         var daily = service.daily(userId).get(0);
         assertEquals(1, daily.completedQuizzes());
         assertEquals(2, daily.checkedQuestions());

@@ -6,24 +6,19 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 @Service
 public class MediaStorageService {
     public static final long MAX_IMAGE_BYTES = 16L * 1024L * 1024L;
-
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-            "image/jpeg",
-            "image/png",
-            "image/gif",
-            "image/webp",
-            "image/bmp"
-    );
 
     private static final Map<String, String> EXTENSION_BY_CONTENT_TYPE = Map.of(
             "image/jpeg", "jpg",
@@ -51,7 +46,8 @@ public class MediaStorageService {
         }
     }
 
-    public StoredMedia store(byte[] bytes, String contentTypeHint, String originalFilename) {
+    /** Store bytes; type from file signature only. */
+    public String store(byte[] bytes) {
         if (bytes == null || bytes.length == 0) {
             throw new IllegalArgumentException("Plik obrazu jest pusty.");
         }
@@ -59,7 +55,10 @@ public class MediaStorageService {
             throw new IllegalArgumentException("Obraz może mieć maksymalnie 16 MB.");
         }
 
-        String contentType = resolveContentType(bytes, contentTypeHint, originalFilename);
+        String contentType = detectContentType(bytes);
+        if (contentType == null) {
+            throw new IllegalArgumentException("Nieobsługiwany format obrazu. Dozwolone: JPEG, PNG, GIF, WebP, BMP.");
+        }
         String extension = EXTENSION_BY_CONTENT_TYPE.get(contentType);
         String hash = sha256(bytes);
         String key = hash + "." + extension;
@@ -70,14 +69,16 @@ public class MediaStorageService {
         }
 
         try {
-            if (!Files.exists(target)) {
+            if (Files.exists(target)) {
+                markUsed(target);
+            } else {
                 Files.write(target, bytes);
             }
         } catch (IOException exception) {
             throw new IllegalStateException("Nie udało się zapisać obrazu.", exception);
         }
 
-        return new StoredMedia(key, publicUrl(key), contentType, originalFilename(key, originalFilename));
+        return key;
     }
 
     public byte[] read(String key) {
@@ -87,6 +88,30 @@ public class MediaStorageService {
         } catch (IOException exception) {
             throw new IllegalStateException("Nie udało się odczytać obrazu.", exception);
         }
+    }
+
+    /** Touch mtime on use/store; delete keys unused since unusedBefore. */
+    public int deleteUnused(Set<String> usedKeys, Instant unusedBefore) {
+        int deleted = 0;
+        try (Stream<Path> files = Files.list(storageRoot)) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String key = file.getFileName().toString();
+                if (!Files.isRegularFile(file) || !looksLikeMediaKey(key)) continue;
+                if (usedKeys.contains(key)) {
+                    markUsed(file);
+                } else if (Files.getLastModifiedTime(file).toInstant().isBefore(unusedBefore)) {
+                    Files.delete(file);
+                    deleted++;
+                }
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("Nie udało się usunąć nieużywanych obrazów.", exception);
+        }
+        return deleted;
+    }
+
+    private void markUsed(Path file) throws IOException {
+        Files.setLastModifiedTime(file, FileTime.from(Instant.now()));
     }
 
     public boolean exists(String key) {
@@ -174,25 +199,6 @@ public class MediaStorageService {
         return lower;
     }
 
-    private String resolveContentType(byte[] bytes, String contentTypeHint, String originalFilename) {
-        String detected = detectContentType(bytes);
-        if (detected != null) {
-            return detected;
-        }
-
-        String hinted = normalizeContentType(contentTypeHint);
-        if (hinted != null) {
-            return hinted;
-        }
-
-        String fromName = contentTypeFromFilename(originalFilename);
-        if (fromName != null) {
-            return fromName;
-        }
-
-        throw new IllegalArgumentException("Nieobsługiwany format obrazu. Dozwolone: JPEG, PNG, GIF, WebP, BMP.");
-    }
-
     private String detectContentType(byte[] bytes) {
         if (bytes.length >= 3 && (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xD8 && (bytes[2] & 0xFF) == 0xFF) {
             return "image/jpeg";
@@ -218,46 +224,6 @@ public class MediaStorageService {
         return null;
     }
 
-    private String normalizeContentType(String contentType) {
-        if (contentType == null || contentType.isBlank()) {
-            return null;
-        }
-        String normalized = contentType.trim().toLowerCase(Locale.ROOT);
-        if (normalized.contains(";")) {
-            normalized = normalized.substring(0, normalized.indexOf(';')).trim();
-        }
-        if ("image/jpg".equals(normalized)) {
-            normalized = "image/jpeg";
-        }
-        return ALLOWED_CONTENT_TYPES.contains(normalized) ? normalized : null;
-    }
-
-    private String contentTypeFromFilename(String filename) {
-        if (filename == null || !filename.contains(".")) {
-            return null;
-        }
-        String extension = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
-        return switch (extension) {
-            case "jpg", "jpeg" -> "image/jpeg";
-            case "png" -> "image/png";
-            case "gif" -> "image/gif";
-            case "webp" -> "image/webp";
-            case "bmp" -> "image/bmp";
-            default -> null;
-        };
-    }
-
-    private String originalFilename(String key, String originalFilename) {
-        String extension = key.contains(".") ? key.substring(key.lastIndexOf('.')) : "";
-        if (originalFilename != null && !originalFilename.isBlank()) {
-            String cleaned = Path.of(originalFilename).getFileName().toString().trim();
-            if (!cleaned.isBlank()) {
-                return cleaned.contains(".") ? cleaned : cleaned + extension;
-            }
-        }
-        return key;
-    }
-
     private String sha256(byte[] bytes) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -266,6 +232,4 @@ public class MediaStorageService {
             throw new IllegalStateException("SHA-256 unavailable", exception);
         }
     }
-
-    public record StoredMedia(String key, String url, String contentType, String filename) {}
 }

@@ -34,23 +34,10 @@ spring:
                   args:
                     parts: 1
 
-          default-filters:
-            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
-
-          globalcors:
-            corsConfigurations:
-              '[/**]':
-                allowedOrigins:
-                  - ${CORS_ALLOWED_ORIGIN:http://localhost:4200}
-                allowedMethods:
-                  - GET
-                  - POST
-                  - PUT
-                  - PATCH
-                  - DELETE
-                  - OPTIONS
-                allowedHeaders: "*"
-                allowCredentials: true
+app:
+  jwt:
+    # Wymagany, bez wartości domyślnej: ten sam sekret co w user-service (co najmniej 32 bajty).
+    secret: ${APP_JWT_SECRET}
 
 management:
   endpoints:

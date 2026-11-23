@@ -6,6 +6,7 @@ import net.edu.courser.quizservice.entity.QuizShareCode;
 
 import java.util.Optional;
 import java.time.LocalDateTime;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,7 +15,8 @@ import org.springframework.data.repository.query.Param;
 public interface QuizShareCodeRepository extends JpaRepository<QuizShareCode, Long> {
     boolean existsByCode(String code);
 
-    Optional<QuizShareCode> findByCodeAndActiveTrue(String code);
+    @EntityGraph(attributePaths = "rankingVersion")
+    Optional<QuizShareCode> findByCode(String code);
 
     @Modifying
     @Query("delete from QuizShareCode code where code.expiresAt is not null and code.expiresAt < :threshold")

@@ -1,11 +1,8 @@
-# A global TODO 
+# TODO
 
 Urgent:
-    empty 
+- empty
 
-Non urgent:
-- settings - option is currently empty
-- ranking
-- quiz hub for public quizzes
-- quiz answers come in one request with the question enabling easy cheating
-- frontend rework - more modern look
+Later:
+- public quiz hub (browse quizzes from other users without a share code)
+- frontend visual rework

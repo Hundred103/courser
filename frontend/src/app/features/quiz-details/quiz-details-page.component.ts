@@ -3,7 +3,6 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { QuizPlayDTO, RankingLeaderboardDTO } from '../../core/models/quiz.model';
 import { QuestionPlayDTO } from '../../core/models/question.model';
-import { toImageSrc } from '../../core/utils/image-compression.util';
 
 @Component({
   selector: 'app-quiz-details-page',
@@ -24,7 +23,6 @@ export class QuizDetailsPageComponent {
 
   readonly questionCount = computed(() => this.quiz()?.questions.length ?? 0);
 
-  // Set of expanded question indices
   readonly expandedQuestions = signal<Set<number>>(new Set());
 
   constructor() {
@@ -65,7 +63,7 @@ export class QuizDetailsPageComponent {
   }
 
   questionImageSrc(question: QuestionPlayDTO): string | null {
-    return toImageSrc(question.image);
+    return question.image || null;
   }
 
   rankingDurationText(milliseconds: number): string {

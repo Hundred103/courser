@@ -1,7 +1,9 @@
 package net.edu.courser.user.service;
 
+import lombok.Getter;
 import net.edu.courser.user.entity.RefreshSession;
 import net.edu.courser.user.entity.User;
+import net.edu.courser.user.exception.AuthenticationFailedException;
 import net.edu.courser.user.repository.RefreshSessionRepository;
 import net.edu.courser.user.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,27 +12,36 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.HexFormat;
 
 @Service
 public class RefreshSessionService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String SESSION_EXPIRED = "Sesja wygasła. Zaloguj się ponownie.";
 
     private final RefreshSessionRepository refreshSessionRepository;
     private final UserRepository userRepository;
+    /** Cookie max-age matches session TTL. */
+    @Getter
     private final Duration inactivityDuration;
+    /** Concurrent tabs may rotate the same key; keep a short grace. */
+    private final Duration rotationGrace;
 
     public RefreshSessionService(
             RefreshSessionRepository refreshSessionRepository,
             UserRepository userRepository,
-            @Value("${app.refresh-session.inactivity-hours:48}") long inactivityHours
+            @Value("${app.refresh-session.inactivity-hours}") long inactivityHours,
+            @Value("${app.refresh-session.rotation-grace-seconds}") long rotationGraceSeconds
     ) {
         this.refreshSessionRepository = refreshSessionRepository;
         this.userRepository = userRepository;
         this.inactivityDuration = Duration.ofHours(inactivityHours);
+        this.rotationGrace = Duration.ofSeconds(rotationGraceSeconds);
     }
 
     @Transactional
@@ -46,24 +57,26 @@ public class RefreshSessionService {
         return rawToken;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = AuthenticationFailedException.class)
     public RefreshResult rotate(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
-            throw new IllegalArgumentException("Brak sesji odświeżającej.");
+            throw new AuthenticationFailedException(SESSION_EXPIRED);
         }
 
         RefreshSession session = refreshSessionRepository.findByTokenHash(hash(rawToken))
-                .orElseThrow(() -> new IllegalArgumentException("Nieprawidłowa sesja odświeżająca."));
+                .orElseThrow(() -> new AuthenticationFailedException(SESSION_EXPIRED));
         LocalDateTime now = LocalDateTime.now();
 
         if (!session.getExpiresAt().isAfter(now)) {
             refreshSessionRepository.delete(session);
-            throw new IllegalArgumentException("Sesja odświeżająca wygasła.");
+            throw new AuthenticationFailedException(SESSION_EXPIRED);
         }
 
         User user = userRepository.findById(session.getUser().getId())
-                .orElseThrow(() -> new IllegalArgumentException("Użytkownik sesji nie istnieje."));
-        refreshSessionRepository.delete(session);
+                .orElseThrow(() -> new AuthenticationFailedException(SESSION_EXPIRED));
+        LocalDateTime graceEnd = now.plus(rotationGrace);
+        if (session.getExpiresAt().isAfter(graceEnd)) session.setExpiresAt(graceEnd);
+        session.setLastUsedAt(now);
         String nextToken = create(user);
         refreshSessionRepository.deleteByExpiresAtBefore(now);
         return new RefreshResult(user, nextToken);
@@ -83,12 +96,9 @@ public class RefreshSessionService {
 
     private String hash(String rawToken) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(rawToken.getBytes(StandardCharsets.UTF_8));
-            StringBuilder result = new StringBuilder();
-            for (byte value : digest) result.append(String.format("%02x", value));
-            return result.toString();
-        } catch (Exception exception) {
-            throw new IllegalStateException("Nie udało się zabezpieczyć sesji odświeżającej.", exception);
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(rawToken.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
         }
     }
 

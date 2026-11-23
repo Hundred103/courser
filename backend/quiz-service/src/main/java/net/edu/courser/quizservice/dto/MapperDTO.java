@@ -2,29 +2,41 @@ package net.edu.courser.quizservice.dto;
 import net.edu.courser.quizservice.entity.Answer;
 import net.edu.courser.quizservice.entity.*;
 import net.edu.courser.quizservice.service.MediaStorageService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.Base64;
-import java.util.List;
-
-
 
 @Component
+@RequiredArgsConstructor
 public class MapperDTO {
     private static final double MAX_SCORE_VALUE = 99.99d;
+    /** quizzes.title is VARCHAR(255). */
+    public static final int MAX_TITLE_LENGTH = 255;
+    private static final String COPY_SUFFIX = " (kopia)";
 
     private final MediaStorageService mediaStorageService;
 
-    public MapperDTO(MediaStorageService mediaStorageService) {
-        this.mediaStorageService = mediaStorageService;
+    public String validTitle(String title) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("Podaj tytuł quizu.");
+        }
+        if (title.length() > MAX_TITLE_LENGTH) {
+            throw new IllegalArgumentException("Tytuł quizu może mieć najwyżej " + MAX_TITLE_LENGTH + " znaków.");
+        }
+        return title;
     }
 
-    public QuizRawDTO toQuizRawDTO (Quiz quiz) {
-        return new QuizRawDTO(quiz.getId(), quiz.getTitle(), quiz.getRankingVersion() != null && quiz.getRankingVersion().isHasLoggedImport());
+    public String copyTitle(String title) {
+        String base = title == null ? "" : title;
+        return base.substring(0, Math.min(base.length(), MAX_TITLE_LENGTH - COPY_SUFFIX.length())) + COPY_SUFFIX;
     }
 
-    //ENTITY --> DTO (wysylamy do uzytkownika)
+    public QuizRawDTO toQuizRawDTO(Quiz quiz, long questionCount, Integer rankingPosition) {
+        return new QuizRawDTO(quiz.getId(), quiz.getTitle(), questionCount, toLimitsDto(quiz), rankingPosition);
+    }
+
     public QuizPlayDTO toQuizPlayDTO(Quiz quiz) {
         return new QuizPlayDTO(
                 quiz.getId(),
@@ -81,11 +93,10 @@ public class MapperDTO {
         quiz.setPenaltyMode(PenaltyMode.valueOf(normalized.penaltyMode().toUpperCase()));
     }
 
-    //DTO --> ENTITY (dostajemy od uzytkownika)
     public Quiz toQuizEntity(QuizCreateDTO dto) {
         QuizScoringDTO scoring = normalizeScoring(dto.scoring());
         Quiz quiz = Quiz.builder()
-                .title(dto.title())
+                .title(validTitle(dto.title()))
                 .scoringMode(ScoringMode.valueOf(scoring.mode().toUpperCase()))
                 .allowNegativeScore(Boolean.TRUE.equals(scoring.allowNegativeScore()))
                 .pointsPerCorrect(scoring.pointsPerCorrect())
@@ -93,11 +104,8 @@ public class MapperDTO {
                 .penaltyMode(PenaltyMode.valueOf(scoring.penaltyMode().toUpperCase()))
                 .build();
         applyLimits(quiz, dto.limits());
-        List<QuestionCreateDTO> questions = dto.questions();
         boolean customScoring = quiz.getScoringMode() == ScoringMode.CUSTOM;
-        for (int index = 0; index < questions.size(); index++) {
-            quiz.addQuestion(toQuestionEntity(questions.get(index), index, customScoring));
-        }
+        dto.questions().forEach(question -> quiz.addQuestion(toQuestionEntity(question, customScoring)));
         return quiz;
     }
 
@@ -119,11 +127,11 @@ public class MapperDTO {
         quiz.setShowCorrectAnswers(limits.showCorrectAnswers() == null || limits.showCorrectAnswers());
     }
 
-    public Question toQuestionEntity(QuestionCreateDTO qDto, int index, boolean customScoring) {
+    public Question toQuestionEntity(QuestionCreateDTO qDto, boolean customScoring) {
         Question question = Question.builder()
                 .content(qDto.content())
+                .imageKey(imageKey(qDto.image()))
                 .build();
-        applyImage(question, qDto.image(), index);
         qDto.answers().forEach(aDto -> {
             Answer answer = Answer.builder()
                     .content(aDto.content())
@@ -213,58 +221,30 @@ public class MapperDTO {
         return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString().replace('.', ',');
     }
 
-    public void applyImage(Question question, String imageReference, int index) {
+    /** /media/ path → key, or store data URL; used in ranking hash. */
+    private String imageKey(String imageReference) {
         if (imageReference == null || imageReference.isBlank()) {
-            question.setImageFilename(null);
-            question.setImageKey(null);
-            return;
+            return null;
         }
 
         String trimmed = imageReference.trim();
-
-        // Already stored in media — only keep the shared key (no duplicate file).
         if (!trimmed.startsWith("data:")) {
-            if (mediaStorageService.isMediaReference(trimmed)) {
-                String key = mediaStorageService.extractKey(trimmed);
-                question.setImageKey(key);
-                if (question.getImageFilename() == null || question.getImageFilename().isBlank()) {
-                    question.setImageFilename(key);
-                }
-                return;
-            }
-
-            if (trimmed.startsWith("/media/") || trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            if (!mediaStorageService.isMediaReference(trimmed)) {
                 throw new IllegalArgumentException("Nie znaleziono pliku multimediów.");
             }
+            return mediaStorageService.extractKey(trimmed);
         }
 
-        byte[] bytes = decodeImagePayload(trimmed);
-        String contentTypeHint = contentTypeFromDataUrl(trimmed);
-        MediaStorageService.StoredMedia stored = mediaStorageService.store(
-                bytes,
-                contentTypeHint,
-                "image" + (index + 1)
-        );
-        question.setImageKey(stored.key());
-        question.setImageFilename(stored.filename());
-    }
-
-    private byte[] decodeImagePayload(String imageReference) {
-        String payload = imageReference.contains(",")
-                ? imageReference.substring(imageReference.indexOf(',') + 1)
-                : imageReference;
-
+        int comma = trimmed.indexOf(',');
+        if (comma < 0) {
+            throw new IllegalArgumentException("Nieprawidłowe dane obrazu.");
+        }
+        byte[] bytes;
         try {
-            return Base64.getDecoder().decode(payload);
+            bytes = Base64.getDecoder().decode(trimmed.substring(comma + 1));
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("Nieprawidłowe dane obrazu.", exception);
         }
-    }
-
-    private String contentTypeFromDataUrl(String imageReference) {
-        if (!imageReference.startsWith("data:") || !imageReference.contains(";")) {
-            return null;
-        }
-        return imageReference.substring("data:".length(), imageReference.indexOf(';')).trim();
+        return mediaStorageService.store(bytes);
     }
 }

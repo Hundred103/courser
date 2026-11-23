@@ -1,3 +1,8 @@
+### Courser ###
+.env
+__pycache__/
+backup.sql
+
 # Created by https://www.toptal.com/developers/gitignore/api/java,angular,visualstudiocode,intellij
 # Edit at https://www.toptal.com/developers/gitignore?templates=java,angular,visualstudiocode,intellij
 

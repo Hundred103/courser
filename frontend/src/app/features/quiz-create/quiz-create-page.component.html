@@ -33,6 +33,7 @@
         id="quiz-title"
         class="title-input squircle"
         type="text"
+        [maxLength]="maxTitleLength"
         [value]="title()"
         (input)="updateTitle($event)"
         placeholder="Wpisz tytuł quizu"

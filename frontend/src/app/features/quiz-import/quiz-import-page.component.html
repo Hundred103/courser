@@ -112,21 +112,33 @@
         </section>
 
         <section class="template-panel squircle">
-          <div class="template-heading">
-            <div>
-              <h2>Format pliku ZIP</h2>
-              <p class="template-note">
-                Spakuj folder z plikiem <code>quiz.json</code> w katalogu głównym oraz opcjonalnym folderem
-                <code>images/</code>. W JSON każde pytanie może mieć pole <code>image</code> (np.
-                <code>"image1.jpg"</code>) albo <code>null</code>.
-              </p>
-            </div>
-            <button class="secondary-button squircle" type="button" (click)="downloadTemplate()">
+          <div class="template-body">
+            <span class="template-icon" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="34"
+                height="34"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <path d="M7 10 12 15 17 10" />
+                <path d="M12 15V3" />
+              </svg>
+            </span>
+            <h2>Format pliku ZIP</h2>
+            <p class="template-note">
+              Spakuj folder z plikiem <code>quiz.json</code> w katalogu głównym oraz opcjonalnym folderem
+              <code>images/</code>. W JSON każde pytanie może mieć pole <code>image</code> (np.
+              <code>"image1.jpg"</code>) albo <code>null</code>.
+            </p>
+            <button class="secondary-button template-download squircle" type="button" (click)="downloadTemplate()">
               Pobierz szablon
             </button>
           </div>
-
-          <pre><code>{{ templateJson }}</code></pre>
         </section>
       </div>
     } @else {
@@ -140,7 +152,7 @@
             type="text"
             inputmode="text"
             autocomplete="off"
-            maxlength="11"
+            maxlength="32"
             placeholder="ABCDE-FGHIJ"
             [ngModel]="shareCode()"
             (ngModelChange)="updateShareCode($event)"

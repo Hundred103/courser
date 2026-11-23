@@ -1,20 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { HttpBackend, HttpClient } from '@angular/common/http';
-import { Observable, catchError, finalize, forkJoin, map, of, shareReplay, tap } from 'rxjs';
+import { HttpBackend, HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Observable, catchError, finalize, map, of, shareReplay, tap, throwError } from 'rxjs';
 import { environment } from '../../../environment';
-import { GuestQuizStorageService } from './guest-quiz-storage.service';
 import { AccentColor, DEFAULT_ACCENT_COLOR, isAccentColor } from '../models/theme.model';
-
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  username: string;
-}
 
 export interface AuthResponse {
   id: number;
@@ -22,7 +10,6 @@ export interface AuthResponse {
   username: string;
   accentColor: AccentColor;
   token: string;
-  message: string;
 }
 
 const STORAGE_KEY = 'user';
@@ -33,13 +20,9 @@ const STORAGE_KEY = 'user';
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly httpBackend = inject(HttpBackend);
-  // Odświeżenie sesji jest wykonywane już podczas tworzenia AuthService.
-  // Omijamy interceptor, który sam wstrzykuje AuthService, aby nie tworzyć
-  // cyklicznej zależności przy starcie aplikacji.
+  // HttpBackend: skip interceptor (circular dep with AuthService at bootstrap).
   private readonly sessionHttp = new HttpClient(this.httpBackend);
-  private readonly guestQuizStorage = inject(GuestQuizStorageService);
   private readonly apiUrl = `${environment.apiUrl}/users`;
-  private readonly quizzesApiUrl = `${environment.apiUrl}/quizzes`;
 
   private readonly currentUser = signal<AuthResponse | null>(this.loadStoredUser());
   private refreshInFlight$: Observable<boolean> | null = null;
@@ -48,10 +31,8 @@ export class AuthService {
   readonly isLoggedIn = computed(() => this.currentUser() !== null);
 
   constructor() {
-    // Ciasteczko HttpOnly jest źródłem prawdy dla trwałej sesji. Odświeżamy ją
-    // zawsze, także gdy wpis w localStorage nie istnieje albo został usunięty.
-    // Dzięki temu zwykłe odświeżenie strony może odtworzyć zalogowanego użytkownika.
-    this.refreshAccessToken().subscribe();
+    // Refresh on init: HttpOnly cookie restores session even without localStorage.
+    this.refreshAccessToken().subscribe({ error: () => undefined });
   }
 
   login(email: string, password: string): Observable<AuthResponse> {
@@ -78,22 +59,6 @@ export class AuthService {
     );
   }
 
-  migrateGuestQuizzesToUser(user: AuthResponse): Observable<unknown[]> {
-    const guestQuizzes = this.guestQuizStorage.getAllImports();
-
-    if (guestQuizzes.length === 0) {
-      return of([]);
-    }
-
-    return forkJoin(guestQuizzes.map(({ quiz, rankingVersionId }) => this.http.post(`${this.quizzesApiUrl}/import-archive`, {
-      quiz,
-      rankingVersionId,
-      migratingGuestQuiz: true,
-    }))).pipe(
-      tap(() => this.guestQuizStorage.clear()),
-    );
-  }
-
   getCurrentUser(): AuthResponse | null {
     return this.currentUser();
   }
@@ -106,6 +71,7 @@ export class AuthService {
     this.clearAuthState();
   }
 
+  // false = 401/403 only; network/5xx rethrow (don't logout on blip).
   refreshAccessToken(): Observable<boolean> {
     if (this.refreshInFlight$) {
       return this.refreshInFlight$;
@@ -114,7 +80,10 @@ export class AuthService {
     this.refreshInFlight$ = this.sessionHttp.post<AuthResponse>(`${this.apiUrl}/refresh`, {}, { withCredentials: true }).pipe(
       tap((user) => this.setCurrentUser(user)),
       map(() => true),
-      catchError(() => {
+      catchError((error: unknown) => {
+        if (!(error instanceof HttpErrorResponse) || (error.status !== 401 && error.status !== 403)) {
+          return throwError(() => error);
+        }
         this.clearAuthState();
         return of(false);
       }),
@@ -138,10 +107,6 @@ export class AuthService {
       const key = sessionStorage.key(index);
       if (key?.startsWith(prefix)) sessionStorage.removeItem(key);
     }
-  }
-
-  isAuthenticated(): boolean {
-    return this.isLoggedIn();
   }
 
   getToken(): string | null {

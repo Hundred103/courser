@@ -4,15 +4,27 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.Set;
+
+/** Strip client X-User-* on every request; set only from a valid JWT. */
 @Component
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
+    private static final Set<String> PUBLIC_PATHS = Set.of(
+            "/api/users/login",
+            "/api/users/register",
+            "/api/users/refresh",
+            "/api/users/logout",
+            "/api/quizzes/share-code-preview",
+            "/actuator/health",
+            "/actuator/info"
+    );
+
     private final JwtService jwtService;
 
     public JwtAuthenticationFilter(JwtService jwtService) {
@@ -23,35 +35,20 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
 
-        if (isPublicRequest(path, exchange.getRequest().getMethod())) {
-            return chain.filter(exchange);
+        if (PUBLIC_PATHS.contains(path)) {
+            return chain.filter(withUserHeaders(exchange, null));
         }
 
         String authorization = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-
         if (authorization == null || !authorization.startsWith("Bearer ")) {
-            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
+            return unauthorized(exchange);
         }
 
         try {
             JwtClaims claims = jwtService.validate(authorization.substring("Bearer ".length()));
-            ServerHttpRequest request = exchange.getRequest()
-                    .mutate()
-                    .headers(headers -> {
-                        headers.remove("X-User-Id");
-                        headers.remove("X-User-Email");
-                        headers.remove("X-Username");
-                        headers.set("X-User-Id", claims.userId().toString());
-                        headers.set("X-User-Email", claims.email());
-                        headers.set("X-Username", claims.username());
-                    })
-                    .build();
-
-            return chain.filter(exchange.mutate().request(request).build());
+            return chain.filter(withUserHeaders(exchange, claims));
         } catch (IllegalArgumentException e) {
-            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
+            return unauthorized(exchange);
         }
     }
 
@@ -60,14 +57,25 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         return Ordered.HIGHEST_PRECEDENCE;
     }
 
-    private boolean isPublicRequest(String path, HttpMethod method) {
-        return method == HttpMethod.OPTIONS
-                || path.equals("/api/users/login")
-                || path.equals("/api/users/register")
-                || path.equals("/api/users/refresh")
-                || path.equals("/api/users/logout")
-                || path.equals("/api/users/leaderboard")
-                || path.equals("/api/quizzes/share-code-preview")
-                || path.startsWith("/actuator");
+    private ServerWebExchange withUserHeaders(ServerWebExchange exchange, JwtClaims claims) {
+        ServerHttpRequest request = exchange.getRequest()
+                .mutate()
+                .headers(headers -> {
+                    headers.remove("X-User-Id");
+                    headers.remove("X-User-Email");
+                    headers.remove("X-Username");
+                    if (claims != null) {
+                        headers.set("X-User-Id", claims.userId().toString());
+                        headers.set("X-User-Email", claims.email());
+                        headers.set("X-Username", claims.username());
+                    }
+                })
+                .build();
+        return exchange.mutate().request(request).build();
+    }
+
+    private Mono<Void> unauthorized(ServerWebExchange exchange) {
+        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+        return exchange.getResponse().setComplete();
     }
 }

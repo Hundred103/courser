@@ -36,11 +36,13 @@ export class HomePageComponent {
   }), { quizzes: 0, questions: 0, sum: 0, count: 0 }));
   readonly chartScale = computed(() => this.createChartScale(this.buckets().map(bucket => this.value(bucket))));
 
+  private readonly userId = computed(() => this.auth.user()?.id ?? null);
+
   constructor() {
     effect(() => {
-      const user = this.auth.user();
+      const userId = this.userId();
       this.scores.scoresVersion();
-      if (!user) { this.daily.set([]); return; }
+      if (userId === null) { this.daily.set([]); return; }
       this.load();
     });
   }

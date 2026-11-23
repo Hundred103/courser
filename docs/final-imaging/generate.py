@@ -625,7 +625,7 @@ ranksep="0.75",
 
 
 # ---------------------------------------------------------------------------
-# 2. Schemat bazy (stan po wszystkich migracjach Liquibase; notacja „kurzej stopki”)
+# 2. Schemat bazy (notacja „kurzej stopki”)
 # ---------------------------------------------------------------------------
 
 _KEY_STYLE = {
@@ -729,12 +729,8 @@ def database_schema(*, landscape: bool = False) -> str:
         ("UQ", "username", "VARCHAR(255)", True),
         ("UQ", "email", "VARCHAR(255)", True),
         ("", "password", "VARCHAR(255) · BCrypt", True),
-        ("", "role", "STUDENT | TEACHER | ADMIN", True),
         ("", "accent_color", "VARCHAR(16) = 'coral'", True),
-        ("", "quizzes_completed", "INTEGER", False),
-        ("", "total_score", "INTEGER", False),
         ("", "created_at", "TIMESTAMP", False),
-        ("", "last_login", "TIMESTAMP", False),
     ], **T("blue", "blue", "blue_bg"))
 
     refresh = er_table("refresh", "refresh_sessions", [
@@ -745,22 +741,6 @@ def database_schema(*, landscape: bool = False) -> str:
         ("", "last_used_at", "TIMESTAMP", True),
         ("", "expires_at", "TIMESTAMP", True),
     ], notes=["IDX (expires_at)"], **T("blue", "blue", "blue_bg"))
-
-    results = er_table("results", "quiz_results", [
-        ("PK", "id", "BIGINT IDENTITY", True),
-        ("FK", "user_id", "BIGINT", True),
-        ("FK", "quiz_id", "BIGINT", True),
-        ("", "score", "INTEGER", True),
-        ("", "max_score", "INTEGER", True),
-        ("", "completed_at", "TIMESTAMP", True),
-    ], **T("navy", "navy", "slate_bg"))
-
-    completed = er_table("completed", "quiz_completed_attempts", [
-        ("PK", "id", "BIGINT IDENTITY", True),
-        ("FK", "quiz_id", "BIGINT", True),
-        ("FK", "user_id", "BIGINT", True),
-        ("", "completed_at", "TIMESTAMP", True),
-    ], notes=["IDX (user_id, quiz_id)"], **T("navy", "navy", "slate_bg"))
 
     daily = er_table("daily", "user_daily_statistics", [
         ("PK FK", "user_id", "BIGINT", True),
@@ -775,8 +755,6 @@ def database_schema(*, landscape: bool = False) -> str:
         ("PK FK", "user_id", "BIGINT", True),
         ("PK FK", "quiz_id", "BIGINT", True),
         ("", "completed_count", "BIGINT = 0", True),
-        ("", "best_score", "INTEGER", False),
-        ("", "best_max_score", "INTEGER", False),
     ], **T("navy", "navy", "slate_bg"))
 
     retry = er_table("retry", "user_statistics_retry_keys", [
@@ -787,8 +765,8 @@ def database_schema(*, landscape: bool = False) -> str:
 
     quizzes = er_table("quizzes", "quizzes", [
         ("PK", "id", "BIGINT IDENTITY", True),
-        ("", "title", "VARCHAR(255)", False),
-        ("FK", "owner_user_id", "BIGINT", False),
+        ("", "title", "VARCHAR(255)", True),
+        ("FK", "owner_user_id", "BIGINT", True),
         ("FK", "ranking_version_id", "UUID", False),
         ("", "scoring_mode", "DEFAULT | CUSTOM", True),
         ("", "allow_negative_score", "BOOLEAN = false", True),
@@ -804,9 +782,7 @@ def database_schema(*, landscape: bool = False) -> str:
         ("FK", "quiz_id", "BIGINT", True),
         ("", "content", "TEXT", False),
         ("", "image_key", "VARCHAR(160)", False),
-        ("", "image_filename", "VARCHAR(255)", False),
-        ("", "question_order", "INTEGER", False),
-    ], notes=["question_order: kolumna historyczna, JPA sortuje po id"], **T("teal", "teal", "teal_bg"))
+    ], notes=["kolejność pytań: JPA sortuje po id"], **T("teal", "teal", "teal_bg"))
 
     answers = er_table("answers", "answers", [
         ("PK", "id", "BIGINT IDENTITY", True),
@@ -814,15 +790,12 @@ def database_schema(*, landscape: bool = False) -> str:
         ("", "content", "TEXT", False),
         ("", "correct", "BOOLEAN", True),
         ("", "points", "DOUBLE", False),
-        ("", "answer_order", "INTEGER", False),
-    ], notes=["answer_order: kolumna historyczna, JPA sortuje po id"], **T("teal", "teal", "teal_bg"))
+    ], notes=["kolejność odpowiedzi: JPA sortuje po id"], **T("teal", "teal", "teal_bg"))
 
     share = er_table("share", "quiz_share_codes", [
         ("PK", "id", "BIGINT IDENTITY", True),
         ("UQ", "code", "VARCHAR(10)", True),
-        ("", "active", "BOOLEAN", True),
-        ("FK", "quiz_id", "BIGINT", False),
-        ("FK", "ranking_version_id", "UUID", False),
+        ("FK", "ranking_version_id", "UUID", True),
         ("FK", "created_by_user_id", "BIGINT", True),
         ("", "created_at", "TIMESTAMP", True),
         ("", "expires_at", "TIMESTAMP", False),
@@ -843,13 +816,11 @@ def database_schema(*, landscape: bool = False) -> str:
         ("", "client_session_id", "UUID", True),
         ("", "started_at", "TIMESTAMP", True),
         ("", "completed_at", "TIMESTAMP", False),
-        ("", "status", "VARCHAR(16): STARTED | FINISHED", True),
         ("", "score_scaled", "INTEGER", False),
         ("", "max_score_scaled", "INTEGER", False),
         ("", "duration_ms", "BIGINT", False),
         ("", "position", "INTEGER", False),
-        ("", "outside_top_five", "BOOLEAN", False),
-    ], notes=["UQ (ranking_version_id, user_id, client_session_id)"], **T("brown", "brown", "brown_bg"))
+    ], notes=["UQ (ranking_version_id, user_id, client_session_id) · STARTED ⇔ completed_at IS NULL"], **T("brown", "brown", "brown_bg"))
 
     entries = er_table("entries", "quiz_ranking_entries", [
         ("PK", "id", "BIGINT IDENTITY", True),
@@ -890,37 +861,32 @@ digraph DatabaseSchema {{
         pad="0.5",
         newrank="true",
     )},
-    label=<<FONT POINT-SIZE="20" COLOR="{C["ink"]}"><B>Courser — schemat bazy danych</B></FONT><BR/><FONT POINT-SIZE="11" COLOR="{C["muted"]}">PostgreSQL 16 · courserdb · stan po migracjach Liquibase 001–017</FONT>>
+    label=<<FONT POINT-SIZE="20" COLOR="{C["ink"]}"><B>Courser — schemat bazy danych</B></FONT><BR/><FONT POINT-SIZE="11" COLOR="{C["muted"]}">PostgreSQL 16 · courserdb</FONT>>
   ];
   node [fontname="Helvetica", shape=plaintext];
   edge [fontname="Helvetica", penwidth=1.4, arrowsize=0.9, color="{C["line"]}"];
 
   {domain_cluster("acct", "KONTO I SESJE", C["blue"], C["blue_bg"], users + refresh)}
-  {domain_cluster("stats", "WYNIKI I STATYSTYKI", C["navy"], C["slate_bg"], results + completed + daily + summary + retry)}
+  {domain_cluster("stats", "WYNIKI I STATYSTYKI", C["navy"], C["slate_bg"], daily + summary + retry)}
   {domain_cluster("content", "TREŚĆ QUIZU", C["teal"], C["teal_bg"], quizzes + questions + answers)}
   {domain_cluster("rank", "RANKING I UDOSTĘPNIANIE", C["brown"], C["brown_bg"], versions + share + attempts + entries)}
   {legend}
 
   {fk_edge("users", "refresh", "user_id", color=C["blue"], on_delete="CASCADE")}
-  {fk_edge("users", "quizzes", "owner_user_id", color=C["blue"], on_delete="NO ACTION", nullable=True)}
+  {fk_edge("users", "quizzes", "owner_user_id", color=C["blue"], on_delete="NO ACTION")}
   {fk_edge("users", "share", "created_by_user_id", color=C["blue"], on_delete="NO ACTION")}
   {fk_edge("users", "attempts", "user_id", color=C["blue"], on_delete="CASCADE")}
   {fk_edge("users", "entries", "user_id", color=C["blue"], on_delete="CASCADE")}
-  {fk_edge("users", "results", "user_id", color=C["blue"], on_delete="NO ACTION")}
-  {fk_edge("users", "completed", "user_id", color=C["blue"], on_delete="CASCADE")}
   {fk_edge("users", "daily", "user_id", color=C["blue"], on_delete="CASCADE")}
   {fk_edge("users", "summary", "user_id", color=C["blue"], on_delete="CASCADE")}
   {fk_edge("users", "retry", "user_id", color=C["blue"], on_delete="CASCADE")}
 
   {fk_edge("quizzes", "questions", "quiz_id", color=C["teal"], on_delete="NO ACTION")}
   {fk_edge("questions", "answers", "question_id", color=C["teal"], on_delete="NO ACTION")}
-  {fk_edge("quizzes", "share", "quiz_id", color=C["teal"], on_delete="SET NULL", nullable=True)}
-  {fk_edge("quizzes", "results", "quiz_id", color=C["teal"], on_delete="CASCADE")}
-  {fk_edge("quizzes", "completed", "quiz_id", color=C["teal"], on_delete="CASCADE")}
   {fk_edge("quizzes", "summary", "quiz_id", color=C["teal"], on_delete="CASCADE")}
 
   {fk_edge("versions", "quizzes", "ranking_version_id", color=C["brown"], on_delete="SET NULL", nullable=True)}
-  {fk_edge("versions", "share", "ranking_version_id", color=C["brown"], on_delete="SET NULL", nullable=True)}
+  {fk_edge("versions", "share", "ranking_version_id", color=C["brown"], on_delete="CASCADE")}
   {fk_edge("versions", "attempts", "ranking_version_id", color=C["brown"], on_delete="CASCADE")}
   {fk_edge("versions", "entries", "ranking_version_id", color=C["brown"], on_delete="CASCADE")}
 }}
@@ -1017,8 +983,8 @@ def lifecycle() -> str:
 
     imp = lane("import", "4. Import kodem (zalogowany)", "amber", f'''
     {trigger("i_t", "POST /import-code", "odbiorca (JWT)")}
-    {outcome("i_q", ["quiz", "same"], "Kopia B · owner_user_id = odbiorca\\ntreść z snapshot_json wersji kodu\\nranking_version = wersja kodu\\nhas_logged_import := true")}
-    {rule_card("i_n", "A i B mają różne wiersze quizzes,\\nale WSPÓLNĄ tablicę top 5.")}
+    {outcome("i_q", ["quiz", "same"], "Kopia B · owner_user_id = odbiorca\\ntreść z snapshot_json wersji kodu\\nranking_version = wersja kodu\\nhas_logged_import := true\\n(tylko gdy inny właściciel na wersji)")}
+    {rule_card("i_n", "A i B mają różne wiersze quizzes,\\nale WSPÓLNĄ tablicę top 5.\\nWłasny kod nie zamraża oryginału.")}
     i_t -> i_q -> i_n;''')
 
     rank = lane("rank", "5. Podejście rankingowe", "brown", f'''
@@ -1039,7 +1005,7 @@ def lifecycle() -> str:
     {decision("g_d1", "wersja istnieje\\ni hash zgodny?")}
     {decision("g_d2", "właściciel ma już\\nquiz z tą wersją?")}
     {outcome("g_dup", ["none"], "Zwraca istniejący quiz\\n(bez duplikatu)")}
-    {outcome("g_join", ["quiz", "same"], "Nowy wiersz (tytuł oryginału)\\nwspólna wersja\\nhas_logged_import := true")}
+    {outcome("g_join", ["quiz", "same"], "Nowy wiersz (tytuł oryginału)\\nwspólna wersja\\nhas_logged_import przy innym właścicielu")}
     {decision("g_d3", "identyczny quiz\\nu właściciela?")}
     {outcome("g_priv", ["quiz", "version"], "Nowy wiersz + prywatna wersja")}
     g_t -> g_l -> g_m -> g_d1;
@@ -1051,9 +1017,9 @@ def lifecycle() -> str:
     g_d3 -> g_priv [{no}];''')
 
     zipimp = lane("zip", "7. Import ZIP (zalogowany)", "slate", f'''
-    {trigger("z_t", "POST /import-archive", "quiz.json + _ranking.versionId\\n+ contentHash (z eksportu)")}
+    {trigger("z_t", "POST /import-archive", "quiz.json + _ranking.versionId\\n(hash treści liczony na serwerze)")}
     {decision("z_d", "wersja istnieje\\ni hash zgodny?")}
-    {outcome("z_join", ["quiz", "same"], "Nowy wiersz · tytuł i limity\\nze snapshotu wersji\\nhas_logged_import := true")}
+    {outcome("z_join", ["quiz", "same"], "Nowy wiersz · tytuł i limity\\nze snapshotu wersji\\nhas_logged_import przy innym właścicielu")}
     {outcome("z_priv", ["quiz", "version"], "Nowy wiersz „(kopia)”\\n+ prywatna wersja")}
     z_t -> z_d;
     z_d -> z_join [{yes}];
@@ -1348,16 +1314,13 @@ def class_diagram() -> str:
             "- showCorrectAnswers: boolean = true",
         ], [
             "+ addQuestion(q: Question): void",
-            "+ removeQuestion(q: Question): void",
         ], **teal),
         uml_classifier("Question", "Question", [
             "- id: Long {id}",
             "- content: String",
             "- imageKey: String [0..1]",
-            "- imageFilename: String [0..1]",
         ], [
             "+ addAnswer(a: Answer): void",
-            "+ removeAnswer(a: Answer): void",
         ], **teal),
         uml_classifier("Answer", "Answer", [
             "- id: Long {id}",
@@ -1374,7 +1337,6 @@ def class_diagram() -> str:
             "- id: Long {id}",
             "- code: String {unique}",
             "- createdByUserId: Long",
-            "- active: boolean",
             "- createdAt: LocalDateTime",
             "- expiresAt: LocalDateTime [0..1]",
         ], ["# onCreate(): void  «PrePersist»"], **amber),
@@ -1391,12 +1353,10 @@ def class_diagram() -> str:
             "- clientSessionId: UUID",
             "- startedAt: LocalDateTime",
             "- completedAt: LocalDateTime [0..1]",
-            "- status: String  {STARTED | FINISHED}",
             "- scoreScaled: Integer [0..1]",
             "- maxScoreScaled: Integer [0..1]",
             "- durationMs: Long [0..1]",
             "- position: Integer [0..1]",
-            "- outsideTopFive: Boolean [0..1]",
         ], ["~ created(): void  «PrePersist»"], **brown),
         uml_classifier("QuizRankingEntry", "QuizRankingEntry", [
             "- id: Long {id}",
@@ -1412,18 +1372,14 @@ def class_diagram() -> str:
         ], [], note="mapuje tabelę users", accent=C["slate"], tint=C["slate_bg"]),
     ]))
 
-    user_pkg = domain_cluster("user", "«serwis» user-service — konto, wyniki i statystyki", C["blue"], C["blue_bg"], "".join([
+    user_pkg = domain_cluster("user", "«serwis» user-service — konto i statystyki", C["blue"], C["blue_bg"], "".join([
         uml_classifier("User", "User", [
             "- id: Long {id}",
             "- username: String {unique}",
             "- email: String {unique}",
             "- password: String",
-            "- role: UserRole",
             "- accentColor: String = \"coral\"",
-            "- totalScore: Integer [0..1]",
-            "- quizzesCompleted: Integer [0..1]",
             "- createdAt: LocalDateTime",
-            "- lastLogin: LocalDateTime [0..1]",
         ], ["# onCreate(): void  «PrePersist»"], **blue),
         uml_classifier("RefreshSession", "RefreshSession", [
             "- id: UUID {id}",
@@ -1432,28 +1388,12 @@ def class_diagram() -> str:
             "- lastUsedAt: LocalDateTime",
             "- expiresAt: LocalDateTime",
         ], [], **blue),
-        uml_classifier("UserRole", "UserRole", ["STUDENT", "TEACHER", "ADMIN"], **enum),
-        uml_classifier("QuizResult", "QuizResult", [
-            "- id: Long {id}",
-            "- userId: Long",
-            "- quizId: Long",
-            "- score: Integer",
-            "- maxScore: Integer",
-            "- completedAt: LocalDateTime",
-        ], ["# onCreate(): void  «PrePersist»"], **navy),
-        uml_classifier("CompletedQuizAttempt", "CompletedQuizAttempt", [
-            "- id: Long {id}",
-            "- quizId: Long",
-            "- userId: Long",
-            "- completedAt: LocalDateTime",
-        ], ["# onCreate(): void  «PrePersist»"], **navy),
         uml_classifier("UserStatisticsService", "UserStatisticsService", [
             "- jdbc: JdbcTemplate",
         ], [
             "+ complete(userId: Long, request: CompleteStatisticsRequest): void",
             "+ daily(userId: Long): List&lt;DailyStatistics&gt;",
             "+ count(userId: Long, quizId: Long): long",
-            "+ bestScores(userId: Long): List&lt;BestQuizScoreResponse&gt;",
         ], kind="service", accent=C["navy"], tint=C["slate_bg"]),
         uml_classifier("DailyStatistics", "DailyStatistics", [
             "+ date: LocalDate",
@@ -1500,15 +1440,13 @@ digraph ClassDiagram {{
   {assoc("Quiz", "Question", role="questions", tail_mult="1", head_mult="0..*", composition=True, color=C["teal"])}
   {assoc("Question", "Answer", role="answers", tail_mult="1", head_mult="0..*", composition=True, color=C["teal"])}
   {assoc("Quiz", "QuizRankingVersion", role="rankingVersion", tail_mult="0..*", head_mult="0..1", color=C["brown"])}
-  {assoc("QuizShareCode", "Quiz", role="quiz", tail_mult="0..*", head_mult="0..1", color=C["amber"], constraint=False)}
-  {assoc("QuizShareCode", "QuizRankingVersion", role="rankingVersion", tail_mult="0..*", head_mult="0..1", color=C["amber"])}
+  {assoc("QuizShareCode", "QuizRankingVersion", role="rankingVersion", tail_mult="0..*", head_mult="1", color=C["amber"])}
   {assoc("QuizRankingAttempt", "QuizRankingVersion", role="rankingVersion", tail_mult="0..*", head_mult="1", color=C["brown"])}
   {assoc("QuizRankingEntry", "QuizRankingVersion", role="rankingVersion", tail_mult="0..*", head_mult="1", color=C["brown"])}
   {assoc("RefreshSession", "User", role="user", tail_mult="0..*", head_mult="1", color=C["blue"])}
 
   Quiz -> ScoringMode [{dep}];
   Quiz -> PenaltyMode [{dep}];
-  User -> UserRole [{dep}];
   UserStatisticsService -> DailyStatistics [{dep}, label=<<FONT POINT-SIZE="9">«create»</FONT>>];
   UserStatisticsService -> jdbc_note [style=dashed, arrowhead=none, color="#CA8A04"];
   RankingUser -> User [{dep}, label=<<FONT POINT-SIZE="9">«ta sama tabela»</FONT>>, constraint=false];
@@ -1517,13 +1455,9 @@ digraph ClassDiagram {{
   QuizShareCode -> User [{id_ref}, constraint=false];
   QuizRankingAttempt -> User [{id_ref}, constraint=false];
   QuizRankingEntry -> User [{id_ref}, constraint=false];
-  QuizResult -> User [{id_ref}];
-  QuizResult -> Quiz [{id_ref}, constraint=false];
-  CompletedQuizAttempt -> User [{id_ref}];
-  CompletedQuizAttempt -> Quiz [{id_ref}, constraint=false];
 
   Answer -> RefreshSession [style=invis];
-  QuizRankingVersion -> QuizResult [style=invis];
+  QuizRankingVersion -> RankingUser [style=invis];
   QuizShareCode -> RankingUser [style=invis];
   DailyStatistics -> legend [style=invis];
 }}
@@ -1630,7 +1564,7 @@ _FE_CHIPS = {
     "guest": ("GuestQuizStorage", "amber", "amber_bg"),
     "theme": ("ThemeService", "red", "red_bg"),
     "zip": ("quiz-zip", "navy", "slate_bg"),
-    "img": ("image-compression", "navy", "slate_bg"),
+    "img": ("image.util", "navy", "slate_bg"),
     "scoring": ("quiz-scoring", "navy", "slate_bg"),
     "local": ("localStorage", "brown", "brown_bg"),
     "session": ("sessionStorage", "brown", "brown_bg"),
@@ -1790,8 +1724,8 @@ def frontend_architecture() -> str:
             "ID &lt; 0 → quiz gościa z pamięci lokalnej",
         ], ["auth", "guest"], accent=C["teal"], tint=C["teal_bg"], width=250),
         fe_card("scoresvc", ic["fe_gear_violet"], "QuizScoreService", "scoresVersion (signal)", [
-            "statystyki dzienne, najlepsze wyniki",
-            "liczba podejść, zapis ukończenia",
+            "statystyki dzienne, liczba ukończeń",
+            "zapis ukończenia (idempotentny requestId)",
         ], accent=C["violet"], tint=C["violet_bg"]),
         fe_card("guestsvc", ic["fe_gear_amber"], "GuestQuizStorageService", "klucz: guestQuizzes", [
             "quizy gościa (ID &lt; 0) bez konta",
@@ -1805,8 +1739,9 @@ def frontend_architecture() -> str:
     infra = layer("infra", "5 · NARZĘDZIA I PRZEGLĄDARKA", C["navy"], "#F8FAFC", "".join([
         fe_card("utils", ic["fe_util"], "core/utils", "czyste funkcje", [
             "quiz-zip.util — JSZip: build / parse ZIP",
-            "image-compression.util — walidacja, odczyt obrazów",
+            "image.util — walidacja, odczyt obrazów",
             "quiz-scoring.util — punktacja pytań",
+            "quiz-request.util — limity rozmiaru / tytułu",
         ], accent=C["navy"], tint=C["slate_bg"], width=280),
         fe_card("storage", ic["fe_storage"], "Pamięć przeglądarki", "Web Storage + cookie", [
             "localStorage: user, guestQuizzes",
@@ -1910,7 +1845,10 @@ def pad_to_aspect(path: Path, ratio: float) -> None:
 
 
 # Wyjście o stałych proporcjach (np. slajd prezentacji).
-ASPECT = {"02_database_schema_16x9": 16 / 9}
+ASPECT = {
+    "02_database_schema_16x9": 16 / 9,
+    "02_database_schema_16x9_final": 16 / 9,
+}
 
 # name -> (factory, graphviz engine)
 GENERATORS = {
@@ -1933,24 +1871,32 @@ def main() -> None:
         help="Katalog wyjściowy PNG",
     )
     parser.add_argument(
+        "--suffix",
+        default="",
+        help="Przyrostek nazwy pliku (np. _final → 01_system_architecture_final.png)",
+    )
+    parser.add_argument(
         "--keep-dot",
         action="store_true",
         help="Zapisz też źródła .dot obok PNG",
     )
     args = parser.parse_args()
+    suffix = args.suffix or ""
 
     dot_bin = require_dot()
-    print(f"Renderowanie {len(GENERATORS)} diagramów → {args.out}")
+    print(f"Renderowanie {len(GENERATORS)} diagramów → {args.out} (suffix={suffix!r})")
 
     for name, (factory, engine) in GENERATORS.items():
+        out_name = f"{name}{suffix}"
         source = resolve_card_splits(dot_bin, factory(), engine)
         if args.keep_dot:
-            dot_path = args.out / f"{name}.dot"
+            dot_path = args.out / f"{out_name}.dot"
             dot_path.parent.mkdir(parents=True, exist_ok=True)
             dot_path.write_text(source, encoding="utf-8")
-        render(dot_bin, source, args.out / f"{name}.png", engine=engine)
-        if name in ASPECT:
-            pad_to_aspect(args.out / f"{name}.png", ASPECT[name])
+        png_path = args.out / f"{out_name}.png"
+        render(dot_bin, source, png_path, engine=engine)
+        if out_name in ASPECT or name in ASPECT:
+            pad_to_aspect(png_path, ASPECT.get(out_name) or ASPECT[name])
 
     print("Gotowe.")
 

@@ -14,6 +14,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Create CI environment
+        run: |
+          {
+            echo "POSTGRES_DB=courserdb"
+            echo "POSTGRES_USER=courseruser"
+            echo "POSTGRES_PASSWORD=courserpassword"
+            echo "APP_JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')"
+          } > .env
+
       - name: Build all services
         # This triggers the Dockerfile contexts for your frontend and backend Spring Boot microservices
         run: docker compose build

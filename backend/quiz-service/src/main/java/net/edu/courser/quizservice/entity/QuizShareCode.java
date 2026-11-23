@@ -20,12 +20,8 @@ public class QuizShareCode {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "quiz_id")
-    private Quiz quiz;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ranking_version_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "ranking_version_id", nullable = false)
     private QuizRankingVersion rankingVersion;
 
     @Column(nullable = false, length = 10)
@@ -33,9 +29,6 @@ public class QuizShareCode {
 
     @Column(name = "created_by_user_id", nullable = false)
     private Long createdByUserId;
-
-    @Column(nullable = false)
-    private boolean active;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -48,6 +41,5 @@ public class QuizShareCode {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
-        active = true;
     }
 }

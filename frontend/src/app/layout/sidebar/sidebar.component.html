@@ -26,6 +26,7 @@
                   #titleInput
                   class="quiz-title-input"
                   type="text"
+                  maxlength="255"
                   [value]="draftTitle()"
                   [disabled]="busyQuizId() === quiz.id"
                   (input)="updateDraftTitle($event)"
@@ -41,8 +42,8 @@
           } @else {
             <div class="quiz-info">
               <a class="quiz-title quiz-title-link" [routerLink]="['/quizzes', quiz.id, 'details']">{{ quiz.title }}</a>
-              @if (isLoggedIn() && rankingPositionLabel(quiz.id); as positionLabel) {
-                <span class="quiz-best-score" [class.quiz-rank-medal]="isMedalPosition(quiz.id)">{{ positionLabel }}</span>
+              @if (isLoggedIn() && rankingPositionLabel(quiz); as positionLabel) {
+                <span class="quiz-ranking-position" [class.quiz-rank-medal]="isMedalPosition(quiz)">{{ positionLabel }}</span>
               }
             </div>
           }
@@ -291,7 +292,7 @@
       <header class="settings-header">
         <h3 id="quiz-settings-title">{{ quizToStart.title }}</h3>
         <div class="start-facts">
-          <p>Pytania: {{ quizToStart.questions.length }}</p>
+          <p>Pytania: {{ quizToStart.questionCount }}</p>
           @if (isLoggedIn() && completedAttemptsCount(); as attempts) {
             <p>Ukończone podejścia: {{ attempts }}</p>
           } @else if (isLoggedIn() && completedAttemptsCount() === 0) {

@@ -1,6 +1,7 @@
 package net.edu.courser.quizservice.repository;
 import net.edu.courser.quizservice.entity.QuizRankingVersion;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
 import java.util.UUID;
 import java.time.LocalDateTime;
 import org.springframework.data.jpa.repository.Modifying;
@@ -16,7 +17,6 @@ public interface QuizRankingVersionRepository extends JpaRepository<QuizRankingV
               and not exists (
                   select 1 from quiz_share_codes code
                   where code.ranking_version_id = version.id
-                    and code.active = true
                     and (code.expires_at is null or code.expires_at > :now)
               )
             """, nativeQuery = true)
@@ -24,4 +24,7 @@ public interface QuizRankingVersionRepository extends JpaRepository<QuizRankingV
             @Param("orphanedBefore") LocalDateTime orphanedBefore,
             @Param("now") LocalDateTime now
     );
+
+    @Query("select version.snapshotJson from QuizRankingVersion version")
+    List<String> findAllSnapshotJson();
 }
