@@ -726,21 +726,22 @@ def database_schema(*, landscape: bool = False) -> str:
 
     users = er_table("users", "users", [
         ("PK", "id", "BIGINT IDENTITY", True),
-        ("UQ", "username", "VARCHAR(255)", True),
+        ("", "username", "VARCHAR(255)", True),
         ("UQ", "email", "VARCHAR(255)", True),
         ("", "password", "VARCHAR(255) · BCrypt", True),
         ("", "accent_color", "VARCHAR(16) = 'coral'", True),
         ("", "created_at", "TIMESTAMP", False),
-    ], **T("blue", "blue", "blue_bg"))
+    ], notes=["UQ (lower(username))"], **T("blue", "blue", "blue_bg"))
 
     refresh = er_table("refresh", "refresh_sessions", [
         ("PK", "id", "UUID", True),
         ("FK", "user_id", "BIGINT", True),
+        ("", "family_id", "UUID", True),
         ("UQ", "token_hash", "VARCHAR(64) · SHA-256", True),
         ("", "created_at", "TIMESTAMP", True),
         ("", "last_used_at", "TIMESTAMP", True),
         ("", "expires_at", "TIMESTAMP", True),
-    ], notes=["IDX (expires_at)"], **T("blue", "blue", "blue_bg"))
+    ], notes=["IDX (expires_at) · IDX (family_id)"], **T("blue", "blue", "blue_bg"))
 
     daily = er_table("daily", "user_daily_statistics", [
         ("PK FK", "user_id", "BIGINT", True),
@@ -1375,7 +1376,7 @@ def class_diagram() -> str:
     user_pkg = domain_cluster("user", "«serwis» user-service — konto i statystyki", C["blue"], C["blue_bg"], "".join([
         uml_classifier("User", "User", [
             "- id: Long {id}",
-            "- username: String {unique}",
+            "- username: String {unique · ignoreCase}",
             "- email: String {unique}",
             "- password: String",
             "- accentColor: String = \"coral\"",
@@ -1383,6 +1384,7 @@ def class_diagram() -> str:
         ], ["# onCreate(): void  «PrePersist»"], **blue),
         uml_classifier("RefreshSession", "RefreshSession", [
             "- id: UUID {id}",
+            "- familyId: UUID",
             "- tokenHash: String {unique}",
             "- createdAt: LocalDateTime",
             "- lastUsedAt: LocalDateTime",

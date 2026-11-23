@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.UUID;
 
 @Service
 public class RefreshSessionService {
@@ -46,15 +47,7 @@ public class RefreshSessionService {
 
     @Transactional
     public String create(User user) {
-        String rawToken = generateToken();
-        LocalDateTime now = LocalDateTime.now();
-        refreshSessionRepository.save(RefreshSession.builder()
-                .user(user)
-                .tokenHash(hash(rawToken))
-                .lastUsedAt(now)
-                .expiresAt(now.plus(inactivityDuration))
-                .build());
-        return rawToken;
+        return createInFamily(user, UUID.randomUUID());
     }
 
     @Transactional(noRollbackFor = AuthenticationFailedException.class)
@@ -77,15 +70,30 @@ public class RefreshSessionService {
         LocalDateTime graceEnd = now.plus(rotationGrace);
         if (session.getExpiresAt().isAfter(graceEnd)) session.setExpiresAt(graceEnd);
         session.setLastUsedAt(now);
-        String nextToken = create(user);
+        String nextToken = createInFamily(user, session.getFamilyId());
         refreshSessionRepository.deleteByExpiresAtBefore(now);
         return new RefreshResult(user, nextToken);
     }
 
+    /** Revokes every key in the rotated session family (grace siblings included). */
     @Transactional
     public void revoke(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) return;
-        refreshSessionRepository.findByTokenHash(hash(rawToken)).ifPresent(refreshSessionRepository::delete);
+        refreshSessionRepository.findByTokenHash(hash(rawToken)).ifPresent(session ->
+                refreshSessionRepository.deleteByFamilyId(session.getFamilyId()));
+    }
+
+    private String createInFamily(User user, UUID familyId) {
+        String rawToken = generateToken();
+        LocalDateTime now = LocalDateTime.now();
+        refreshSessionRepository.save(RefreshSession.builder()
+                .user(user)
+                .tokenHash(hash(rawToken))
+                .familyId(familyId)
+                .lastUsedAt(now)
+                .expiresAt(now.plus(inactivityDuration))
+                .build());
+        return rawToken;
     }
 
     private String generateToken() {

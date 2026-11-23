@@ -38,7 +38,7 @@ Each section has the same shape:
 3. `UserController.register()` (`user-service/controller/UserController.java`) builds a `User` and hands it to `UserService.createUser()` (`user-service/service/UserService.java`), which:
    - repeats every form rule (`validateEmail()`, `validateUsername()`, `validatePassword()`), so a request sent around the form gets the same answer. The password may also be at most 72 bytes, because BCrypt ignores anything beyond that;
    - trims the email and stores it in **lower case**;
-   - checks whether the email (ignoring case) or the username is already taken, with a separate message for each case;
+   - checks whether the email (ignoring case) or the username (also ignoring case) is already taken, with a separate message for each case. The database enforces username uniqueness with `UNIQUE (lower(username))`. Older case-only duplicates were renamed to alphanumeric `u{id}` so settings validation still accepts them;
    - sets the default page colour `coral` and the role `STUDENT`;
    - scrambles the password with BCrypt (`PasswordEncoder` from `config/SecurityConfig.java`);
    - saves the row in `users`.
@@ -68,14 +68,14 @@ Each section has the same shape:
 2. `RefreshSessionService.rotate()` (`user-service/service/RefreshSessionService.java`):
    - finds the session by the cookie's fingerprint;
    - checks that it hasn't expired;
-   - **creates a brand-new one** and lets the old key run out **30 seconds** later (`app.refresh-session.rotation-grace-seconds`). Several tabs opened at once all send the same old key; thanks to that short grace period each of them still gets a session, instead of all but one being logged out;
+   - **creates a brand-new key in the same session family** (`family_id`) and lets the old key run out **30 seconds** later (`app.refresh-session.rotation-grace-seconds`). Several tabs opened at once all send the same old key; thanks to that short grace period each of them still gets a session, instead of all but one being logged out;
    - tidies up any other expired sessions.
 
    A rejected refresh doesn't clear the cookie, because a late request from one tab would otherwise erase the key another tab has just received.
 3. **When any call returns 401** (the wristband expired), `auth.interceptor.ts` asks for a refresh once. If several calls fail at the same moment, they share one refresh request (`refreshInFlight$`), and each original call is then retried with the new token.
    - Only when the server **rejects the session** (401/403 from `/refresh`) is the user logged out and sent to `/login`.
    - A network error or a server error (5xx) just fails the original call. The user stays logged in and the saved quiz runs survive.
-4. **Logout** (from `frontend/layout/navbar/navbar.component.ts`) sends `POST /api/users/logout`. `RefreshSessionService.revoke()` deletes the session and the cookie is cleared. `AuthService.clearAuthState()` also wipes the saved quiz-in-progress snapshots in `sessionStorage` (see section 8).
+4. **Logout** (from `frontend/layout/navbar/navbar.component.ts`) sends `POST /api/users/logout`. `RefreshSessionService.revoke()` deletes **every key in that session family** (current cookie plus any grace siblings from rotation) and the cookie is cleared. `AuthService.clearAuthState()` also wipes the saved quiz-in-progress snapshots in `sessionStorage` (see section 8).
 
 ---
 
@@ -285,7 +285,7 @@ That's why `update()` and `importArchive()` first rebuild the quiz, which turns 
 
 1. In `frontend/layout/navbar/navbar.component.ts`, the settings dialog lets you change your username and pick one of six colours from `ACCENT_OPTIONS` in `frontend/core/models/theme.model.ts`: coral, blue, green, violet, turquoise or pink.
 2. `AuthService.updateSettings()` sends `PUT /api/users/me/settings` with `{ username, accentColor }`.
-3. `UserService.updateSettings()` checks the username rules and that it isn't taken, and that the colour is one of the six allowed (`ACCENT_COLORS`). It then saves both on the `users` row.
+3. `UserService.updateSettings()` checks the username rules and that it isn't taken (ignoring case), and that the colour is one of the six allowed (`ACCENT_COLORS`). It then saves both on the `users` row.
 4. The server replies with a fresh login response, **including a new token**, because the username lives inside the token. `setCurrentUser()` stores it.
 5. `frontend/core/services/theme.service.ts` (started by `app.component.ts`) has an `effect` that watches the user. It sets `document.documentElement.dataset.accent`, i.e. `<html data-accent="blue">`.
 6. `frontend/src/styles.css` has one block per colour (`:root[data-accent='blue'] { … }`) that redefines the colour variables, so every component re-colours at once.

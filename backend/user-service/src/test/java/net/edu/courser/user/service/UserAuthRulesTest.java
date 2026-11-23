@@ -97,6 +97,37 @@ class UserAuthRulesTest {
         assertThat(firstTab).isNotEqualTo(secondTab);
         RefreshSession old = byHash.values().stream().filter(s -> s.getExpiresAt().isBefore(LocalDateTime.now().plusMinutes(1))).findFirst().orElseThrow();
         assertThat(old.getExpiresAt()).isBefore(LocalDateTime.now().plusSeconds(31));
+        assertThat(byHash.values().stream().map(RefreshSession::getFamilyId).distinct()).hasSize(1);
+    }
+
+    @Test
+    void logoutRevokesTheWholeRotatedFamily() {
+        RefreshSessionRepository sessions = mock(RefreshSessionRepository.class);
+        Map<String, RefreshSession> byHash = new HashMap<>();
+        when(sessions.save(any(RefreshSession.class))).thenAnswer(invocation -> {
+            RefreshSession session = invocation.getArgument(0);
+            byHash.put(session.getTokenHash(), session);
+            return session;
+        });
+        when(sessions.findByTokenHash(anyString())).thenAnswer(invocation -> Optional.ofNullable(byHash.get(invocation.<String>getArgument(0))));
+        when(sessions.deleteByFamilyId(any())).thenAnswer(invocation -> {
+            java.util.UUID familyId = invocation.getArgument(0);
+            long removed = byHash.values().stream().filter(session -> familyId.equals(session.getFamilyId())).count();
+            byHash.entrySet().removeIf(entry -> familyId.equals(entry.getValue().getFamilyId()));
+            return removed;
+        });
+        User owner = user("a@b.pl", "x");
+        owner.setId(1L);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(owner));
+        RefreshSessionService service = new RefreshSessionService(sessions, userRepository, 48, 30);
+
+        String keyA = service.create(owner);
+        String keyB = service.rotate(keyA).rawToken();
+        service.rotate(keyA); // grace sibling
+        assertThat(byHash).hasSize(3);
+
+        service.revoke(keyB);
+        assertThat(byHash).isEmpty();
     }
 
     private static User user(String email, String password) {

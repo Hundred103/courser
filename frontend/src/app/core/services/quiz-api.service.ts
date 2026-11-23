@@ -66,8 +66,9 @@ export class QuizApiService {
 
   deleteQuiz(id: number): Observable<void> {
     if (id < 0) {
+      const epoch = this.authService.getSessionGeneration();
       this.guestQuizStorage.delete(id);
-      this.removeFromList(id);
+      this.withSession(epoch, () => this.removeFromList(id));
       return of(void 0);
     }
 
@@ -75,7 +76,10 @@ export class QuizApiService {
       return throwError(() => new Error('Login required'));
     }
 
-    return this.http.delete<void>(`${this.apiUrl}/${id}`).pipe(tap(() => this.removeFromList(id)));
+    const epoch = this.authService.getSessionGeneration();
+    return this.http.delete<void>(`${this.apiUrl}/${id}`).pipe(
+      tap(() => this.withSession(epoch, () => this.removeFromList(id))),
+    );
   }
 
   createQuiz(dto: QuizCreateDTO): Observable<QuizRawDTO> {
@@ -83,12 +87,18 @@ export class QuizApiService {
       return throwError(() => new Error('Login required'));
     }
 
-    return sendIfQuizFits(dto, () => this.http.post<QuizRawDTO>(this.apiUrl, dto)).pipe(tap((quiz) => this.addToList(quiz)));
+    const epoch = this.authService.getSessionGeneration();
+    return sendIfQuizFits(dto, () => this.http.post<QuizRawDTO>(this.apiUrl, dto)).pipe(
+      tap((quiz) => this.withSession(epoch, () => this.addToList(quiz))),
+    );
   }
 
   importQuiz(dto: QuizCreateDTO, rankingVersionId: string | null = null): Observable<QuizRawDTO> {
     if (!this.authService.getCurrentUser()) {
-      return defer(() => of(this.guestQuizStorage.create(dto, rankingVersionId))).pipe(tap((quiz) => this.addToList(quiz)));
+      const epoch = this.authService.getSessionGeneration();
+      return defer(() => of(this.guestQuizStorage.create(dto, rankingVersionId))).pipe(
+        tap((quiz) => this.withSession(epoch, () => this.addToList(quiz))),
+      );
     }
 
     return this.createQuiz(dto);
@@ -96,9 +106,10 @@ export class QuizApiService {
 
   importArchiveQuiz(dto: QuizCreateDTO, rankingVersionId: string | null): Observable<QuizRawDTO> {
     if (!this.authService.getCurrentUser()) return this.importQuiz(dto, rankingVersionId);
+    const epoch = this.authService.getSessionGeneration();
     const body = { quiz: dto, rankingVersionId };
     return sendIfQuizFits(body, () => this.http.post<QuizRawDTO>(`${this.apiUrl}/import-archive`, body)).pipe(
-      tap((quiz) => this.addToList(quiz)),
+      tap((quiz) => this.withSession(epoch, () => this.addToList(quiz))),
     );
   }
 
@@ -139,7 +150,10 @@ export class QuizApiService {
         .pipe(switchMap((preview) => this.importQuiz(preview.quiz, preview.rankingVersionId)));
     }
 
-    return this.http.post<QuizRawDTO>(`${this.apiUrl}/import-code`, { code }).pipe(tap((quiz) => this.addToList(quiz)));
+    const epoch = this.authService.getSessionGeneration();
+    return this.http.post<QuizRawDTO>(`${this.apiUrl}/import-code`, { code }).pipe(
+      tap((quiz) => this.withSession(epoch, () => this.addToList(quiz))),
+    );
   }
 
   updateQuiz(id: number, dto: QuizCreateDTO): Observable<QuizRawDTO> {
@@ -147,7 +161,10 @@ export class QuizApiService {
       return throwError(() => new Error('Login required'));
     }
 
-    return sendIfQuizFits(dto, () => this.http.put<QuizRawDTO>(`${this.apiUrl}/${id}`, dto)).pipe(tap((quiz) => this.replaceInList(quiz)));
+    const epoch = this.authService.getSessionGeneration();
+    return sendIfQuizFits(dto, () => this.http.put<QuizRawDTO>(`${this.apiUrl}/${id}`, dto)).pipe(
+      tap((quiz) => this.withSession(epoch, () => this.replaceInList(quiz))),
+    );
   }
 
   updateQuizTitle(id: number, dto: QuizEditTitleDTO): Observable<QuizRawDTO> {
@@ -155,23 +172,30 @@ export class QuizApiService {
       return throwError(() => new Error('Login required'));
     }
 
-    return this.http.patch<QuizRawDTO>(`${this.apiUrl}/${id}`, dto).pipe(tap((quiz) => this.replaceInList(quiz)));
+    const epoch = this.authService.getSessionGeneration();
+    return this.http.patch<QuizRawDTO>(`${this.apiUrl}/${id}`, dto).pipe(
+      tap((quiz) => this.withSession(epoch, () => this.replaceInList(quiz))),
+    );
   }
 
   // Guest = local clone; account = POST fork (images by key).
   copyQuiz(id: number): Observable<QuizRawDTO> {
     if (id < 0) {
+      const epoch = this.authService.getSessionGeneration();
       return defer(() => {
         const dto = this.guestQuizStorage.toCreateDtoById(id);
         return dto ? of(this.guestQuizStorage.create({ ...dto, title: copyTitle(dto.title) })) : throwError(() => new Error('Local quiz not found'));
-      }).pipe(tap((quiz) => this.addToList(quiz)));
+      }).pipe(tap((quiz) => this.withSession(epoch, () => this.addToList(quiz))));
     }
 
     if (!this.authService.getCurrentUser()) {
       return throwError(() => new Error('Login required'));
     }
 
-    return this.http.post<QuizRawDTO>(`${this.apiUrl}/${id}/fork`, null).pipe(tap((quiz) => this.addToList(quiz)));
+    const epoch = this.authService.getSessionGeneration();
+    return this.http.post<QuizRawDTO>(`${this.apiUrl}/${id}/fork`, null).pipe(
+      tap((quiz) => this.withSession(epoch, () => this.addToList(quiz))),
+    );
   }
 
   exportQuiz(id: number): Observable<Blob> {
@@ -187,8 +211,9 @@ export class QuizApiService {
   }
 
   finishRankingAttempt(id: number, attemptId: string, answers: { questionIndex: number; answerIndexes: number[] }[]): Observable<RankingFinishDTO> {
+    const epoch = this.authService.getSessionGeneration();
     return this.http.post<RankingFinishDTO>(`${this.apiUrl}/${id}/ranking-attempts/${attemptId}/finish`, { answers }).pipe(
-      tap((result) => this.updateInList(id, (quiz) => ({ ...quiz, rankingPosition: result.position }))),
+      tap((result) => this.withSession(epoch, () => this.updateInList(id, (quiz) => ({ ...quiz, rankingPosition: result.position })))),
     );
   }
 
@@ -204,7 +229,17 @@ export class QuizApiService {
     return this.http.get<QuizRawDTO[]>(this.apiUrl);
   }
 
+  private withSession(epoch: number, apply: () => void): void {
+    if (this.authService.getSessionGeneration() === epoch) {
+      apply();
+    }
+  }
+
   private addToList(quiz: QuizRawDTO): void {
+    if (this.listState().status !== 'ready') {
+      this.reloadQuizList();
+      return;
+    }
     this.listState.update((state) => ({ ...state, quizzes: [...state.quizzes, quiz] }));
   }
 

@@ -33,10 +33,11 @@ services:
       LIQUIBASE_COMMAND_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       LIQUIBASE_COMMAND_USERNAME: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
       LIQUIBASE_COMMAND_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-    command: >
-      --changelog-file=changelog/db.changelog-master.xml
-      --contexts=${LIQUIBASE_CONTEXTS:-!seed}
-      update
+    # Exec-form keeps the context expression as one argv (spaces in AND must not split).
+    command:
+      - --changelog-file=changelog/db.changelog-master.xml
+      - --contexts=${LIQUIBASE_CONTEXTS:-!seed AND !seed-legacy}
+      - update
 
   media:
     image: nginx:1.27-alpine

@@ -28,6 +28,10 @@ public class MediaStorageService {
             "image/bmp", "bmp"
     );
 
+    /** Stripe locks so store/touch and age-check/delete for the same key cannot race. */
+    private static final int LOCK_STRIPES = 64;
+    private final Object[] keyLocks = new Object[LOCK_STRIPES];
+
     private final Path storageRoot;
     private final String publicBaseUrl;
 
@@ -39,6 +43,9 @@ public class MediaStorageService {
         this.publicBaseUrl = publicBaseUrl.endsWith("/")
                 ? publicBaseUrl.substring(0, publicBaseUrl.length() - 1)
                 : publicBaseUrl;
+        for (int i = 0; i < keyLocks.length; i++) {
+            keyLocks[i] = new Object();
+        }
         try {
             Files.createDirectories(this.storageRoot);
         } catch (IOException exception) {
@@ -68,14 +75,16 @@ public class MediaStorageService {
             throw new IllegalArgumentException("Nieprawidłowa ścieżka mediów.");
         }
 
-        try {
-            if (Files.exists(target)) {
-                markUsed(target);
-            } else {
-                Files.write(target, bytes);
+        synchronized (lockFor(key)) {
+            try {
+                if (Files.exists(target)) {
+                    markUsed(target);
+                } else {
+                    Files.write(target, bytes);
+                }
+            } catch (IOException exception) {
+                throw new IllegalStateException("Nie udało się zapisać obrazu.", exception);
             }
-        } catch (IOException exception) {
-            throw new IllegalStateException("Nie udało się zapisać obrazu.", exception);
         }
 
         return key;
@@ -90,7 +99,10 @@ public class MediaStorageService {
         }
     }
 
-    /** Touch mtime on use/store; delete keys unused since unusedBefore. */
+    /**
+     * Touch mtime for keys still referenced; delete others unused since {@code unusedBefore}.
+     * Age check and delete run under the same per-key lock as {@link #store(byte[])}.
+     */
     public int deleteUnused(Set<String> usedKeys, Instant unusedBefore) {
         int deleted = 0;
         try (Stream<Path> files = Files.list(storageRoot)) {
@@ -98,16 +110,30 @@ public class MediaStorageService {
                 String key = file.getFileName().toString();
                 if (!Files.isRegularFile(file) || !looksLikeMediaKey(key)) continue;
                 if (usedKeys.contains(key)) {
-                    markUsed(file);
-                } else if (Files.getLastModifiedTime(file).toInstant().isBefore(unusedBefore)) {
-                    Files.delete(file);
-                    deleted++;
+                    synchronized (lockFor(key)) {
+                        if (Files.isRegularFile(file)) {
+                            markUsed(file);
+                        }
+                    }
+                    continue;
+                }
+                synchronized (lockFor(key)) {
+                    if (!Files.isRegularFile(file)) continue;
+                    Instant modified = Files.getLastModifiedTime(file).toInstant();
+                    if (modified.isBefore(unusedBefore)) {
+                        Files.delete(file);
+                        deleted++;
+                    }
                 }
             }
         } catch (IOException exception) {
             throw new IllegalStateException("Nie udało się usunąć nieużywanych obrazów.", exception);
         }
         return deleted;
+    }
+
+    private Object lockFor(String key) {
+        return keyLocks[(key.hashCode() & 0x7fffffff) % LOCK_STRIPES];
     }
 
     private void markUsed(Path file) throws IOException {

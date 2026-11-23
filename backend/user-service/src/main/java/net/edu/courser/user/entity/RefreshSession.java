@@ -25,6 +25,10 @@ public class RefreshSession {
     @Column(name = "token_hash", nullable = false, unique = true, length = 64)
     private String tokenHash;
 
+    /** Shared across rotated keys so logout can revoke the whole session chain. */
+    @Column(name = "family_id", nullable = false)
+    private UUID familyId;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

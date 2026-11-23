@@ -45,6 +45,28 @@ class MediaStorageServiceTest {
         assertThat(media.exists(key)).isTrue();
     }
 
+    @Test
+    void storeTouchWinsOverConcurrentCleanupOfSameKey() throws Exception {
+        MediaStorageService media = new MediaStorageService(storage.toString(), "/media");
+        byte[] sameBytes = png(1);
+        String key = null;
+
+        // Stress the store/cleanup lock: a late delete after touch must not remove the key.
+        for (int i = 0; i < 100; i++) {
+            key = storeAgedImage(media, 1, 40);
+            Instant cutoff = Instant.now().minus(RETENTION);
+            Thread cleanup = new Thread(() -> media.deleteUnused(Set.of(), cutoff));
+            Thread upload = new Thread(() -> media.store(sameBytes));
+            cleanup.start();
+            upload.start();
+            cleanup.join();
+            upload.join();
+            assertThat(media.exists(key)).isTrue();
+        }
+
+        assertThat(lastModified(key)).isAfter(Instant.now().minus(Duration.ofMinutes(1)));
+    }
+
     static byte[] png(int variant) {
         return new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, (byte) variant};
     }

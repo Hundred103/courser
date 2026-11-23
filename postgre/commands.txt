@@ -22,7 +22,7 @@ Sprawdzenie statusu migracji:
 docker compose ps -a liquibase
 docker inspect -f '{{ .State.ExitCode }}' courser-liquibase
 
-Domyślnie Liquibase tworzy tylko schemat (kontekst `!seed`), bez danych przykładowych.
+Domyślnie Liquibase tworzy tylko schemat (kontekst `!seed AND !seed-legacy`), bez danych przykładowych ani starych seedów.
 
 ---DANE PRZYKŁADOWE (tylko lokalnie, na świeżej bazie)---
 Dane przykładowe zawierają konto testowe ze znanym hasłem, więc nigdy nie włączaj ich na serwerze.

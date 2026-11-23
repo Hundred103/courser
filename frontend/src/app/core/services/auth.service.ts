@@ -25,6 +25,8 @@ export class AuthService {
   private readonly apiUrl = `${environment.apiUrl}/users`;
 
   private readonly currentUser = signal<AuthResponse | null>(this.loadStoredUser());
+  /** Bumps when the logged-in identity changes (login / logout / account switch), not on token refresh. */
+  private readonly sessionGeneration = signal(0);
   private refreshInFlight$: Observable<boolean> | null = null;
 
   readonly user = this.currentUser.asReadonly();
@@ -48,9 +50,18 @@ export class AuthService {
   }
 
   setCurrentUser(user: AuthResponse): void {
+    const previousId = this.currentUser()?.id ?? null;
     const normalizedUser = { ...user, accentColor: isAccentColor(user.accentColor) ? user.accentColor : DEFAULT_ACCENT_COLOR };
     this.currentUser.set(normalizedUser);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedUser));
+    if (previousId !== normalizedUser.id) {
+      this.sessionGeneration.update((value) => value + 1);
+    }
+  }
+
+  /** Identity epoch for ignoring in-flight quiz-list mutations after logout / account switch. */
+  getSessionGeneration(): number {
+    return this.sessionGeneration();
   }
 
   updateSettings(username: string, accentColor: AccentColor): Observable<AuthResponse> {
@@ -97,8 +108,12 @@ export class AuthService {
   private clearAuthState(): void {
     const userId = this.currentUser()?.id;
     if (userId != null) this.clearPlaySessionsForUser(userId);
+    const hadUser = this.currentUser() != null;
     this.currentUser.set(null);
     localStorage.removeItem(STORAGE_KEY);
+    if (hadUser) {
+      this.sessionGeneration.update((value) => value + 1);
+    }
   }
 
   private clearPlaySessionsForUser(userId: number): void {
