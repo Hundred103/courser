@@ -63,7 +63,6 @@ Szczegóły resetu bazy i Liquibase: `postgre/commands.txt`.
 | `backend/quiz-service/` | quizy, ranking, media, eksport ZIP |
 | `postgre/liquibase/` | migracje schematu |
 | `docs/how-it-works.md` | opis głównych mechanizmów |
-| `final_cleanup.md` | checklista porządków przed wydaniem |
 | `docs/final-imaging/` | diagramy architektury / bazy / klas |
 
 ## Dokumentacja
@@ -74,7 +73,6 @@ Szczegóły resetu bazy i Liquibase: `postgre/commands.txt`.
 - tryb pracy: rozproszony
 - komunikacja: Discord (kanały techniczne i organizacyjne)
 - spotkania: 2 razy w miesiącu
-- ustalenia: dokumentowane w pliku MEETINGS.MD
 
 ## Zespół
 - Mateusz Michałowski (Full Stack) - s198263@student.pg.edu.pl
