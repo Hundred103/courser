@@ -5,16 +5,18 @@ import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.EntityGraph;
 import java.util.List;
 import java.util.Optional;
-
-
+import java.util.UUID;
 
 @Repository
 public interface QuizRepository extends JpaRepository<Quiz, Long> {
-    List<Quiz> findByOwnerUserId(Long ownerUserId, org.springframework.data.domain.Sort sort);
+    List<Quiz> findByOwnerUserIdOrderByIdAsc(Long ownerUserId);
 
     Optional<Quiz> findByIdAndOwnerUserId(Long id, Long ownerUserId);
 
-    Optional<Quiz> findByOwnerUserIdAndRankingVersion_Id(Long ownerUserId, java.util.UUID rankingVersionId);
+    /** Oldest copy when owner has multiple quizzes on one version. */
+    Optional<Quiz> findFirstByOwnerUserIdAndRankingVersion_IdOrderByIdAsc(Long ownerUserId, UUID rankingVersionId);
+
+    boolean existsByRankingVersion_IdAndOwnerUserIdNot(UUID rankingVersionId, Long ownerUserId);
 
     @EntityGraph(attributePaths = {
             "questions"

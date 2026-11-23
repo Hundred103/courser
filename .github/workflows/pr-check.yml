@@ -14,6 +14,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Create CI environment
+        run: |
+          {
+            echo "POSTGRES_DB=courserdb"
+            echo "POSTGRES_USER=courseruser"
+            echo "POSTGRES_PASSWORD=courserpassword"
+            echo "APP_JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')"
+          } > .env
+
       - name: Build all services
         # This triggers the Dockerfile contexts for your frontend and backend Spring Boot microservices
         run: docker compose build
@@ -61,6 +70,13 @@ jobs:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/courserdb
           SPRING_DATASOURCE_USERNAME: courseruser
           SPRING_DATASOURCE_PASSWORD: courserpassword
+        run: mvn test
+
+      - name: Run user-service unit tests
+        working-directory: backend/user-service
+        env:
+          # Unit tests (UserAuthRulesTest) do not need a DB; secret satisfies JwtService beans if context loads.
+          APP_JWT_SECRET: ci-test-jwt-secret-at-least-32-bytes-long
         run: mvn test
 
       - name: Wait for application readiness

@@ -1,22 +1,15 @@
-import { Component, ElementRef, HostListener, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { catchError, combineLatest, finalize, forkJoin, map, of, startWith, switchMap } from 'rxjs';
-import { QuizCreateDTO, QuizPlayDTO, QuizRawDTO } from '../../core/models/quiz.model';
+import { catchError, finalize, of } from 'rxjs';
+import { QuizRawDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { GuestQuizStorageService } from '../../core/services/guest-quiz-storage.service';
 import { QuizScoreService } from '../../core/services/quiz-score.service';
 import { buildQuizZip } from '../../core/utils/quiz-zip.util';
+import { quizRequestErrorMessage } from '../../core/utils/quiz-request.util';
 import { normalizeQuizLimits } from '../../core/models/quiz-limits.model';
-
-type QuizSidebarState =
-  | { status: 'loading'; quizzes: QuizRawDTO[]; errorMessage: '' }
-  | { status: 'ready'; quizzes: QuizRawDTO[]; errorMessage: '' }
-  | { status: 'error'; quizzes: QuizRawDTO[]; errorMessage: string };
-
-type RankingPositionsState = { positions: Map<number, number> };
 
 @Component({
   selector: 'app-sidebar',
@@ -34,76 +27,10 @@ export class SidebarComponent {
 
   @ViewChild('titleInput') private titleInput?: ElementRef<HTMLInputElement>;
 
-  private readonly quizState = toSignal(
-    toObservable(this.authService.user).pipe(
-      switchMap(() =>
-        this.quizApiService.getAllQuizzes().pipe(
-          map((quizzes): QuizSidebarState => ({
-            status: 'ready',
-            quizzes,
-            errorMessage: '',
-          })),
-          startWith({
-            status: 'loading',
-            quizzes: [],
-            errorMessage: '',
-          } satisfies QuizSidebarState),
-          catchError(() =>
-            of({
-              status: 'error',
-              quizzes: [],
-              errorMessage: 'Nie udało się pobrać listy quizów.',
-            } satisfies QuizSidebarState),
-          ),
-        ),
-      ),
-    ),
-    {
-      initialValue: {
-        status: 'loading',
-        quizzes: [],
-        errorMessage: '',
-      } satisfies QuizSidebarState,
-    },
-  );
-
-  private readonly localQuizzes = signal<QuizRawDTO[]>([]);
-
-  private readonly rankingPositionsState = toSignal(
-    combineLatest([
-      toObservable(this.authService.user),
-      toObservable(this.quizScoreService.scoresVersion).pipe(startWith(0)),
-      toObservable(this.quizState),
-    ]).pipe(
-      switchMap(([user, , quizState]) => {
-        if (!user) {
-          return of({ positions: new Map<number, number>() } satisfies RankingPositionsState);
-        }
-        const quizzes = quizState.quizzes.filter((quiz) => quiz.id > 0);
-        if (!quizzes.length) return of({ positions: new Map<number, number>() } satisfies RankingPositionsState);
-        return forkJoin(
-          quizzes.map((quiz) =>
-            this.quizApiService.getRankingPosition(quiz.id).pipe(
-              map((result) => [quiz.id, result.position] as const),
-              catchError(() => of([quiz.id, null] as const)),
-            ),
-          ),
-        ).pipe(
-          map((items) => ({
-            positions: new Map(items.filter((item): item is readonly [number, number] => item[1] !== null)),
-          } satisfies RankingPositionsState)),
-        );
-      }),
-    ),
-    {
-      initialValue: { positions: new Map<number, number>() } satisfies RankingPositionsState,
-    },
-  );
-
-  readonly quizzes = computed(() => this.localQuizzes());
+  readonly quizzes = computed(() => this.quizApiService.quizList().quizzes);
   readonly isLoggedIn = this.authService.isLoggedIn;
-  readonly isLoading = computed(() => this.quizState().status === 'loading');
-  readonly errorMessage = computed(() => this.quizState().errorMessage);
+  readonly isLoading = computed(() => this.quizApiService.quizList().status === 'loading');
+  readonly errorMessage = computed(() => this.quizApiService.quizList().status === 'error' ? 'Nie udało się pobrać listy quizów.' : '');
   readonly hasQuizzes = computed(() => this.quizzes().length > 0);
   readonly openMenuQuizId = signal<number | null>(null);
   readonly editingQuizId = signal<number | null>(null);
@@ -111,7 +38,7 @@ export class SidebarComponent {
   readonly renameError = signal('');
   readonly busyQuizId = signal<number | null>(null);
   readonly quizPendingDelete = signal<QuizRawDTO | null>(null);
-  readonly quizPendingStart = signal<QuizPlayDTO | null>(null);
+  readonly quizPendingStart = signal<QuizRawDTO | null>(null);
   readonly startQuizLoading = signal(false);
   readonly startRandomQuestionOrder = signal(false);
   readonly startStudyMode = signal(false);
@@ -130,21 +57,6 @@ export class SidebarComponent {
     { label: '30 dni', value: 2592000 },
     { label: 'Na zawsze', value: null },
   ];
-
-  constructor() {
-    effect(() => {
-      const state = this.quizState();
-
-      if (state.status === 'loading') {
-        this.localQuizzes.set([]);
-        return;
-      }
-
-      if (state.status === 'ready') {
-        this.localQuizzes.set(state.quizzes);
-      }
-    });
-  }
 
   @HostListener('document:click', ['$event'])
   closeMenuOnOutsideClick(event: MouseEvent): void {
@@ -230,13 +142,13 @@ export class SidebarComponent {
   }
 
   private async exportGuestQuiz(quiz: QuizRawDTO): Promise<void> {
-    const dto = this.guestQuizStorage.toCreateDtoById(quiz.id);
+    const guestQuiz = this.guestQuizStorage.getImportById(quiz.id);
 
-    if (!dto) {
+    if (!guestQuiz) {
       return;
     }
 
-    const blob = await buildQuizZip(dto);
+    const blob = await buildQuizZip(guestQuiz.quiz, { rankingVersionId: guestQuiz.rankingVersionId });
 
     this.downloadQuizZip(blob, quiz.title);
   }
@@ -274,29 +186,17 @@ export class SidebarComponent {
       return;
     }
 
-    if (quiz.id < 0) {
-      const dto = this.guestQuizStorage.toCreateDtoById(quiz.id);
-      if (!dto) return;
-      const copy = this.guestQuizStorage.create({ ...dto, title: `${dto.title} (kopia)` });
-      this.localQuizzes.update((quizzes) => [...quizzes, copy]);
-      return;
-    }
-
-    if (!this.isLoggedIn()) {
+    if (quiz.id > 0 && !this.isLoggedIn()) {
       this.authPromptMessage.set('Żeby utworzyć kopię quizu, musisz się zalogować.');
       return;
     }
 
     this.busyQuizId.set(quiz.id);
     this.quizApiService
-      .getQuizById(quiz.id)
-      .pipe(
-        switchMap((sourceQuiz) => this.quizApiService.forkQuiz(quiz.id, this.toCreateDto(sourceQuiz))),
-        finalize(() => this.busyQuizId.set(null)),
-      )
+      .copyQuiz(quiz.id)
+      .pipe(finalize(() => this.busyQuizId.set(null)))
       .subscribe({
-        next: (copy) => this.localQuizzes.update((quizzes) => [...quizzes, copy]),
-        error: () => this.authPromptMessage.set('Nie udało się utworzyć kopii quizu.'),
+        error: (error) => this.authPromptMessage.set(quizRequestErrorMessage(error, 'Nie udało się utworzyć kopii quizu.')),
       });
   }
 
@@ -347,33 +247,11 @@ export class SidebarComponent {
       .updateQuizTitle(quiz.id, { title: nextTitle })
       .pipe(finalize(() => this.busyQuizId.set(null)))
       .subscribe({
-        next: (updatedQuiz) => {
-          this.localQuizzes.update((quizzes) =>
-            quizzes.map((currentQuiz) => (currentQuiz.id === updatedQuiz.id ? updatedQuiz : currentQuiz)),
-          );
-          this.cancelRename();
-        },
+        next: () => this.cancelRename(),
         error: (error: unknown) => {
           this.renameError.set(this.renameErrorMessage(error));
         },
       });
-  }
-
-  private toCreateDto(quiz: QuizPlayDTO): QuizCreateDTO {
-    return {
-      title: quiz.title,
-      scoring: quiz.scoring ?? null,
-      limits: quiz.limits ?? null,
-      questions: quiz.questions.map((question) => ({
-        content: question.content,
-        image: question.image ?? null,
-        answers: question.answers.map((answer) => ({
-          content: answer.content,
-          correct: answer.correct,
-          points: answer.points ?? null,
-        })),
-      })),
-    };
   }
 
   private renameErrorMessage(error: unknown): string {
@@ -451,8 +329,8 @@ export class SidebarComponent {
     });
   }
 
-  rankingPositionLabel(quizId: number): string | null {
-    const position = this.rankingPositionsState().positions.get(quizId);
+  rankingPositionLabel(quiz: QuizRawDTO): string | null {
+    const position = quiz.rankingPosition;
     if (!position) return null;
     if (position === 1) return '🥇';
     if (position === 2) return '🥈';
@@ -460,9 +338,8 @@ export class SidebarComponent {
     return position === 4 ? 'Czwarte miejsce' : 'Piąte miejsce';
   }
 
-  isMedalPosition(quizId: number): boolean {
-    const position = this.rankingPositionsState().positions.get(quizId);
-    return position !== undefined && position <= 3;
+  isMedalPosition(quiz: QuizRawDTO): boolean {
+    return !!quiz.rankingPosition && quiz.rankingPosition <= 3;
   }
 
   requestStartQuiz(quiz: QuizRawDTO): void {
@@ -478,22 +355,13 @@ export class SidebarComponent {
       ? this.quizScoreService.getCompletedAttemptsCount(quiz.id).pipe(catchError(() => of(null)))
       : of(null);
 
-    forkJoin({
-      quiz: this.quizApiService.getQuizById(quiz.id),
-      completedAttemptsCount,
-    })
+    completedAttemptsCount
       .pipe(finalize(() => this.startQuizLoading.set(false)))
-      .subscribe({
-        next: ({ quiz: quizToStart, completedAttemptsCount: attempts }) => {
-          const limits = normalizeQuizLimits(quizToStart.limits);
-          this.quizPendingStart.set(quizToStart);
-          this.startRandomQuestionOrder.set(limits.randomQuestionOrder);
-          this.startStudyMode.set(false);
-          this.completedAttemptsCount.set(attempts);
-        },
-        error: () => {
-          this.authPromptMessage.set('Nie udało się pobrać ustawień quizu. Spróbuj ponownie.');
-        },
+      .subscribe((attempts) => {
+        this.quizPendingStart.set(quiz);
+        this.startRandomQuestionOrder.set(normalizeQuizLimits(quiz.limits).randomQuestionOrder);
+        this.startStudyMode.set(false);
+        this.completedAttemptsCount.set(attempts);
       });
   }
 
@@ -553,7 +421,6 @@ export class SidebarComponent {
       .pipe(finalize(() => this.busyQuizId.set(null)))
       .subscribe({
         next: () => {
-          this.localQuizzes.update((quizzes) => quizzes.filter((currentQuiz) => currentQuiz.id !== quiz.id));
           this.quizPendingDelete.set(null);
 
           if (this.router.url.startsWith(`/quizzes/${quiz.id}/play`) || this.router.url.startsWith(`/quizzes/${quiz.id}/edit`)) {

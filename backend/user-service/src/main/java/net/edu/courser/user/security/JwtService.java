@@ -1,36 +1,40 @@
 package net.edu.courser.user.security;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import net.edu.courser.user.entity.User;
+import tools.jackson.databind.ObjectMapper;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/** Issues tokens; gateway validates and sets X-User-Id. */
 @Service
 public class JwtService {
     private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final int MIN_SECRET_BYTES = 32;
 
     private final ObjectMapper objectMapper;
-    private final String secret;
+    private final byte[] secret;
     private final long expirationSeconds;
 
     public JwtService(
             ObjectMapper objectMapper,
-            @Value("${app.jwt.secret:courser-local-development-secret-change-me}") String secret,
-            @Value("${app.jwt.expiration-seconds:86400}") long expirationSeconds
+            @Value("${app.jwt.secret}") String secret,
+            @Value("${app.jwt.expiration-seconds}") long expirationSeconds
     ) {
         this.objectMapper = objectMapper;
-        this.secret = secret;
+        this.secret = secret.getBytes(StandardCharsets.UTF_8);
         this.expirationSeconds = expirationSeconds;
+        if (this.secret.length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException("APP_JWT_SECRET must be at least " + MIN_SECRET_BYTES + " bytes long.");
+        }
     }
 
     public String createToken(User user) {
@@ -52,82 +56,17 @@ public class JwtService {
         return unsignedToken + "." + sign(unsignedToken);
     }
 
-    public JwtClaims validate(String token) {
-        String[] parts = token.split("\\.");
-
-        if (parts.length != 3) {
-            throw new IllegalArgumentException("Invalid token");
-        }
-
-        String unsignedToken = parts[0] + "." + parts[1];
-        String expectedSignature = sign(unsignedToken);
-
-        if (!constantTimeEquals(expectedSignature, parts[2])) {
-            throw new IllegalArgumentException("Invalid token signature");
-        }
-
-        try {
-            byte[] payloadBytes = Base64.getUrlDecoder().decode(parts[1]);
-            Map<String, Object> payload = objectMapper.readValue(payloadBytes, new TypeReference<>() {});
-
-            long expiresAt = ((Number) payload.get("exp")).longValue();
-            if (Instant.now().getEpochSecond() >= expiresAt) {
-                throw new IllegalArgumentException("Token expired");
-            }
-
-            Long userId = ((Number) payload.get("userId")).longValue();
-            String email = (String) payload.get("email");
-            String username = (String) payload.get("username");
-
-            if (email == null || username == null) {
-                throw new IllegalArgumentException("Missing token claims");
-            }
-
-            return new JwtClaims(userId, email, username);
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid token payload", e);
-        }
-    }
-
     private String base64UrlJson(Map<String, Object> value) {
-        try {
-            return Base64.getUrlEncoder()
-                    .withoutPadding()
-                    .encodeToString(objectMapper.writeValueAsBytes(value));
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Could not create JWT", e);
-        }
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(objectMapper.writeValueAsBytes(value));
     }
 
     private String sign(String value) {
         try {
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
+            mac.init(new SecretKeySpec(secret, HMAC_ALGORITHM));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
+        } catch (GeneralSecurityException e) {
             throw new IllegalStateException("Could not sign JWT", e);
         }
-    }
-
-    private boolean constantTimeEquals(String left, String right) {
-        if (left == null || right == null) {
-            return false;
-        }
-
-        byte[] leftBytes = left.getBytes(StandardCharsets.UTF_8);
-        byte[] rightBytes = right.getBytes(StandardCharsets.UTF_8);
-
-        if (leftBytes.length != rightBytes.length) {
-            return false;
-        }
-
-        int result = 0;
-        for (int i = 0; i < leftBytes.length; i++) {
-            result |= leftBytes[i] ^ rightBytes[i];
-        }
-
-        return result == 0;
     }
 }

@@ -93,7 +93,19 @@ export class NavbarComponent {
   }
 
   logout(): void {
-    this.authService.logout();
-    this.router.navigate(['/']);
+    // Same-URL navigation resolves false; log out immediately when already home.
+    if (this.isHomeUrl(this.router.url)) {
+      this.authService.logout();
+      return;
+    }
+    // Navigate away first so play/editor leave guards can still keep the session.
+    void this.router.navigate(['/']).then((navigated) => {
+      if (navigated !== false) this.authService.logout();
+    });
+  }
+
+  private isHomeUrl(url: string): boolean {
+    const path = url.split('?')[0].split('#')[0];
+    return path === '/' || path === '';
   }
 }

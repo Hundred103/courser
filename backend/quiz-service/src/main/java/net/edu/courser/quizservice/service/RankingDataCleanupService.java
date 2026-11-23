@@ -28,7 +28,7 @@ public class RankingDataCleanupService {
         this.orphanedRankingRetentionDays = orphanedRankingRetentionDays;
     }
 
-    /** Runs daily at 03:30. A valid code or any quiz owned by a logged-in user protects its ranking version. */
+    /** 03:30: drop orphan ranking versions (no live quiz / valid share code). */
     @Scheduled(cron = "${app.ranking-cleanup.cron:0 30 3 * * *}")
     @Transactional
     public void cleanOrphanedRankingData() {

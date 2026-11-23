@@ -1,34 +1,37 @@
 package net.edu.courser.quizservice.service;
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
 import net.edu.courser.quizservice.dto.*;
-import net.edu.courser.quizservice.repository.QuestionRepository;
-import net.edu.courser.quizservice.repository.QuizShareCodeRepository;
-import net.edu.courser.quizservice.repository.QuizRepository;
 import net.edu.courser.quizservice.entity.*;
-import org.springframework.data.domain.Sort;
+import net.edu.courser.quizservice.exception.RankingCopyRequiredException;
+import net.edu.courser.quizservice.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import jakarta.persistence.EntityNotFoundException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.nio.charset.StandardCharsets;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
+
 import java.security.MessageDigest;
-import java.time.Duration;
-import java.util.Map;
-import java.util.UUID;
-import java.util.Comparator;
-import net.edu.courser.quizservice.repository.*;
-
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HexFormat;
 import java.util.List;
-
-
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
+@RequiredArgsConstructor
 public class QuizService {
     private static final String SHARE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int SHARE_CODE_LENGTH = 10;
+    private static final int LEADERBOARD_SIZE = 5;
     private static final Duration MAX_RANKING_DURATION = Duration.ofHours(6);
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -44,44 +47,36 @@ public class QuizService {
     private final RankingUserRepository rankingUserRepository;
     private final ObjectMapper objectMapper;
 
-    public QuizService(
-            QuizRepository quizRepository,
-            QuestionRepository questionRepository,
-            QuizShareCodeRepository quizShareCodeRepository,
-            MapperDTO mapperDTO,
-            MediaStorageService mediaStorageService,
-            QuizExportService quizExportService,
-            QuizRankingVersionRepository rankingVersionRepository,
-            QuizRankingAttemptRepository rankingAttemptRepository,
-            QuizRankingEntryRepository rankingEntryRepository,
-            RankingUserRepository rankingUserRepository,
-            ObjectMapper objectMapper
-    ) {
-        this.quizRepository = quizRepository;
-        this.questionRepository = questionRepository;
-        this.quizShareCodeRepository = quizShareCodeRepository;
-        this.mapperDTO = mapperDTO;
-        this.mediaStorageService = mediaStorageService;
-        this.quizExportService = quizExportService;
-        this.rankingVersionRepository = rankingVersionRepository;
-        this.rankingAttemptRepository = rankingAttemptRepository;
-        this.rankingEntryRepository = rankingEntryRepository;
-        this.rankingUserRepository = rankingUserRepository;
-        this.objectMapper = objectMapper;
+    public record QuizArchive(String title, byte[] bytes) {}
+
+    @Transactional(readOnly = true)
+    public List<QuizRawDTO> listForOwner(Long ownerUserId) {
+        return toRawDtos(ownerUserId, quizRepository.findByOwnerUserIdOrderByIdAsc(ownerUserId));
     }
 
-    public List<Quiz> findAllByOwnerUserId(Long ownerUserId) {
-        return quizRepository.findByOwnerUserId(ownerUserId, Sort.by(Sort.Direction.ASC, "id"));
+    @Transactional(readOnly = true)
+    public QuizRawDTO toRawDto(Quiz quiz) {
+        return toRawDtos(quiz.getOwnerUserId(), List.of(quiz)).getFirst();
+    }
+
+    private List<QuizRawDTO> toRawDtos(Long ownerUserId, List<Quiz> quizzes) {
+        if (quizzes.isEmpty()) return List.of();
+        Map<Long, Long> questionCounts = questionRepository.countByQuizIds(quizzes.stream().map(Quiz::getId).toList()).stream()
+                .collect(Collectors.toMap(QuestionRepository.QuizQuestionCount::getQuizId, QuestionRepository.QuizQuestionCount::getQuestionCount));
+        Map<UUID, Integer> positions = rankingPositions(ownerUserId, quizzes);
+        return quizzes.stream()
+                .map(quiz -> mapperDTO.toQuizRawDTO(quiz, questionCounts.getOrDefault(quiz.getId(), 0L), positionFor(quiz, positions)))
+                .toList();
     }
 
     public Quiz findByIdAndOwnerUserId(Long id, Long ownerUserId) {
         return quizRepository.findByIdAndOwnerUserId(id, ownerUserId)
-                .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Nie znaleziono quizu."));
     }
 
-    public Quiz findWholeQuizByIdAndOwnerUserId(Long id, Long ownerUserId) {
+    private Quiz findWholeQuizByIdAndOwnerUserId(Long id, Long ownerUserId) {
         return quizRepository.findWholeQuizByIdAndOwnerUserId(id, ownerUserId)
-                .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Nie znaleziono quizu."));
     }
 
     @Transactional(readOnly = true)
@@ -92,29 +87,32 @@ public class QuizService {
     }
 
     @Transactional
-    public byte[] exportQuizArchive(Long id, Long ownerUserId) {
-        Quiz quiz = findWholeQuizByIdAndOwnerUserId(id, ownerUserId);
+    public QuizArchive exportQuizArchive(Long id, Long ownerUserId) {
+        Quiz quiz = findByIdAndOwnerUserId(id, ownerUserId);
         List<Question> questions = questionRepository.findWholeByQuizId(quiz.getId());
         QuizRankingVersion version = ensureRankingVersion(quiz, questions);
-        return quizExportService.exportAsZip(quiz, questions, version.getId().toString(), version.getContentHash());
-    }
-
-    public List<Question> findWholeQuestionsByQuizId(Long quizId) {
-        return questionRepository.findWholeByQuizId(quizId);
+        return new QuizArchive(quiz.getTitle(), quizExportService.exportAsZip(quiz, questions, version.getId().toString()));
     }
 
     @Transactional
-    public Quiz save(Quiz quiz) {
+    public Quiz create(QuizCreateDTO dto, Long ownerUserId) {
+        Quiz quiz = mapperDTO.toQuizEntity(dto);
+        quiz.setOwnerUserId(ownerUserId);
+        return save(quiz);
+    }
+
+    /** Ensure private ranking version if missing. */
+    private Quiz save(Quiz quiz) {
         Quiz saved = quizRepository.save(quiz);
-        // Każdy nowy quiz jest od razu własną, prywatną wersją rankingową.
         if (saved.getRankingVersion() == null) {
             ensureRankingVersion(saved, saved.getQuestions());
         }
         return saved;
     }
 
-    public void delete(Quiz quiz) {
-        quizRepository.delete(quiz);
+    @Transactional
+    public void delete(Long id, Long ownerUserId) {
+        quizRepository.delete(findByIdAndOwnerUserId(id, ownerUserId));
     }
 
     @Transactional
@@ -124,7 +122,6 @@ public class QuizService {
         LocalDateTime expiresAt = expiresInSeconds == null ? null : LocalDateTime.now().plusSeconds(expiresInSeconds);
 
         QuizShareCode shareCode = QuizShareCode.builder()
-                .quiz(quiz)
                 .rankingVersion(version)
                 .code(generateUniqueShareCode())
                 .createdByUserId(ownerUserId)
@@ -137,246 +134,296 @@ public class QuizService {
     @Transactional
     public Quiz importByShareCode(String rawCode, Long ownerUserId) {
         QuizRankingVersion version = findRankingVersionByShareCode(rawCode);
-        QuizCreateDTO snapshot = readSnapshot(version);
-        Quiz copiedQuiz = mapperDTO.toQuizEntity(snapshot);
+        Quiz copiedQuiz = mapperDTO.toQuizEntity(readSnapshot(version));
         copiedQuiz.setOwnerUserId(ownerUserId);
         copiedQuiz.setRankingVersion(version);
-        version.setHasLoggedImport(true);
+        markImportIfShared(version, ownerUserId);
 
         return quizRepository.save(copiedQuiz);
     }
 
-    @Transactional(readOnly = true)
-    public QuizCreateDTO getCreateDtoByShareCode(String rawCode) {
-        return readSnapshot(findRankingVersionByShareCode(rawCode));
+    /** Freeze version only when another user already owns it. */
+    private void markImportIfShared(QuizRankingVersion version, Long importerUserId) {
+        if (quizRepository.existsByRankingVersion_IdAndOwnerUserIdNot(version.getId(), importerUserId)) {
+            version.setHasLoggedImport(true);
+        }
     }
 
     @Transactional
     public Quiz update(Long id, Long ownerUserId, QuizCreateDTO dto) {
-        Quiz quiz = quizRepository.findByIdAndOwnerUserId(id, ownerUserId)
-                .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
-        boolean rankingContentChanged = quiz.getRankingVersion() == null
-                || !quiz.getRankingVersion().getContentHash().equals(rankingContentHash(dto));
-        if (quiz.getRankingVersion() != null && quiz.getRankingVersion().isHasLoggedImport()
-                && rankingContentChanged) {
-            throw new IllegalStateException("RANKING_COPY_REQUIRED");
-        }
-        quiz.setTitle(dto.title());
+        Quiz quiz = findByIdAndOwnerUserId(id, ownerUserId);
+        QuizRankingVersion previousVersion = quiz.getRankingVersion();
+        quiz.setTitle(mapperDTO.validTitle(dto.title()));
         mapperDTO.applyScoring(quiz, dto.scoring());
         mapperDTO.applyLimits(quiz, dto.limits());
         boolean customScoring = quiz.getScoringMode() == ScoringMode.CUSTOM;
         quiz.getQuestions().clear();
-        for (int index = 0; index < dto.questions().size(); index++) {
-            quiz.addQuestion(mapperDTO.toQuestionEntity(dto.questions().get(index), index, customScoring));
+        dto.questions().forEach(question -> quiz.addQuestion(mapperDTO.toQuestionEntity(question, customScoring)));
+        boolean rankingContentChanged = previousVersion == null
+                || !previousVersion.getContentHash().equals(rankingContentHash(quiz, quiz.getQuestions()));
+        if (previousVersion != null && previousVersion.isHasLoggedImport() && rankingContentChanged) {
+            throw new RankingCopyRequiredException();
         }
-        // Przed pierwszym importem można zmieniać quiz bez tworzenia kopii, ale
-        // zmieniona treść zaczyna nową, pustą tabelę wyników.
+        // Content change before share → new ranking version (empty leaderboard).
         if (rankingContentChanged) {
-            quiz.setRankingVersion(createRankingVersion(dto));
+            quiz.setRankingVersion(createRankingVersion(quiz, quiz.getQuestions()));
         }
         return quiz;
     }
 
     @Transactional
     public Quiz updateTitle(Long id, Long ownerUserId, QuizEditTitleDTO dto) {
-        Quiz quiz = quizRepository.findByIdAndOwnerUserId(id, ownerUserId)
-                .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
-        quiz.setTitle(dto.title());
+        Quiz quiz = findByIdAndOwnerUserId(id, ownerUserId);
+        quiz.setTitle(mapperDTO.validTitle(dto.title()));
         return quiz;
     }
 
+    /** Server fork: images shared by media key. */
     @Transactional
-    public Quiz fork(Long id, Long ownerUserId, QuizCreateDTO dto) {
-        findByIdAndOwnerUserId(id, ownerUserId);
-        Quiz copy = mapperDTO.toQuizEntity(dto);
-        copy.setOwnerUserId(ownerUserId);
-        copy.setTitle(dto.title() + " (kopia)");
-        Quiz saved = quizRepository.save(copy);
-        saved.setRankingVersion(ensureRankingVersion(saved, saved.getQuestions()));
-        return saved;
+    public Quiz fork(Long id, Long ownerUserId) {
+        Quiz source = findByIdAndOwnerUserId(id, ownerUserId);
+        Quiz copy = copyQuiz(source, questionRepository.findWholeByQuizId(source.getId()), ownerUserId);
+        copy.setTitle(mapperDTO.copyTitle(source.getTitle()));
+        return save(copy);
     }
 
     @Transactional
     public Quiz importArchive(QuizArchiveImportDTO request, Long ownerUserId) {
         QuizCreateDTO dto = request.quiz();
-        QuizCreateDTO quizToImport = dto;
-        QuizRankingVersion matchingVersion = null;
-        String privateImportTitle = Boolean.TRUE.equals(request.migratingGuestQuiz())
-                ? dto.title()
-                : dto.title() + " (kopia)";
-        if (request.rankingVersionId() != null) {
-            try {
-                QuizRankingVersion version = rankingVersionRepository.findById(UUID.fromString(request.rankingVersionId())).orElse(null);
-                if (version != null && version.getContentHash().equals(rankingContentHash(dto))) {
-                    // ZIP i kod udostępniania mają prowadzić do tego samego
-                    // snapshotu wersji rankingowej. Tytuł i dwa ustawienia
-                    // prezentacji nie są częścią treści rankingowej, więc ich
-                    // ręczna zmiana w ZIP-ie nie może zmienić wspólnego quizu.
-                    QuizCreateDTO snapshot = readSnapshot(version);
-                    quizToImport = new QuizCreateDTO(
-                            snapshot.title(),
-                            dto.questions(),
-                            dto.scoring(),
-                            snapshot.limits()
-                    );
-                    matchingVersion = version;
-                } else {
-                    quizToImport = new QuizCreateDTO(
-                            privateImportTitle, dto.questions(), dto.scoring(), dto.limits()
-                    );
-                }
-            } catch (IllegalArgumentException ignored) {
-                quizToImport = new QuizCreateDTO(
-                        privateImportTitle, dto.questions(), dto.scoring(), dto.limits()
-                );
-            }
+        boolean migratingGuestQuiz = Boolean.TRUE.equals(request.migratingGuestQuiz());
+        Quiz quiz = mapperDTO.toQuizEntity(dto);
+        String importedContentHash = rankingContentHash(quiz, quiz.getQuestions());
+        QuizRankingVersion matchingVersion = findRankingVersion(request.rankingVersionId())
+                .filter(version -> version.getContentHash().equals(importedContentHash))
+                .orElse(null);
+        if (matchingVersion != null) {
+            // Matching version: title/limits from snapshot (not in content hash).
+            QuizCreateDTO snapshot = readSnapshot(matchingVersion);
+            quiz.setTitle(snapshot.title());
+            mapperDTO.applyLimits(quiz, snapshot.limits());
+        } else if (request.rankingVersionId() != null && !migratingGuestQuiz) {
+            quiz.setTitle(mapperDTO.copyTitle(dto.title()));
         }
 
-        Quiz quiz = mapperDTO.toQuizEntity(quizToImport);
-        if (Boolean.TRUE.equals(request.migratingGuestQuiz())) {
-            // W czasie migracji lokalnych quizów gościa wersja rankingowa jest
-            // jednoznaczną tożsamością wspólnego quizu. Tytuł oraz ustawienia
-            // prezentacji nie mogą więc utworzyć drugiej kopii tej samej wersji.
-            if (matchingVersion != null) {
-                Quiz existingRankingQuiz = quizRepository
-                        .findByOwnerUserIdAndRankingVersion_Id(ownerUserId, matchingVersion.getId())
-                        .orElse(null);
-                if (existingRankingQuiz != null) {
-                    return existingRankingQuiz;
-                }
-            } else {
-                Quiz identicalQuiz = findIdenticalQuizByOwnerUserId(ownerUserId, quiz);
-                if (identicalQuiz != null) {
-                    return identicalQuiz;
-                }
+        if (migratingGuestQuiz) {
+            // Guest migration: dedupe by ranking version id, not title/limits.
+            Optional<Quiz> existing = matchingVersion != null
+                    ? quizRepository.findFirstByOwnerUserIdAndRankingVersion_IdOrderByIdAsc(ownerUserId, matchingVersion.getId())
+                    : findIdenticalQuizByOwnerUserId(ownerUserId, quiz);
+            if (existing.isPresent()) {
+                return existing.get();
             }
         }
         quiz.setOwnerUserId(ownerUserId);
         if (matchingVersion != null) {
             quiz.setRankingVersion(matchingVersion);
-            matchingVersion.setHasLoggedImport(true);
+            markImportIfShared(matchingVersion, ownerUserId);
         }
-        Quiz saved = quizRepository.save(quiz);
-        if (saved.getRankingVersion() == null) saved.setRankingVersion(ensureRankingVersion(saved, saved.getQuestions()));
-        return saved;
+        return save(quiz);
+    }
+
+    private Optional<QuizRankingVersion> findRankingVersion(String rawId) {
+        if (rawId == null) return Optional.empty();
+        try {
+            return rankingVersionRepository.findById(UUID.fromString(rawId));
+        } catch (IllegalArgumentException invalidId) {
+            return Optional.empty();
+        }
     }
 
     @Transactional
     public RankingAttemptStartDTO startRankingAttempt(Long id, Long ownerUserId, UUID clientSessionId) {
         Quiz quiz = findByIdAndOwnerUserId(id, ownerUserId);
-        if (quiz.getRankingVersion() == null) throw new IllegalStateException("Quiz nie należy do rankingu.");
+        if (quiz.getRankingVersion() == null) throw new IllegalArgumentException("Quiz nie należy do rankingu.");
         if (clientSessionId == null) throw new IllegalArgumentException("Brakuje identyfikatora sesji rozwiązywania.");
 
         QuizRankingAttempt attempt = rankingAttemptRepository
-                .findByRankingVersionIdAndUserIdAndClientSessionIdAndStatus(
-                        quiz.getRankingVersion().getId(), ownerUserId, clientSessionId, "STARTED")
+                .findByRankingVersionIdAndUserIdAndClientSessionId(
+                        quiz.getRankingVersion().getId(), ownerUserId, clientSessionId)
                 .orElseGet(() -> rankingAttemptRepository.save(QuizRankingAttempt.builder()
                         .rankingVersion(quiz.getRankingVersion())
                         .userId(ownerUserId)
                         .clientSessionId(clientSessionId)
                         .build()));
-
-        long elapsedMs = Math.min(
-                MAX_RANKING_DURATION.toMillis(),
-                Math.max(0, Duration.between(attempt.getStartedAt(), LocalDateTime.now()).toMillis())
-        );
-        return new RankingAttemptStartDTO(attempt.getId(), elapsedMs);
-    }
-
-    @Transactional(readOnly = true)
-    public RankingPositionDTO getRankingPosition(Long id, Long userId) {
-        Quiz quiz = findByIdAndOwnerUserId(id, userId);
-        if (quiz.getRankingVersion() == null) return new RankingPositionDTO(null);
-        List<QuizRankingEntry> entries = rankingEntryRepository.findByRankingVersion(quiz.getRankingVersion());
-        entries.sort(this::compareEntries);
-        for (int index = 0; index < entries.size(); index++) if (entries.get(index).getUserId().equals(userId)) return new RankingPositionDTO(index + 1);
-        return new RankingPositionDTO(null);
+        if (attempt.isFinished()) {
+            throw new IllegalArgumentException("Ta sesja rozwiązywania została już zakończona.");
+        }
+        return new RankingAttemptStartDTO(attempt.getId(), elapsedMs(attempt, LocalDateTime.now()));
     }
 
     @Transactional(readOnly = true)
     public RankingLeaderboardDTO getRankingLeaderboard(Long id, Long userId) {
         Quiz quiz = findByIdAndOwnerUserId(id, userId);
         if (quiz.getRankingVersion() == null) return new RankingLeaderboardDTO(null, List.of());
-
-        List<QuizRankingEntry> entries = rankingEntryRepository.findByRankingVersion(quiz.getRankingVersion());
-        entries.sort(this::compareEntries);
-
-        Integer position = null;
-        for (int index = 0; index < entries.size(); index++) {
-            if (entries.get(index).getUserId().equals(userId)) {
-                position = index + 1;
-                break;
-            }
-        }
-
-        return new RankingLeaderboardDTO(position, toEntryDtos(entries));
+        List<QuizRankingEntry> entries = sortedEntries(quiz.getRankingVersion());
+        return new RankingLeaderboardDTO(positionOf(entries, userId), toEntryDtos(entries));
     }
 
+    /** Score against the version the attempt started on. */
     @Transactional
     public RankingFinishDTO finishRankingAttempt(Long id, UUID attemptId, Long userId, RankingFinishRequestDTO request) {
-        Quiz quiz = findByIdAndOwnerUserId(id, userId);
-        QuizRankingAttempt attempt = rankingAttemptRepository.findById(attemptId).orElseThrow(() -> new EntityNotFoundException("Podejście rankingowe nie istnieje."));
-        if (!attempt.getUserId().equals(userId) || !attempt.getRankingVersion().getId().equals(quiz.getRankingVersion().getId())) throw new IllegalStateException("Niepoprawne podejście rankingowe.");
-        if ("FINISHED".equals(attempt.getStatus())) {
-            if (attempt.getScoreScaled() == null || attempt.getMaxScoreScaled() == null || attempt.getDurationMs() == null || attempt.getOutsideTopFive() == null) {
-                throw new IllegalStateException("Niekompletne zakończone podejście rankingowe.");
-            }
-            List<QuizRankingEntry> finishedEntries = rankingEntryRepository.findByRankingVersion(attempt.getRankingVersion());
-            finishedEntries.sort(this::compareEntries);
+        findByIdAndOwnerUserId(id, userId);
+        QuizRankingAttempt attempt = rankingAttemptRepository.findById(attemptId)
+                .filter(found -> found.getUserId().equals(userId))
+                .orElseThrow(() -> new EntityNotFoundException("Podejście rankingowe nie istnieje."));
+        QuizRankingVersion version = attempt.getRankingVersion();
+        if (attempt.isFinished()) {
             return new RankingFinishDTO(
                     attempt.getScoreScaled(), attempt.getMaxScoreScaled(), attempt.getDurationMs(),
-                    attempt.getPosition(), attempt.getOutsideTopFive(), toEntryDtos(finishedEntries)
+                    attempt.getPosition(), attempt.getPosition() == null, toEntryDtos(sortedEntries(version))
             );
         }
-        if (!"STARTED".equals(attempt.getStatus())) throw new IllegalStateException("Niepoprawne podejście rankingowe.");
-        QuizCreateDTO snapshot = readSnapshot(attempt.getRankingVersion());
-        int max = Math.max(0, (int)Math.round(snapshot.questions().stream().mapToDouble(q -> maxQuestionScore(q, snapshot.scoring())).sum() * 100));
-        Map<Integer, List<Integer>> submitted = request.answers() == null ? Map.of() : request.answers().stream().collect(java.util.stream.Collectors.toMap(RankingAnswerDTO::questionIndex, a -> a.answerIndexes() == null ? List.of() : a.answerIndexes(), (a,b)->a));
-        double score = 0;
-        for (int i=0;i<snapshot.questions().size();i++) score += questionScore(snapshot.questions().get(i), submitted.getOrDefault(i, List.of()), snapshot.scoring());
-        int scaled = (int)Math.round(score * 100);
-        long duration = Math.min(
-                MAX_RANKING_DURATION.toMillis(),
-                Math.max(0, Duration.between(attempt.getStartedAt(), LocalDateTime.now()).toMillis())
-        );
-        attempt.setCompletedAt(LocalDateTime.now()); attempt.setStatus("FINISHED");
-        QuizRankingVersion version = attempt.getRankingVersion();
-        QuizRankingEntry candidate = QuizRankingEntry.builder().rankingVersion(version).userId(userId).scoreScaled(scaled).maxScoreScaled(max).durationMs(duration).completedAt(attempt.getCompletedAt()).build();
-        List<QuizRankingEntry> entries = new java.util.ArrayList<>(rankingEntryRepository.findByRankingVersion(version));
-        QuizRankingEntry previousBest = rankingEntryRepository.findByRankingVersionAndUserId(version, userId).orElse(null);
 
-        // Jeden użytkownik ma tylko jeden wpis. Gorsze podejście nie może
-        // nadpisać jego istniejącego, najlepszego wyniku.
-        boolean shouldStoreCandidate = previousBest == null || compareEntries(candidate, previousBest) < 0;
-        if (shouldStoreCandidate) {
-            if (previousBest != null) {
-                // Aktualizacja istniejącego wpisu zachowuje jego identyfikator
-                // i nie narusza ograniczenia: jeden użytkownik = jeden wpis
-                // w danej wersji rankingu.
-                previousBest.setScoreScaled(candidate.getScoreScaled());
-                previousBest.setMaxScoreScaled(candidate.getMaxScoreScaled());
-                previousBest.setDurationMs(candidate.getDurationMs());
-                previousBest.setCompletedAt(candidate.getCompletedAt());
-                rankingEntryRepository.save(previousBest);
-            } else {
-                entries.add(candidate);
-                entries.sort(this::compareEntries);
-                if (entries.size() <= 5 || entries.indexOf(candidate) < 5) {
-                    rankingEntryRepository.save(candidate);
-                }
-            }
+        QuizCreateDTO snapshot = readSnapshot(version);
+        QuizScoringDTO scoring = mapperDTO.normalizeScoring(snapshot.scoring());
+        Map<Integer, List<Integer>> submitted = request.answers() == null ? Map.of() : request.answers().stream()
+                .collect(Collectors.toMap(RankingAnswerDTO::questionIndex,
+                        answer -> answer.answerIndexes() == null ? List.of() : answer.answerIndexes(),
+                        (first, ignored) -> first));
+        double max = 0;
+        double score = 0;
+        for (int index = 0; index < snapshot.questions().size(); index++) {
+            QuestionCreateDTO question = snapshot.questions().get(index);
+            max += maxQuestionScore(question, scoring);
+            score += questionScore(question, submitted.getOrDefault(index, List.of()), scoring);
         }
-        entries = rankingEntryRepository.findByRankingVersion(version); entries.sort(this::compareEntries);
-        while(entries.size()>5) { rankingEntryRepository.delete(entries.remove(entries.size()-1)); }
-        entries = rankingEntryRepository.findByRankingVersion(version); entries.sort(this::compareEntries);
-        Integer position=null; for(int i=0;i<entries.size();i++) if(entries.get(i).getUserId().equals(userId)) position=i+1;
-        attempt.setScoreScaled(scaled);
-        attempt.setMaxScoreScaled(max);
+        int maxScaled = Math.max(0, (int) Math.round(max * 100));
+        int scoreScaled = (int) Math.round(score * 100);
+        LocalDateTime now = LocalDateTime.now();
+        long duration = elapsedMs(attempt, now);
+
+        List<QuizRankingEntry> entries = recordBestEntry(QuizRankingEntry.builder()
+                .rankingVersion(version).userId(userId).scoreScaled(scoreScaled).maxScoreScaled(maxScaled)
+                .durationMs(duration).completedAt(now).build());
+        Integer position = positionOf(entries, userId);
+
+        attempt.setCompletedAt(now);
+        attempt.setScoreScaled(scoreScaled);
+        attempt.setMaxScoreScaled(maxScaled);
         attempt.setDurationMs(duration);
         attempt.setPosition(position);
-        attempt.setOutsideTopFive(position == null);
         rankingAttemptRepository.save(attempt);
-        return new RankingFinishDTO(scaled,max,duration,position,position==null,toEntryDtos(entries));
+        return new RankingFinishDTO(scoreScaled, maxScaled, duration, position, position == null, toEntryDtos(entries));
+    }
+
+    /** Best score per user/version; return top 5. */
+    private List<QuizRankingEntry> recordBestEntry(QuizRankingEntry candidate) {
+        List<QuizRankingEntry> entries = sortedEntries(candidate.getRankingVersion());
+        QuizRankingEntry previousBest = entries.stream()
+                .filter(entry -> entry.getUserId().equals(candidate.getUserId()))
+                .findFirst()
+                .orElse(null);
+        if (previousBest == null) {
+            entries.add(candidate);
+        } else if (compareEntries(candidate, previousBest) < 0) {
+            previousBest.setScoreScaled(candidate.getScoreScaled());
+            previousBest.setMaxScoreScaled(candidate.getMaxScoreScaled());
+            previousBest.setDurationMs(candidate.getDurationMs());
+            previousBest.setCompletedAt(candidate.getCompletedAt());
+            rankingEntryRepository.save(previousBest);
+        }
+        entries.sort(this::compareEntries);
+        while (entries.size() > LEADERBOARD_SIZE) {
+            QuizRankingEntry dropped = entries.remove(entries.size() - 1);
+            if (dropped != candidate) rankingEntryRepository.delete(dropped);
+        }
+        if (entries.contains(candidate)) {
+            rankingEntryRepository.save(candidate);
+        }
+        return entries;
+    }
+
+    private long elapsedMs(QuizRankingAttempt attempt, LocalDateTime now) {
+        return Math.min(MAX_RANKING_DURATION.toMillis(), Math.max(0, Duration.between(attempt.getStartedAt(), now).toMillis()));
+    }
+
+    private Quiz copyQuiz(Quiz sourceQuiz, List<Question> sourceQuestions, Long ownerUserId) {
+        Quiz copiedQuiz = Quiz.builder()
+                .title(sourceQuiz.getTitle())
+                .ownerUserId(ownerUserId)
+                .scoringMode(sourceQuiz.getScoringMode())
+                .allowNegativeScore(sourceQuiz.isAllowNegativeScore())
+                .pointsPerCorrect(sourceQuiz.getPointsPerCorrect())
+                .incorrectPenalty(sourceQuiz.getIncorrectPenalty())
+                .penaltyMode(sourceQuiz.getPenaltyMode())
+                .randomQuestionOrder(sourceQuiz.isRandomQuestionOrder())
+                .showCorrectAnswers(sourceQuiz.isShowCorrectAnswers())
+                .build();
+
+        sourceQuestions.forEach(sourceQuestion -> {
+            Question copiedQuestion = Question.builder()
+                    .content(sourceQuestion.getContent())
+                    .imageKey(sourceQuestion.getImageKey())
+                    .build();
+            sourceQuestion.getAnswers().forEach(sourceAnswer -> copiedQuestion.addAnswer(Answer.builder()
+                    .content(sourceAnswer.getContent())
+                    .correct(sourceAnswer.isCorrect())
+                    .points(sourceAnswer.getPoints())
+                    .build()));
+            copiedQuiz.addQuestion(copiedQuestion);
+        });
+
+        return copiedQuiz;
+    }
+
+    private String generateUniqueShareCode() {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            String code = generateShareCode();
+            if (!quizShareCodeRepository.existsByCode(code)) {
+                return code;
+            }
+        }
+        throw new IllegalStateException("Could not generate unique share code");
+    }
+
+    private String generateShareCode() {
+        StringBuilder code = new StringBuilder(SHARE_CODE_LENGTH);
+        for (int index = 0; index < SHARE_CODE_LENGTH; index++) {
+            code.append(SHARE_CODE_ALPHABET.charAt(SECURE_RANDOM.nextInt(SHARE_CODE_ALPHABET.length())));
+        }
+        return code.toString();
+    }
+
+    private String normalizeShareCode(String rawCode) {
+        String code = rawCode == null ? "" : rawCode.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+        if (code.length() != SHARE_CODE_LENGTH) {
+            throw new EntityNotFoundException("Nie znaleziono kodu udostępniania.");
+        }
+        return code;
+    }
+
+    private QuizRankingVersion ensureRankingVersion(Quiz quiz, List<Question> questions) {
+        String hash = rankingContentHash(quiz, questions);
+        if (quiz.getRankingVersion() != null && hash.equals(quiz.getRankingVersion().getContentHash())) return quiz.getRankingVersion();
+        QuizRankingVersion version = createRankingVersion(quiz, questions);
+        quiz.setRankingVersion(version);
+        return version;
+    }
+
+    private QuizRankingVersion createRankingVersion(Quiz quiz, List<Question> questions) {
+        QuizCreateDTO snapshot = toCreateDto(quiz, questions);
+        return rankingVersionRepository.save(QuizRankingVersion.builder()
+                .snapshotJson(objectMapper.writeValueAsString(snapshot))
+                .contentHash(contentHashOf(snapshot))
+                .build());
+    }
+
+    @Transactional(readOnly = true)
+    public QuizRankingVersion findRankingVersionByShareCode(String rawCode) {
+        QuizShareCode shareCode = quizShareCodeRepository.findByCode(normalizeShareCode(rawCode))
+                .orElseThrow(() -> new EntityNotFoundException("Nie znaleziono kodu udostępniania."));
+        if (shareCode.getExpiresAt() != null && !shareCode.getExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new EntityNotFoundException("Kod udostępniania wygasł.");
+        }
+        return shareCode.getRankingVersion();
+    }
+
+    public QuizCreateDTO readSnapshot(QuizRankingVersion version) {
+        return objectMapper.readValue(version.getSnapshotJson(), QuizCreateDTO.class);
+    }
+
+    private QuizCreateDTO toCreateDto(Quiz quiz, List<Question> questions) {
+        return new QuizCreateDTO(quiz.getTitle(), questions.stream().map(this::toQuestionCreateDTO).toList(), mapperDTO.toScoringDto(quiz), mapperDTO.toLimitsDto(quiz));
     }
 
     private QuestionCreateDTO toQuestionCreateDTO(Question question) {
@@ -389,210 +436,133 @@ public class QuizService {
         );
     }
 
-    private Quiz copyQuiz(Quiz sourceQuiz, List<Question> sourceQuestions, Long ownerUserId) {
-        Quiz copiedQuiz = Quiz.builder()
-                .title(sourceQuiz.getTitle())
-                .ownerUserId(ownerUserId)
-                .scoringMode(sourceQuiz.getScoringMode() == null ? ScoringMode.DEFAULT : sourceQuiz.getScoringMode())
-                .allowNegativeScore(sourceQuiz.isAllowNegativeScore())
-                .pointsPerCorrect(sourceQuiz.getPointsPerCorrect())
-                .incorrectPenalty(sourceQuiz.getIncorrectPenalty())
-                .penaltyMode(sourceQuiz.getPenaltyMode() == null ? PenaltyMode.FRACTION : sourceQuiz.getPenaltyMode())
-                .randomQuestionOrder(sourceQuiz.isRandomQuestionOrder())
-                .showCorrectAnswers(sourceQuiz.isShowCorrectAnswers())
-                .build();
-
-        sourceQuestions.forEach(sourceQuestion -> {
-            Question copiedQuestion = Question.builder()
-                    .content(sourceQuestion.getContent())
-                    .imageFilename(sourceQuestion.getImageFilename())
-                    .imageKey(sourceQuestion.getImageKey())
-                    .build();
-
-            sourceQuestion.getAnswers().forEach(sourceAnswer -> {
-                Answer copiedAnswer = Answer.builder()
-                        .content(sourceAnswer.getContent())
-                        .correct(sourceAnswer.isCorrect())
-                        .points(sourceAnswer.getPoints())
-                        .build();
-                copiedQuestion.addAnswer(copiedAnswer);
-            });
-
-            copiedQuiz.addQuestion(copiedQuestion);
-        });
-
-        return copiedQuiz;
+    /** Content hash after MapperDTO persist (image media keys). */
+    private String rankingContentHash(Quiz quiz, List<Question> questions) {
+        return contentHashOf(toCreateDto(quiz, questions));
     }
 
-    private Quiz findQuizByShareCode(String rawCode) {
-        String code = normalizeShareCode(rawCode);
-        QuizShareCode shareCode = quizShareCodeRepository.findByCodeAndActiveTrue(code)
-                .orElseThrow(() -> new EntityNotFoundException("Share code not found"));
-
-        if (shareCode.getExpiresAt() != null && !shareCode.getExpiresAt().isAfter(LocalDateTime.now())) {
-            throw new EntityNotFoundException("Share code expired");
-        }
-
-        return quizRepository.findWholeQuizByIdAndOwnerUserId(
-                        shareCode.getQuiz().getId(),
-                        shareCode.getCreatedByUserId()
-                )
-                .orElseThrow(() -> new EntityNotFoundException("Quiz not found"));
+    private String contentHashOf(QuizCreateDTO dto) {
+        ObjectNode root = objectMapper.createObjectNode();
+        root.set("questions", objectMapper.valueToTree(dto.questions()));
+        root.set("scoring", objectMapper.valueToTree(mapperDTO.normalizeScoring(dto.scoring())));
+        return sha256(objectMapper.writeValueAsBytes(root));
     }
 
-    private String generateUniqueShareCode() {
-        for (int attempt = 0; attempt < 20; attempt++) {
-            String code = generateShareCode();
-
-            if (!quizShareCodeRepository.existsByCode(code)) {
-                return code;
-            }
-        }
-
-        throw new IllegalStateException("Could not generate unique share code");
-    }
-
-    private String generateShareCode() {
-        StringBuilder code = new StringBuilder(SHARE_CODE_LENGTH);
-
-        for (int index = 0; index < SHARE_CODE_LENGTH; index++) {
-            code.append(SHARE_CODE_ALPHABET.charAt(SECURE_RANDOM.nextInt(SHARE_CODE_ALPHABET.length())));
-        }
-
-        return code.toString();
-    }
-
-    private String normalizeShareCode(String rawCode) {
-        if (rawCode == null) {
-            throw new EntityNotFoundException("Share code not found");
-        }
-
-        String code = rawCode.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
-
-        if (code.length() != SHARE_CODE_LENGTH) {
-            throw new EntityNotFoundException("Share code not found");
-        }
-
-        return code;
-    }
-
-    private QuizRankingVersion ensureRankingVersion(Quiz quiz, List<Question> questions) {
-        QuizCreateDTO dto = toCreateDto(quiz, questions);
-        String hash = rankingContentHash(dto);
-        if (quiz.getRankingVersion() != null && hash.equals(quiz.getRankingVersion().getContentHash())) return quiz.getRankingVersion();
-        try {
-            QuizRankingVersion version = createRankingVersion(dto);
-            quiz.setRankingVersion(version);
-            return version;
-        } catch (Exception exception) { throw new IllegalStateException("Nie udało się utworzyć wersji rankingowej.", exception); }
-    }
-
-    private QuizRankingVersion createRankingVersion(QuizCreateDTO dto) {
-        try {
-            return rankingVersionRepository.save(QuizRankingVersion.builder()
-                    .snapshotJson(objectMapper.writeValueAsString(dto))
-                    .contentHash(rankingContentHash(dto))
-                    .build());
-        } catch (Exception exception) {
-            throw new IllegalStateException("Nie udało się utworzyć wersji rankingowej.", exception);
-        }
-    }
-
-    public QuizRankingVersion findRankingVersionByShareCode(String rawCode) {
-        String code = normalizeShareCode(rawCode);
-        QuizShareCode shareCode = quizShareCodeRepository.findByCodeAndActiveTrue(code).orElseThrow(() -> new EntityNotFoundException("Share code not found"));
-        if (shareCode.getExpiresAt() != null && !shareCode.getExpiresAt().isAfter(LocalDateTime.now())) throw new EntityNotFoundException("Share code expired");
-        if (shareCode.getRankingVersion() != null) return shareCode.getRankingVersion();
-        if (shareCode.getQuiz() == null) throw new EntityNotFoundException("Quiz not found");
-        Quiz quiz = findWholeQuizByIdAndOwnerUserId(shareCode.getQuiz().getId(), shareCode.getCreatedByUserId());
-        QuizRankingVersion version = ensureRankingVersion(quiz, quiz.getQuestions());
-        shareCode.setRankingVersion(version);
-        return version;
-    }
-
-    public QuizCreateDTO readSnapshot(QuizRankingVersion version) {
-        try { return objectMapper.readValue(version.getSnapshotJson(), QuizCreateDTO.class); }
-        catch (Exception exception) { throw new IllegalStateException("Uszkodzona wersja rankingowa.", exception); }
-    }
-
-    private QuizCreateDTO toCreateDto(Quiz quiz, List<Question> questions) {
-        return new QuizCreateDTO(quiz.getTitle(), questions.stream().map(this::toQuestionCreateDTO).toList(), mapperDTO.toScoringDto(quiz), mapperDTO.toLimitsDto(quiz));
-    }
-
-    private String rankingContentHash(QuizCreateDTO dto) {
-        try {
-            ObjectNode root = objectMapper.createObjectNode();
-            root.set("questions", objectMapper.valueToTree(dto.questions()));
-            root.set("scoring", objectMapper.valueToTree(mapperDTO.normalizeScoring(dto.scoring())));
-            byte[] bytes = objectMapper.writeValueAsBytes(root);
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
-            StringBuilder result = new StringBuilder(); for(byte value:digest) result.append(String.format("%02x", value));
-            return result.toString();
-        } catch(Exception exception) { throw new IllegalStateException("Nie udało się porównać wersji quizu.", exception); }
-    }
-
-    private Quiz findIdenticalQuizByOwnerUserId(Long ownerUserId, Quiz candidate) {
+    private Optional<Quiz> findIdenticalQuizByOwnerUserId(Long ownerUserId, Quiz candidate) {
         String candidateHash = fullQuizContentHash(candidate, candidate.getQuestions());
-
-        for (Quiz existingQuiz : quizRepository.findByOwnerUserId(ownerUserId, Sort.by(Sort.Direction.ASC, "id"))) {
-            List<Question> existingQuestions = questionRepository.findWholeByQuizId(existingQuiz.getId());
-            if (candidateHash.equals(fullQuizContentHash(existingQuiz, existingQuestions))) {
-                return existingQuiz;
-            }
-        }
-
-        return null;
+        return quizRepository.findByOwnerUserIdOrderByIdAsc(ownerUserId).stream()
+                .filter(existing -> candidateHash.equals(fullQuizContentHash(existing, questionRepository.findWholeByQuizId(existing.getId()))))
+                .findFirst();
     }
 
     private String fullQuizContentHash(Quiz quiz, List<Question> questions) {
-        try {
-            ObjectNode root = objectMapper.createObjectNode();
-            root.put("title", quiz.getTitle());
-            root.set("questions", objectMapper.valueToTree(questions.stream().map(this::toQuestionCreateDTO).toList()));
-            root.set("scoring", objectMapper.valueToTree(mapperDTO.toScoringDto(quiz)));
-            root.set("limits", objectMapper.valueToTree(mapperDTO.toLimitsDto(quiz)));
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put("title", quiz.getTitle());
+        root.set("questions", objectMapper.valueToTree(questions.stream().map(this::toQuestionCreateDTO).toList()));
+        root.set("scoring", objectMapper.valueToTree(mapperDTO.toScoringDto(quiz)));
+        root.set("limits", objectMapper.valueToTree(mapperDTO.toLimitsDto(quiz)));
+        return sha256(objectMapper.writeValueAsBytes(root));
+    }
 
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(objectMapper.writeValueAsBytes(root));
-            StringBuilder result = new StringBuilder();
-            for (byte value : digest) result.append(String.format("%02x", value));
-            return result.toString();
-        } catch (Exception exception) {
-            throw new IllegalStateException("Nie udało się porównać zawartości quizu.", exception);
+    private static String sha256(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
         }
     }
 
+    private List<QuizRankingEntry> sortedEntries(QuizRankingVersion version) {
+        List<QuizRankingEntry> entries = new ArrayList<>(rankingEntryRepository.findByRankingVersion(version));
+        entries.sort(this::compareEntries);
+        return entries;
+    }
+
+    /** Caller top-5 place per ranking version (one query). */
+    private Map<UUID, Integer> rankingPositions(Long userId, Collection<Quiz> quizzes) {
+        List<UUID> versionIds = quizzes.stream()
+                .map(Quiz::getRankingVersion)
+                .filter(Objects::nonNull)
+                .map(QuizRankingVersion::getId)
+                .distinct()
+                .toList();
+        if (versionIds.isEmpty()) return Map.of();
+        return rankingEntryRepository.findByRankingVersion_IdIn(versionIds).stream()
+                .collect(Collectors.groupingBy(entry -> entry.getRankingVersion().getId()))
+                .entrySet().stream()
+                .filter(group -> group.getValue().stream().anyMatch(entry -> entry.getUserId().equals(userId)))
+                .collect(Collectors.toMap(Map.Entry::getKey, group -> {
+                    List<QuizRankingEntry> entries = new ArrayList<>(group.getValue());
+                    entries.sort(this::compareEntries);
+                    return positionOf(entries, userId);
+                }));
+    }
+
+    private static Integer positionFor(Quiz quiz, Map<UUID, Integer> positions) {
+        return quiz.getRankingVersion() == null ? null : positions.get(quiz.getRankingVersion().getId());
+    }
+
+    private static Integer positionOf(List<QuizRankingEntry> sortedEntries, Long userId) {
+        for (int index = 0; index < sortedEntries.size(); index++) {
+            if (sortedEntries.get(index).getUserId().equals(userId)) return index + 1;
+        }
+        return null;
+    }
+
     private int compareEntries(QuizRankingEntry left, QuizRankingEntry right) {
-        long a=(long)left.getScoreScaled()*right.getMaxScoreScaled(), b=(long)right.getScoreScaled()*left.getMaxScoreScaled();
-        if(a!=b) return Long.compare(b,a);
-        int duration=Long.compare(left.getDurationMs(),right.getDurationMs()); if(duration!=0)return duration;
+        long a = (long) left.getScoreScaled() * right.getMaxScoreScaled();
+        long b = (long) right.getScoreScaled() * left.getMaxScoreScaled();
+        if (a != b) return Long.compare(b, a);
+        int duration = Long.compare(left.getDurationMs(), right.getDurationMs());
+        if (duration != 0) return duration;
         return left.getCompletedAt().compareTo(right.getCompletedAt());
     }
 
     private List<RankingEntryDTO> toEntryDtos(List<QuizRankingEntry> entries) {
-        return java.util.stream.IntStream.range(0,entries.size()).mapToObj(index -> {
-            QuizRankingEntry entry=entries.get(index);
-            String name=rankingUserRepository.findById(entry.getUserId()).map(RankingUser::getUsername).orElse("Użytkownik");
-            return new RankingEntryDTO(index+1,name,entry.getScoreScaled(),entry.getMaxScoreScaled(),entry.getDurationMs());
+        Map<Long, String> usernames = rankingUserRepository
+                .findAllById(entries.stream().map(QuizRankingEntry::getUserId).toList()).stream()
+                .collect(Collectors.toMap(RankingUser::getId, RankingUser::getUsername));
+        return IntStream.range(0, entries.size()).mapToObj(index -> {
+            QuizRankingEntry entry = entries.get(index);
+            return new RankingEntryDTO(index + 1, usernames.getOrDefault(entry.getUserId(), "Użytkownik"),
+                    entry.getScoreScaled(), entry.getMaxScoreScaled(), entry.getDurationMs());
         }).toList();
     }
 
+    /** Mirror quiz-scoring.util.ts; normalized scoring only. */
     private double maxQuestionScore(QuestionCreateDTO question, QuizScoringDTO scoring) {
-        QuizScoringDTO normalized=mapperDTO.normalizeScoring(scoring);
-        if("custom".equals(normalized.mode())) return question.answers().stream().filter(a->a.correct()).mapToDouble(a->a.points()==null?0:a.points()).sum();
-        return normalized.pointsPerCorrect();
+        if ("custom".equals(scoring.mode())) {
+            return question.answers().stream().filter(AnswerCreateDTO::correct).mapToDouble(answer -> answer.points() == null ? 0 : answer.points()).sum();
+        }
+        long correct = question.answers().stream().filter(AnswerCreateDTO::correct).count();
+        if ("fraction".equals(scoring.penaltyMode())) return correct == 0 ? 0 : scoring.pointsPerCorrect();
+        return scoring.pointsPerCorrect() * correct;
     }
 
+    /** Expects normalized scoring. */
     private double questionScore(QuestionCreateDTO question, List<Integer> indexes, QuizScoringDTO scoring) {
-        QuizScoringDTO normalized=mapperDTO.normalizeScoring(scoring); List<AnswerCreateDTO> answers=question.answers();
-        if("custom".equals(normalized.mode())) return answers.stream().filter(a->indexes.contains(answers.indexOf(a))).mapToDouble(a->a.points()==null?0:a.points()).sum();
-        long correct=answers.stream().filter(AnswerCreateDTO::correct).count(), incorrect=answers.size()-correct;
-        long selectedCorrect=indexes.stream().filter(i->i>=0&&i<answers.size()&&answers.get(i).correct()).count();
-        long selectedIncorrect=indexes.stream().filter(i->i>=0&&i<answers.size()&&!answers.get(i).correct()).count();
+        List<AnswerCreateDTO> answers = question.answers();
+        List<AnswerCreateDTO> selected = indexes.stream()
+                .filter(index -> index != null && index >= 0 && index < answers.size())
+                .distinct()
+                .map(answers::get)
+                .toList();
         double value;
-        if("fraction".equals(normalized.penaltyMode())) value=(correct==0?0:(double)selectedCorrect/correct)-(incorrect==0?0:(double)selectedIncorrect/incorrect);
-        else if("percent".equals(normalized.penaltyMode())) value=selectedCorrect*normalized.pointsPerCorrect()*(1-(selectedIncorrect*normalized.incorrectPenalty()/100));
-        else value=selectedCorrect*normalized.pointsPerCorrect()-selectedIncorrect*normalized.incorrectPenalty();
-        return !normalized.allowNegativeScore() && value<0 ? 0 : value;
+        if ("custom".equals(scoring.mode())) {
+            value = selected.stream().mapToDouble(answer -> answer.points() == null ? 0 : answer.points()).sum();
+        } else {
+            long correct = answers.stream().filter(AnswerCreateDTO::correct).count();
+            long incorrect = answers.size() - correct;
+            long selectedCorrect = selected.stream().filter(AnswerCreateDTO::correct).count();
+            long selectedIncorrect = selected.size() - selectedCorrect;
+            if ("fraction".equals(scoring.penaltyMode())) {
+                value = (correct == 0 ? 0 : (double) selectedCorrect / correct) - (incorrect == 0 ? 0 : (double) selectedIncorrect / incorrect);
+            } else if ("percent".equals(scoring.penaltyMode())) {
+                value = selectedCorrect * scoring.pointsPerCorrect() * (1 - (selectedIncorrect * scoring.incorrectPenalty() / 100));
+            } else {
+                value = selectedCorrect * scoring.pointsPerCorrect() - selectedIncorrect * scoring.incorrectPenalty();
+            }
+        }
+        return !scoring.allowNegativeScore() && value < 0 ? 0 : value;
     }
 }

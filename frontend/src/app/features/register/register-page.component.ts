@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
+import { QuizApiService } from '../../core/services/quiz-api.service';
 
 @Component({
   selector: 'app-register-page',
@@ -13,6 +14,7 @@ import { AuthService } from '../../core/services/auth.service';
 })
 export class RegisterPageComponent {
   private readonly authService = inject(AuthService);
+  private readonly quizApiService = inject(QuizApiService);
   private readonly router = inject(Router);
 
   model = { email: '', password: '', passwordConfirm: '', username: '' };
@@ -52,7 +54,7 @@ export class RegisterPageComponent {
       .subscribe({
         next: (response) => {
           this.authService.setCurrentUser(response);
-          this.authService.migrateGuestQuizzesToUser(response).subscribe({
+          this.quizApiService.migrateGuestQuizzes().subscribe({
             next: () => {
               this.router.navigate(['/']);
             },

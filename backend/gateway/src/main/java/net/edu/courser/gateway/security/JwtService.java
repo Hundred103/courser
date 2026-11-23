@@ -1,30 +1,34 @@
 package net.edu.courser.gateway.security;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 
+/** Validates user-service JWTs (shared secret). */
 @Service
 public class JwtService {
     private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final int MIN_SECRET_BYTES = 32;
 
     private final ObjectMapper objectMapper;
-    private final String secret;
+    private final byte[] secret;
 
-    public JwtService(
-            ObjectMapper objectMapper,
-            @Value("${app.jwt.secret:courser-local-development-secret-change-me}") String secret
-    ) {
+    public JwtService(ObjectMapper objectMapper, @Value("${app.jwt.secret}") String secret) {
         this.objectMapper = objectMapper;
-        this.secret = secret;
+        this.secret = secret.getBytes(StandardCharsets.UTF_8);
+        if (this.secret.length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException("APP_JWT_SECRET must be at least " + MIN_SECRET_BYTES + " bytes long.");
+        }
     }
 
     public JwtClaims validate(String token) {
@@ -34,16 +38,13 @@ public class JwtService {
             throw new IllegalArgumentException("Invalid token");
         }
 
-        String unsignedToken = parts[0] + "." + parts[1];
-        String expectedSignature = sign(unsignedToken);
-
-        if (!constantTimeEquals(expectedSignature, parts[2])) {
+        byte[] expectedSignature = sign(parts[0] + "." + parts[1]);
+        if (!MessageDigest.isEqual(expectedSignature, parts[2].getBytes(StandardCharsets.UTF_8))) {
             throw new IllegalArgumentException("Invalid token signature");
         }
 
         try {
-            byte[] payloadBytes = Base64.getUrlDecoder().decode(parts[1]);
-            Map<String, Object> payload = objectMapper.readValue(payloadBytes, new TypeReference<>() {});
+            Map<String, Object> payload = objectMapper.readValue(Base64.getUrlDecoder().decode(parts[1]), new TypeReference<>() {});
 
             long expiresAt = ((Number) payload.get("exp")).longValue();
             if (Instant.now().getEpochSecond() >= expiresAt) {
@@ -54,45 +55,26 @@ public class JwtService {
             String email = (String) payload.get("email");
             String username = (String) payload.get("username");
 
-            if (userId == null || email == null || username == null) {
+            if (email == null || username == null) {
                 throw new IllegalArgumentException("Missing token claims");
             }
 
             return new JwtClaims(userId, email, username);
         } catch (IllegalArgumentException e) {
             throw e;
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             throw new IllegalArgumentException("Invalid token payload", e);
         }
     }
 
-    private String sign(String value) {
+    private byte[] sign(String value) {
         try {
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
+            mac.init(new SecretKeySpec(secret, HMAC_ALGORITHM));
+            return Base64.getUrlEncoder().withoutPadding()
+                    .encode(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (GeneralSecurityException e) {
             throw new IllegalStateException("Could not validate JWT", e);
         }
-    }
-
-    private boolean constantTimeEquals(String left, String right) {
-        if (left == null || right == null) {
-            return false;
-        }
-
-        byte[] leftBytes = left.getBytes(StandardCharsets.UTF_8);
-        byte[] rightBytes = right.getBytes(StandardCharsets.UTF_8);
-
-        if (leftBytes.length != rightBytes.length) {
-            return false;
-        }
-
-        int result = 0;
-        for (int i = 0; i < leftBytes.length; i++) {
-            result |= leftBytes[i] ^ rightBytes[i];
-        }
-
-        return result == 0;
     }
 }

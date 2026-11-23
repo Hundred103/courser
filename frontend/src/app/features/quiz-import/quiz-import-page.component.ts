@@ -5,6 +5,7 @@ import { finalize } from 'rxjs';
 import { DEFAULT_QUIZ_LIMITS } from '../../core/models/quiz-limits.model';
 import { QuizCreateDTO } from '../../core/models/quiz.model';
 import { QuizApiService } from '../../core/services/quiz-api.service';
+import { quizRequestErrorMessage } from '../../core/utils/quiz-request.util';
 import { buildQuizZip, normalizeQuiz, parseQuizZip } from '../../core/utils/quiz-zip.util';
 
 const QUIZ_TEMPLATE: QuizCreateDTO = {
@@ -20,17 +21,19 @@ const QUIZ_TEMPLATE: QuizCreateDTO = {
   questions: [
     {
       content: 'Która odpowiedź jest poprawna?',
-      image: null,
       answers: [
         {
           content: 'Pierwsza odpowiedź',
           correct: true,
+          points: null,
         },
         {
           content: 'Druga odpowiedź',
           correct: false,
+          points: null,
         },
       ],
+      image: null,
     },
   ],
 };
@@ -45,7 +48,7 @@ const TEMPLATE_INSTRUCTIONS = [
   'points: każda poprawna daje pointsPerCorrect, a błędna odejmuje incorrectPenalty.',
   'percent: incorrectPenalty to procent kary; np. pointsPerCorrect: 2 i incorrectPenalty: 25 oznacza +2 za poprawną oraz -0,5 za błędną odpowiedź.',
   'allowNegativeScore: true pozwala, aby ujemny wynik pytania obniżył wynik quizu.',
-  'Dla custom liczy się jedno pole points przy każdej odpowiedzi; np. { "text": "Warszawa", "correct": true, "points": 2 } albo { "text": "Kraków", "correct": false, "points": -1 }. Pozostałe ustawienia punktacji nie wpływają na wynik.',
+  'Dla custom liczy się jedno pole points przy każdej odpowiedzi; np. { "content": "Warszawa", "correct": true, "points": 2 } albo { "content": "Kraków", "correct": false, "points": -1 }. Poprawne odpowiedzi mają od 0 do 99,99 pkt, błędne od -99,99 do 0, maksymalnie z dwiema cyframi po przecinku. Pozostałe ustawienia punktacji nie wpływają na wynik.',
 ] as const;
 
 @Component({
@@ -71,21 +74,6 @@ export class QuizImportPageComponent {
   readonly shareCode = signal('');
   readonly codeImportError = signal('');
   readonly isCodeImporting = signal(false);
-  readonly templateJson = JSON.stringify(
-    {
-      _instrukcja: TEMPLATE_INSTRUCTIONS,
-      title: QUIZ_TEMPLATE.title,
-      scoring: QUIZ_TEMPLATE.scoring,
-      limits: QUIZ_TEMPLATE.limits,
-      questions: QUIZ_TEMPLATE.questions.map((question) => ({
-        content: question.content,
-        image: question.image,
-        answers: question.answers,
-      })),
-    },
-    null,
-    2,
-  );
 
   readonly canImport = computed(() => this.importedQuiz() !== null && !this.validationError() && !this.isImporting());
   readonly questionCount = computed(() => this.importedQuiz()?.questions.length ?? 0);
@@ -135,7 +123,7 @@ export class QuizImportPageComponent {
   }
 
   async downloadTemplate(): Promise<void> {
-    const blob = await buildQuizZip(QUIZ_TEMPLATE, TEMPLATE_INSTRUCTIONS);
+    const blob = await buildQuizZip(QUIZ_TEMPLATE, { instructions: TEMPLATE_INSTRUCTIONS });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
 
@@ -176,8 +164,8 @@ export class QuizImportPageComponent {
             queryParams: { imported: 'true' },
           });
         },
-        error: () => {
-          this.importError.set('Nie udało się zaimportować quizu. Spróbuj ponownie.');
+        error: (error) => {
+          this.importError.set(quizRequestErrorMessage(error, 'Nie udało się zaimportować quizu. Spróbuj ponownie.'));
         },
       });
   }
@@ -207,8 +195,8 @@ export class QuizImportPageComponent {
             queryParams: { imported: 'true' },
           });
         },
-        error: () => {
-          this.codeImportError.set('Nie udało się dodać quizu. Sprawdź kod i spróbuj ponownie.');
+        error: (error) => {
+          this.codeImportError.set(quizRequestErrorMessage(error, 'Nie udało się dodać quizu. Sprawdź kod i spróbuj ponownie.'));
         },
       });
   }
@@ -248,7 +236,14 @@ export class QuizImportPageComponent {
   }
 
   private parseJsonQuiz(rawJson: string): QuizCreateDTO {
-    return normalizeQuiz(JSON.parse(rawJson) as unknown);
+    const quiz = normalizeQuiz(JSON.parse(rawJson) as unknown);
+    const questionWithImage = quiz.questions.findIndex((question) => question.image);
+
+    if (questionWithImage >= 0) {
+      throw new Error(`Pytanie ${questionWithImage + 1} ma obraz, a plik JSON nie może go zawierać. Użyj archiwum ZIP z plikiem quiz.json i folderem images/.`);
+    }
+
+    return quiz;
   }
 
   private normalizeShareCode(code: string): string {

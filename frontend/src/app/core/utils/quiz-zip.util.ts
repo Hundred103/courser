@@ -2,7 +2,8 @@ import JSZip from 'jszip';
 import { QuizCreateDTO } from '../models/quiz.model';
 import { DEFAULT_QUIZ_LIMITS, parseQuizLimits } from '../models/quiz-limits.model';
 import { DEFAULT_QUIZ_SCORING, parseAnswerPoints, parseQuizScoring } from './quiz-scoring.util';
-import { base64ToUint8Array, extensionFromImageReference } from './image-compression.util';
+import { base64ToUint8Array, extensionFromImageReference, imageBytesToDataUrl } from './image.util';
+import { MAX_QUIZ_TITLE_LENGTH } from './quiz-request.util';
 
 const QUIZ_JSON = 'quiz.json';
 
@@ -40,18 +41,23 @@ export async function parseQuizZip(file: ArrayBuffer): Promise<ParsedQuizZip> {
           throw new Error(`Nie znaleziono obrazu ${question.image} dla pytania ${index + 1}.`);
         }
 
-        const bytes = await imageEntry.async('uint8array');
-        const mime = detectMimeType(bytes) ?? mimeFromFilename(question.image) ?? 'application/octet-stream';
-        return {
-          ...question,
-          image: `data:${mime};base64,${uint8ToBase64(bytes)}`,
-        };
+        try {
+          return { ...question, image: imageBytesToDataUrl(await imageEntry.async('uint8array')) };
+        } catch (error) {
+          throw new Error(`Obraz ${question.image} dla pytania ${index + 1}: ${(error as Error).message}`);
+        }
       }),
     ),
   }, rankingVersionId };
 }
 
-export async function buildQuizZip(quiz: QuizCreateDTO, instructions?: readonly string[]): Promise<Blob> {
+export interface QuizZipOptions {
+  instructions?: readonly string[];
+  rankingVersionId?: string | null;
+}
+
+export async function buildQuizZip(quiz: QuizCreateDTO, options: QuizZipOptions = {}): Promise<Blob> {
+  const { instructions, rankingVersionId } = options;
   const zip = new JSZip();
   const resolvedImages = await Promise.all(
     quiz.questions.map(async (question, index) => {
@@ -68,10 +74,11 @@ export async function buildQuizZip(quiz: QuizCreateDTO, instructions?: readonly 
     title: quiz.title,
     scoring: quiz.scoring ?? { ...DEFAULT_QUIZ_SCORING },
     limits: quiz.limits ?? { ...DEFAULT_QUIZ_LIMITS },
+    ...(rankingVersionId ? { _ranking: { versionId: rankingVersionId } } : {}),
     questions: quiz.questions.map((question, index) => ({
       content: question.content,
-      image: resolvedImages[index]?.filename ?? null,
       answers: question.answers.map((answer) => exportAnswer(answer)),
+      image: resolvedImages[index]?.filename ?? null,
     })),
   };
 
@@ -94,6 +101,10 @@ export function normalizeQuiz(value: unknown): QuizCreateDTO {
 
   if (typeof value['title'] !== 'string' || value['title'].trim().length === 0) {
     throw new Error('Pole title musi być niepustym tekstem.');
+  }
+
+  if (value['title'].trim().length > MAX_QUIZ_TITLE_LENGTH) {
+    throw new Error(`Pole title może mieć najwyżej ${MAX_QUIZ_TITLE_LENGTH} znaków.`);
   }
 
   if (!Array.isArray(value['questions']) || value['questions'].length === 0) {
@@ -165,6 +176,7 @@ function normalizeAnswer(
     points: parseAnswerPoints(
       value['points'],
       `Odpowiedź ${answerIndex + 1} w pytaniu ${questionIndex + 1}: pole points`,
+      value['correct'],
     ),
   };
 }
@@ -172,18 +184,13 @@ function normalizeAnswer(
 function exportAnswer(answer: QuizCreateDTO['questions'][number]['answers'][number]): {
   content: string;
   correct: boolean;
-  points?: number;
+  points: number | null;
 } {
-  const exported: { content: string; correct: boolean; points?: number } = {
+  return {
     content: answer.content,
     correct: answer.correct,
+    points: typeof answer.points === 'number' && Number.isFinite(answer.points) ? answer.points : null,
   };
-
-  if (typeof answer.points === 'number' && Number.isFinite(answer.points)) {
-    exported.points = answer.points;
-  }
-
-  return exported;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -206,70 +213,4 @@ async function resolveImageForZip(
   }
 
   return { filename, bytes: base64ToUint8Array(image) };
-}
-
-function mimeFromFilename(filename: string): string | null {
-  const extension = filename.includes('.')
-    ? filename.substring(filename.lastIndexOf('.') + 1).toLowerCase()
-    : '';
-  switch (extension) {
-    case 'jpg':
-    case 'jpeg':
-      return 'image/jpeg';
-    case 'png':
-      return 'image/png';
-    case 'gif':
-      return 'image/gif';
-    case 'webp':
-      return 'image/webp';
-    case 'bmp':
-      return 'image/bmp';
-    default:
-      return null;
-  }
-}
-
-function detectMimeType(bytes: Uint8Array): string | null {
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return 'image/jpeg';
-  }
-  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
-    return 'image/png';
-  }
-  if (
-    bytes.length >= 6
-    && bytes[0] === 0x47
-    && bytes[1] === 0x49
-    && bytes[2] === 0x46
-    && bytes[3] === 0x38
-    && (bytes[4] === 0x37 || bytes[4] === 0x39)
-    && bytes[5] === 0x61
-  ) {
-    return 'image/gif';
-  }
-  if (
-    bytes.length >= 12
-    && bytes[0] === 0x52
-    && bytes[1] === 0x49
-    && bytes[2] === 0x46
-    && bytes[3] === 0x46
-    && bytes[8] === 0x57
-    && bytes[9] === 0x45
-    && bytes[10] === 0x42
-    && bytes[11] === 0x50
-  ) {
-    return 'image/webp';
-  }
-  if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) {
-    return 'image/bmp';
-  }
-  return null;
-}
-
-function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary);
 }

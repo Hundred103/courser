@@ -6,7 +6,8 @@ import { DEFAULT_QUIZ_LIMITS, QuizLimits, normalizeQuizLimits } from '../../core
 import { QuizCreateDTO, QuizPlayDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
-import { readImageFile, toImageSrc } from '../../core/utils/image-compression.util';
+import { readImageFile } from '../../core/utils/image.util';
+import { MAX_QUIZ_TITLE_LENGTH, copyTitle, quizRequestErrorMessage } from '../../core/utils/quiz-request.util';
 import { normalizeQuizScoring, QuizScoring } from '../../core/utils/quiz-scoring.util';
 
 const NEW_QUIZ_SCORING: QuizScoring = {
@@ -67,6 +68,7 @@ export class QuizCreatePageComponent implements OnDestroy {
   private pendingRankingCopyAction: (() => void) | null = null;
 
   readonly title = signal('');
+  readonly maxTitleLength = MAX_QUIZ_TITLE_LENGTH;
   readonly scoring = signal<QuizScoring>({ ...NEW_QUIZ_SCORING });
   readonly limits = signal<QuizLimits>({ ...DEFAULT_QUIZ_LIMITS });
   readonly useDefaultPointsLook = signal(true);
@@ -429,7 +431,7 @@ export class QuizCreatePageComponent implements OnDestroy {
   }
 
   questionImageSrc(image: string | null): string | null {
-    return toImageSrc(image);
+    return image || null;
   }
 
   updateAnswerContent(answerId: number, event: Event): void {
@@ -661,15 +663,17 @@ export class QuizCreatePageComponent implements OnDestroy {
       return;
     }
 
-    const saveRequest = createCopy && quizId ? this.quizApiService.forkQuiz(quizId, dto) : quizId ? this.quizApiService.updateQuiz(quizId, dto) : this.quizApiService.createQuiz(dto);
+    const saveRequest = createCopy && quizId
+      ? this.quizApiService.createQuiz({ ...dto, title: copyTitle(dto.title) })
+      : quizId ? this.quizApiService.updateQuiz(quizId, dto) : this.quizApiService.createQuiz(dto);
 
     saveRequest.pipe(finalize(() => this.isSaving.set(false))).subscribe({
       next: () => {
         this.quizSaved = true;
         void this.router.navigate(['/']);
       },
-      error: () => {
-        this.saveError.set('Nie udało się zapisać quizu.');
+      error: (error) => {
+        this.saveError.set(quizRequestErrorMessage(error, 'Nie udało się zapisać quizu.'));
       },
     });
   }
@@ -816,8 +820,7 @@ export class QuizCreatePageComponent implements OnDestroy {
       return;
     }
 
-    // Tytuł oraz ustawienia sposobu wyświetlania pytań są bezpieczne dla
-    // wspólnego rankingu, dlatego przy anulowaniu zostają bez zmian.
+    // Title/display settings excluded from ranking hash — revert rest on cancel.
     this.questions.set(this.cloneQuestions(this.initialDraft.questions));
     this.scoring.set({ ...this.initialDraft.scoring });
     this.syncRememberedPenalties(this.initialDraft.scoring);

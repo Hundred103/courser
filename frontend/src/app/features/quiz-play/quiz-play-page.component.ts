@@ -1,6 +1,5 @@
 import { Component, HostListener, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, map, of, startWith, switchMap } from 'rxjs';
 import { AnswerPlayDTO } from '../../core/models/answer.model';
@@ -10,7 +9,7 @@ import { QuizPlayDTO, RankingFinishDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
 import { QuizScoreService } from '../../core/services/quiz-score.service';
-import { toImageSrc } from '../../core/utils/image-compression.util';
+import { serverErrorMessage } from '../../core/utils/quiz-request.util';
 import { awardedQuestionScore, normalizeQuizScoring, questionMaxScore } from '../../core/utils/quiz-scoring.util';
 
 type QuizState =
@@ -150,6 +149,7 @@ export class QuizPlayPageComponent {
   readonly lastCheckedQuestionRunId = signal<number | null>(null);
   readonly rankingAttemptId = signal<string | null>(null);
   readonly rankingResult = signal<RankingFinishDTO | null>(null);
+  readonly rankingError = signal<string | null>(null);
   readonly rankingSeconds = signal(0);
   private readonly playSessionActive = signal(false);
   readonly confettiPieces = Array.from({ length: 36 }, (_, index) => index);
@@ -211,9 +211,36 @@ export class QuizPlayPageComponent {
   readonly maxScore = computed(() =>
     this.questions().reduce((total, question) => total + questionMaxScore(question.answers, this.scoring()), 0),
   );
-  readonly formattedScore = computed(() => this.formatScore(this.score()));
-  readonly formattedMaxScore = computed(() => this.formatScore(this.maxScore()));
-  readonly scorePercent = computed(() => this.formatPercentage(this.score(), this.maxScore()));
+  /** Ranked finish: show server score only (avoids TS/Java scoring drift on the medal screen). */
+  readonly awaitingServerScore = computed(
+    () =>
+      this.resultReady() &&
+      !this.isStudyMode() &&
+      this.quiz()?.rankingEnabled === true &&
+      (this.quiz()?.id ?? 0) > 0 &&
+      this.isLoggedIn() &&
+      !!this.rankingAttemptId() &&
+      !this.rankingResult() &&
+      !this.rankingError(),
+  );
+  readonly formattedScore = computed(() => {
+    const ranking = this.rankingResult();
+    if (ranking) return this.formatScore(ranking.scoreScaled / 100);
+    if (this.awaitingServerScore()) return '…';
+    return this.formatScore(this.score());
+  });
+  readonly formattedMaxScore = computed(() => {
+    const ranking = this.rankingResult();
+    if (ranking) return this.formatScore(ranking.maxScoreScaled / 100);
+    if (this.awaitingServerScore()) return '…';
+    return this.formatScore(this.maxScore());
+  });
+  readonly scorePercent = computed(() => {
+    const ranking = this.rankingResult();
+    if (ranking) return this.formatPercentage(ranking.scoreScaled, ranking.maxScoreScaled);
+    if (this.awaitingServerScore()) return '…';
+    return this.formatPercentage(this.score(), this.maxScore());
+  });
 
   constructor() {
     effect(() => {
@@ -227,7 +254,7 @@ export class QuizPlayPageComponent {
         return;
       }
 
-      const playSessionId = this.getOrCreatePlaySessionId();
+      let playSessionId = this.getOrCreatePlaySessionId();
       if (quiz.id !== this.currentQuizId || playSessionId !== this.currentPlaySessionId) {
         this.currentQuizId = quiz.id;
         this.currentPlaySessionId = playSessionId;
@@ -239,6 +266,11 @@ export class QuizPlayPageComponent {
 
         const restored = this.restorePlaySession(quiz, playSessionId, randomQuestions, studyMode);
         if (!restored) {
+          // Old attempt URL must not reuse a session the server may have finished.
+          if (this.runOptions().playSessionId === playSessionId) {
+            playSessionId = this.replacePlaySessionId();
+            this.currentPlaySessionId = playSessionId;
+          }
           this.nextQuestionRunId = 1;
           this.questions.set(this.prepareQuestions(quiz.questions, randomQuestions));
         }
@@ -263,8 +295,7 @@ export class QuizPlayPageComponent {
         return;
       }
 
-      // Odczyt sygnałów sprawia, że stan jest utrwalany po każdej interakcji
-      // użytkownika, ale bez osobnego zapisu dla każdego przycisku.
+      // effect() reads signals → one persist per interaction batch.
       this.questions();
       this.selectedAnswers();
       this.submittedAnswers();
@@ -299,20 +330,34 @@ export class QuizPlayPageComponent {
         return;
       }
 
-      if (!this.isStudyMode() && quiz.rankingEnabled && this.rankingAttemptId()) this.finishRanking(quiz.id);
+      const ranked = !this.isStudyMode() && quiz.rankingEnabled === true && !!this.rankingAttemptId();
+      if (ranked) {
+        this.finishRanking(quiz.id);
+        // Prefer server score for stats; wait until finish succeeds or fails.
+        this.rankingResult();
+        this.rankingError();
+        if (!this.rankingResult() && !this.rankingError()) {
+          return;
+        }
+      }
+
+      const ranking = this.rankingResult();
+      const effectivenessHundredths = this.isStudyMode()
+        ? null
+        : ranking
+          ? ranking.maxScoreScaled === 0
+            ? 0
+            : Math.round((ranking.scoreScaled / ranking.maxScoreScaled) * 10_000)
+          : Math.round(Number(this.formatPercentage(this.score(), this.maxScore()).replace(',', '.')) * 100);
 
       this.resultSaved.set(true);
       this.resultSaveError.set(null);
-      const scaledMax = Math.max(0, this.quizScoreService.toScaledScore(this.maxScore()));
-      const scaledScore = Math.min(scaledMax, this.quizScoreService.toScaledScore(this.score()));
       this.quizScoreService.completeQuiz({
         requestId: this.completionRequestId,
         quizId: quiz.id,
         checkedQuestions: this.checkedQuestions().size,
         studyMode: this.isStudyMode(),
-        score: this.isStudyMode() ? null : scaledScore,
-        maxScore: this.isStudyMode() ? null : scaledMax,
-        effectivenessHundredths: this.isStudyMode() ? null : Math.round(Number(this.scorePercent().replace(',', '.')) * 100),
+        effectivenessHundredths,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       }).subscribe({ next: () => this.resultSaveConfirmed.set(true), error: (error) => this.handleSaveError(error) });
     });
@@ -470,6 +515,7 @@ export class QuizPlayPageComponent {
     this.lastCheckedQuestionRunId.set(null);
     this.rankingAttemptId.set(null);
     this.rankingResult.set(null);
+    this.rankingError.set(null);
     this.rankingSeconds.set(0);
     this.stopRankingTimers();
   }
@@ -480,6 +526,10 @@ export class QuizPlayPageComponent {
       return requestedId;
     }
 
+    return this.replacePlaySessionId();
+  }
+
+  private replacePlaySessionId(): string {
     const playSessionId = crypto.randomUUID();
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -526,7 +576,7 @@ export class QuizPlayPageComponent {
     try {
       sessionStorage.setItem(this.playSessionStorageKey(quiz.id, playSessionId), JSON.stringify(snapshot));
     } catch {
-      // Brak miejsca w sessionStorage nie może blokować rozwiązywania quizu.
+      // sessionStorage full must not block play.
     }
   }
 
@@ -622,9 +672,7 @@ export class QuizPlayPageComponent {
       );
       this.rankingAttemptId.set(typeof snapshot.rankingAttemptId === 'string' ? snapshot.rankingAttemptId : null);
       this.resultReady.set(snapshot.resultReady);
-      // Potwierdzonego zapisu nigdy nie wysyłamy drugi raz. Jeżeli odświeżenie
-      // nastąpiło podczas żądania, pozostawiamy false i bezpiecznie ponawiamy
-      // ten sam requestId (backend obsługuje go idempotentnie).
+      // After confirmed save, skip resend; same requestId is idempotent on backend.
       this.resultSaved.set(snapshot.resultSaveConfirmed);
       this.resultSaveConfirmed.set(snapshot.resultSaveConfirmed);
       this.completionRequestId = snapshot.completionRequestId;
@@ -785,7 +833,13 @@ export class QuizPlayPageComponent {
   private startRanking(quizId: number, playSessionId: string): void {
     this.quizApiService.startRankingAttempt(quizId, playSessionId).subscribe({
       next: ({ attemptId, elapsedMs }) => {
+        if (this.currentQuizId !== quizId || this.currentPlaySessionId !== playSessionId) return;
         this.rankingAttemptId.set(attemptId);
+        // Completion effect may already have run without an attempt id.
+        if (this.resultReady()) {
+          this.finishRanking(quizId);
+          return;
+        }
         this.rankingStartedAt = Date.now() - elapsedMs;
         this.rankingTimer = setInterval(() => {
           const elapsedMs = Date.now() - this.rankingStartedAt;
@@ -798,6 +852,7 @@ export class QuizPlayPageComponent {
           Math.max(0, QuizPlayPageComponent.MAX_RANKING_DURATION_MS - elapsedMs),
         );
       },
+      error: () => this.rankingError.set('Nie udało się rozpocząć podejścia rankingowego. Ten wynik nie trafi do rankingu.'),
     });
   }
 
@@ -809,7 +864,10 @@ export class QuizPlayPageComponent {
       questionIndex: question.rankingQuestionIndex,
       answerIndexes: (this.submittedAnswers()[question.runId] ?? []).map((answerId) => question.rankingAnswerIndexes[answerId]).filter((index): index is number => index !== undefined),
     }));
-    this.quizApiService.finishRankingAttempt(quizId, attemptId, answers).subscribe({ next: (result) => this.rankingResult.set(result) });
+    this.quizApiService.finishRankingAttempt(quizId, attemptId, answers).subscribe({
+      next: (result) => this.rankingResult.set(result),
+      error: () => this.rankingError.set('Nie udało się zapisać wyniku w rankingu.'),
+    });
   }
 
   rankingTimeText(): string {
@@ -872,26 +930,9 @@ export class QuizPlayPageComponent {
   }
 
   private handleSaveError(error: unknown): void {
-    const message = this.readErrorMessage(error);
+    const message = serverErrorMessage(error) ?? 'Nie udało się zapisać rozwiązania.';
 
     this.resultSaveError.set(message);
-  }
-
-  private readErrorMessage(error: unknown): string {
-    if (error instanceof HttpErrorResponse) {
-      if (typeof error.error === 'string' && error.error.trim()) {
-        return error.error;
-      }
-
-      if (error.error && typeof error.error === 'object' && 'error' in error.error) {
-        const nested = (error.error as { error?: unknown }).error;
-        if (typeof nested === 'string' && nested.trim()) {
-          return nested;
-        }
-      }
-    }
-
-    return 'Nie udało się zapisać rozwiązania.';
   }
 
   private resolveExitDecision(canLeave: boolean): void {
@@ -985,9 +1026,7 @@ export class QuizPlayPageComponent {
     const awarded = awardedQuestionScore(question.answers, selectedIds, this.scoring());
     const maximum = questionMaxScore(question.answers, this.scoring());
 
-    // Pytanie z maksymalnym wynikiem 0 może wystąpić przy niestandardowej
-    // punktacji. Wtedy pełna poprawność nadal oznacza 100%, a każda inna
-    // odpowiedź 0%.
+    // maxScore 0: UI still shows 100% vs 0% for correct vs wrong.
     if (maximum <= 0) {
       return this.isQuestionFullyCorrect(question) ? 100 : 0;
     }
@@ -1011,7 +1050,7 @@ export class QuizPlayPageComponent {
   }
 
   questionImageSrc(question: QuestionPlayDTO): string | null {
-    return toImageSrc(question.image);
+    return question.image || null;
   }
 
   private clearPendingSelectionForCurrentQuestion(): void {

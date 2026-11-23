@@ -1,11 +1,8 @@
 package net.edu.courser.quizservice.entity;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.List;
 import java.util.ArrayList;
-
-
 
 @Getter
 @Setter
@@ -18,7 +15,6 @@ public class Question {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "quiz_id", nullable = false)
     private Quiz quiz;
@@ -28,18 +24,11 @@ public class Question {
     private List<Answer> answers = new ArrayList<>();
     @Column(columnDefinition = "TEXT")
     private String content;
-    @Column(name = "image_filename")
-    private String imageFilename;
     @Column(name = "image_key", length = 160)
     private String imageKey;
 
     public void addAnswer(Answer answer) {
         answers.add(answer);
         answer.setQuestion(this);
-    }
-
-    public void removeAnswer(Answer answer) {
-        answers.remove(answer);
-        answer.setQuestion(null);
     }
 }

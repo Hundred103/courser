@@ -9,5 +9,6 @@ import java.util.UUID;
 
 public interface RefreshSessionRepository extends JpaRepository<RefreshSession, UUID> {
     Optional<RefreshSession> findByTokenHash(String tokenHash);
+    long deleteByFamilyId(UUID familyId);
     long deleteByExpiresAtBefore(LocalDateTime threshold);
 }

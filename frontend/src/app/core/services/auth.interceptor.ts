@@ -20,6 +20,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
     catchError((error: unknown) => {
       if (error instanceof HttpErrorResponse && error.status === 401 && !isAuthEndpoint(request.url)) {
         return authService.refreshAccessToken().pipe(
+          catchError(() => throwError(() => error)),
           switchMap((refreshed) => {
             if (refreshed) {
               const refreshedToken = authService.getToken();

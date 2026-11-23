@@ -172,6 +172,9 @@
         <div class="result-box squircle">
           <p>Wynik: {{ formattedScore() }} / {{ formattedMaxScore() }}</p>
           <p>Skuteczność: {{ scorePercent() }}%</p>
+          @if (awaitingServerScore()) {
+            <p class="result-status">Trwa przeliczanie wyniku rankingu…</p>
+          }
           @if (rankingResult(); as ranking) {
             <p>Czas: {{ rankingDurationText(ranking.durationMs) }}</p>
           }
@@ -185,6 +188,10 @@
             } @else {
               <p class="result-status">Zapisywanie postępów...</p>
             }
+          }
+
+          @if (rankingError() && !rankingResult()) {
+            <p class="result-status error">{{ rankingError() }}</p>
           }
 
           @if (rankingResult(); as ranking) {

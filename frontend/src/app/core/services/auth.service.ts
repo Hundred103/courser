@@ -1,20 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { HttpBackend, HttpClient } from '@angular/common/http';
-import { Observable, catchError, finalize, forkJoin, map, of, shareReplay, tap } from 'rxjs';
+import { HttpBackend, HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Observable, catchError, finalize, map, of, shareReplay, tap, throwError } from 'rxjs';
 import { environment } from '../../../environment';
-import { GuestQuizStorageService } from './guest-quiz-storage.service';
 import { AccentColor, DEFAULT_ACCENT_COLOR, isAccentColor } from '../models/theme.model';
-
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  username: string;
-}
 
 export interface AuthResponse {
   id: number;
@@ -22,7 +10,6 @@ export interface AuthResponse {
   username: string;
   accentColor: AccentColor;
   token: string;
-  message: string;
 }
 
 const STORAGE_KEY = 'user';
@@ -33,25 +20,23 @@ const STORAGE_KEY = 'user';
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly httpBackend = inject(HttpBackend);
-  // Odświeżenie sesji jest wykonywane już podczas tworzenia AuthService.
-  // Omijamy interceptor, który sam wstrzykuje AuthService, aby nie tworzyć
-  // cyklicznej zależności przy starcie aplikacji.
+  // HttpBackend: skip interceptor (circular dep with AuthService at bootstrap).
   private readonly sessionHttp = new HttpClient(this.httpBackend);
-  private readonly guestQuizStorage = inject(GuestQuizStorageService);
   private readonly apiUrl = `${environment.apiUrl}/users`;
-  private readonly quizzesApiUrl = `${environment.apiUrl}/quizzes`;
 
   private readonly currentUser = signal<AuthResponse | null>(this.loadStoredUser());
+  /** Bumps when the logged-in identity changes (login / logout / account switch), not on token refresh. */
+  private readonly sessionGeneration = signal(0);
   private refreshInFlight$: Observable<boolean> | null = null;
+  /** Blocks refresh while logout is revoking the cookie (avoids 401→refresh restoring the session). */
+  private refreshSuppressed = false;
 
   readonly user = this.currentUser.asReadonly();
   readonly isLoggedIn = computed(() => this.currentUser() !== null);
 
   constructor() {
-    // Ciasteczko HttpOnly jest źródłem prawdy dla trwałej sesji. Odświeżamy ją
-    // zawsze, także gdy wpis w localStorage nie istnieje albo został usunięty.
-    // Dzięki temu zwykłe odświeżenie strony może odtworzyć zalogowanego użytkownika.
-    this.refreshAccessToken().subscribe();
+    // Refresh on init: HttpOnly cookie restores session even without localStorage.
+    this.refreshAccessToken().subscribe({ error: () => undefined });
   }
 
   login(email: string, password: string): Observable<AuthResponse> {
@@ -67,9 +52,18 @@ export class AuthService {
   }
 
   setCurrentUser(user: AuthResponse): void {
+    const previousId = this.currentUser()?.id ?? null;
     const normalizedUser = { ...user, accentColor: isAccentColor(user.accentColor) ? user.accentColor : DEFAULT_ACCENT_COLOR };
     this.currentUser.set(normalizedUser);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedUser));
+    if (previousId !== normalizedUser.id) {
+      this.sessionGeneration.update((value) => value + 1);
+    }
+  }
+
+  /** Identity epoch for ignoring in-flight quiz-list mutations after logout / account switch. */
+  getSessionGeneration(): number {
+    return this.sessionGeneration();
   }
 
   updateSettings(username: string, accentColor: AccentColor): Observable<AuthResponse> {
@@ -78,44 +72,50 @@ export class AuthService {
     );
   }
 
-  migrateGuestQuizzesToUser(user: AuthResponse): Observable<unknown[]> {
-    const guestQuizzes = this.guestQuizStorage.getAllImports();
-
-    if (guestQuizzes.length === 0) {
-      return of([]);
-    }
-
-    return forkJoin(guestQuizzes.map(({ quiz, rankingVersionId }) => this.http.post(`${this.quizzesApiUrl}/import-archive`, {
-      quiz,
-      rankingVersionId,
-      migratingGuestQuiz: true,
-    }))).pipe(
-      tap(() => this.guestQuizStorage.clear()),
-    );
-  }
-
   getCurrentUser(): AuthResponse | null {
     return this.currentUser();
   }
 
   logout(revokeRefreshSession = true): void {
-    if (revokeRefreshSession) {
-      this.http.post<void>(`${this.apiUrl}/logout`, {}, { withCredentials: true }).subscribe({ error: () => undefined });
+    this.refreshSuppressed = true;
+    this.refreshInFlight$ = null;
+    this.clearAuthState();
+
+    if (!revokeRefreshSession) {
+      this.refreshSuppressed = false;
+      return;
     }
 
-    this.clearAuthState();
+    this.http.post<void>(`${this.apiUrl}/logout`, {}, { withCredentials: true }).subscribe({
+      next: () => {
+        this.refreshSuppressed = false;
+      },
+      error: () => {
+        this.refreshSuppressed = false;
+      },
+    });
   }
 
+  // false = 401/403 only; network/5xx rethrow (don't logout on blip).
   refreshAccessToken(): Observable<boolean> {
+    if (this.refreshSuppressed) {
+      return of(false);
+    }
+
     if (this.refreshInFlight$) {
       return this.refreshInFlight$;
     }
 
     this.refreshInFlight$ = this.sessionHttp.post<AuthResponse>(`${this.apiUrl}/refresh`, {}, { withCredentials: true }).pipe(
-      tap((user) => this.setCurrentUser(user)),
-      map(() => true),
-      catchError(() => {
-        this.clearAuthState();
+      tap((user) => {
+        if (!this.refreshSuppressed) this.setCurrentUser(user);
+      }),
+      map(() => !this.refreshSuppressed),
+      catchError((error: unknown) => {
+        if (!(error instanceof HttpErrorResponse) || (error.status !== 401 && error.status !== 403)) {
+          return throwError(() => error);
+        }
+        if (!this.refreshSuppressed) this.clearAuthState();
         return of(false);
       }),
       finalize(() => this.refreshInFlight$ = null),
@@ -128,8 +128,12 @@ export class AuthService {
   private clearAuthState(): void {
     const userId = this.currentUser()?.id;
     if (userId != null) this.clearPlaySessionsForUser(userId);
+    const hadUser = this.currentUser() != null;
     this.currentUser.set(null);
     localStorage.removeItem(STORAGE_KEY);
+    if (hadUser) {
+      this.sessionGeneration.update((value) => value + 1);
+    }
   }
 
   private clearPlaySessionsForUser(userId: number): void {
@@ -138,10 +142,6 @@ export class AuthService {
       const key = sessionStorage.key(index);
       if (key?.startsWith(prefix)) sessionStorage.removeItem(key);
     }
-  }
-
-  isAuthenticated(): boolean {
-    return this.isLoggedIn();
   }
 
   getToken(): string | null {

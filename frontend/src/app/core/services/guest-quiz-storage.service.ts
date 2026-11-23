@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { QuizCreateDTO, QuizPlayDTO, QuizRawDTO } from '../models/quiz.model';
 import { normalizeQuizLimits } from '../models/quiz-limits.model';
 import { normalizeQuizScoring } from '../utils/quiz-scoring.util';
+import { QuizUserError } from '../utils/quiz-request.util';
 
 const STORAGE_KEY = 'guestQuizzes';
 
@@ -19,10 +20,7 @@ interface StoredGuestQuiz extends QuizPlayDTO {
 })
 export class GuestQuizStorageService {
   getAllRaw(): QuizRawDTO[] {
-    return this.loadQuizzes().map((quiz) => ({
-      id: quiz.id,
-      title: quiz.title,
-    }));
+    return this.loadQuizzes().map((quiz) => this.toRaw(quiz));
   }
 
   getById(id: number): QuizPlayDTO | null {
@@ -34,30 +32,33 @@ export class GuestQuizStorageService {
     const quiz = this.toLocalQuiz(dto, rankingVersionId);
     this.saveQuizzes([...quizzes, quiz]);
 
-    return {
-      id: quiz.id,
-      title: quiz.title,
-    };
+    return this.toRaw(quiz);
   }
 
   delete(id: number): void {
     this.saveQuizzes(this.loadQuizzes().filter((quiz) => quiz.id !== id));
   }
 
-  getAllImports(): GuestQuizImport[] {
-    return this.loadQuizzes().map((quiz) => ({
-      quiz: this.toCreateDto(quiz),
-      rankingVersionId: typeof quiz.rankingVersionId === 'string' ? quiz.rankingVersionId : null,
-    }));
+  getAllImports(): (GuestQuizImport & { id: number })[] {
+    return this.loadQuizzes().map((quiz) => ({ id: quiz.id, ...this.toImport(quiz) }));
   }
 
   toCreateDtoById(id: number): QuizCreateDTO | null {
-    const quiz = this.getById(id);
-    return quiz ? this.toCreateDto(quiz) : null;
+    return this.getImportById(id)?.quiz ?? null;
   }
 
-  clear(): void {
-    localStorage.removeItem(STORAGE_KEY);
+  getImportById(id: number): GuestQuizImport | null {
+    const quiz = this.loadQuizzes().find((candidate) => candidate.id === id);
+    return quiz ? this.toImport(quiz) : null;
+  }
+
+  private toRaw(quiz: StoredGuestQuiz): QuizRawDTO {
+    return {
+      id: quiz.id,
+      title: quiz.title,
+      questionCount: quiz.questions.length,
+      limits: quiz.limits ?? null,
+    };
   }
 
   private toLocalQuiz(dto: QuizCreateDTO, rankingVersionId: string | null): StoredGuestQuiz {
@@ -70,6 +71,8 @@ export class GuestQuizStorageService {
       title: dto.title,
       scoring: normalizeQuizScoring(dto.scoring),
       limits: normalizeQuizLimits(dto.limits),
+      rankingEnabled: false,
+      rankingProtected: false,
       rankingVersionId,
       questions: dto.questions.map((question) => ({
         id: nextQuestionId--,
@@ -82,6 +85,13 @@ export class GuestQuizStorageService {
           points: typeof answer.points === 'number' && Number.isFinite(answer.points) ? answer.points : null,
         })),
       })),
+    };
+  }
+
+  private toImport(quiz: StoredGuestQuiz): GuestQuizImport {
+    return {
+      quiz: this.toCreateDto(quiz),
+      rankingVersionId: typeof quiz.rankingVersionId === 'string' ? quiz.rankingVersionId : null,
     };
   }
 
@@ -124,6 +134,15 @@ export class GuestQuizStorageService {
   }
 
   private saveQuizzes(quizzes: StoredGuestQuiz[]): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(quizzes));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(quizzes));
+    } catch (error) {
+      if (error instanceof DOMException && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+        throw new QuizUserError(
+          'Brakuje miejsca w pamięci przeglądarki na ten quiz (obrazy zajmują dużo miejsca). Zaloguj się, żeby zapisać go na koncie, albo usuń część lokalnych quizów.',
+        );
+      }
+      throw error;
+    }
   }
 }

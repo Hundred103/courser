@@ -1,6 +1,5 @@
 package net.edu.courser.user.service;
 
-import net.edu.courser.user.dto.BestQuizScoreResponse;
 import net.edu.courser.user.dto.CompleteStatisticsRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -25,8 +24,7 @@ public class UserStatisticsService {
         if (request == null || request.requestId() == null || request.quizId() == null || request.quizId() <= 0
                 || request.checkedQuestions() == null || request.checkedQuestions() < 0
                 || request.timeZone() == null || request.timeZone().length() > 100
-                || (!request.studyMode() && (request.score() == null || request.maxScore() == null
-                || request.maxScore() < 0 || request.score() > request.maxScore() || request.effectivenessHundredths() == null))) {
+                || (!request.studyMode() && request.effectivenessHundredths() == null)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nieprawidłowe dane podejścia.");
         }
         ZoneId zone;
@@ -48,21 +46,10 @@ public class UserStatisticsService {
               effectiveness_count = user_daily_statistics.effectiveness_count + EXCLUDED.effectiveness_count
             """, userId, date, request.checkedQuestions(), request.studyMode() ? 0 : request.effectivenessHundredths(), request.studyMode() ? 0 : 1);
         jdbc.update("""
-            INSERT INTO user_quiz_summary(user_id, quiz_id, completed_count, best_score, best_max_score)
-            VALUES (?, ?, 1, ?, ?)
-            ON CONFLICT (user_id, quiz_id) DO UPDATE SET
-              completed_count = user_quiz_summary.completed_count + 1,
-              best_score = CASE WHEN EXCLUDED.best_score IS NOT NULL AND
-                (user_quiz_summary.best_score IS NULL OR
-                 (CASE WHEN EXCLUDED.best_max_score = 0 THEN EXCLUDED.best_score::double precision ELSE EXCLUDED.best_score::double precision / EXCLUDED.best_max_score END) >=
-                 (CASE WHEN user_quiz_summary.best_max_score = 0 THEN user_quiz_summary.best_score::double precision ELSE user_quiz_summary.best_score::double precision / user_quiz_summary.best_max_score END))
-                THEN EXCLUDED.best_score ELSE user_quiz_summary.best_score END,
-              best_max_score = CASE WHEN EXCLUDED.best_score IS NOT NULL AND
-                (user_quiz_summary.best_score IS NULL OR
-                 (CASE WHEN EXCLUDED.best_max_score = 0 THEN EXCLUDED.best_score::double precision ELSE EXCLUDED.best_score::double precision / EXCLUDED.best_max_score END) >=
-                 (CASE WHEN user_quiz_summary.best_max_score = 0 THEN user_quiz_summary.best_score::double precision ELSE user_quiz_summary.best_score::double precision / user_quiz_summary.best_max_score END))
-                THEN EXCLUDED.best_max_score ELSE user_quiz_summary.best_max_score END
-            """, userId, request.quizId(), request.studyMode() ? null : request.score(), request.studyMode() ? null : request.maxScore());
+            INSERT INTO user_quiz_summary(user_id, quiz_id, completed_count)
+            VALUES (?, ?, 1)
+            ON CONFLICT (user_id, quiz_id) DO UPDATE SET completed_count = user_quiz_summary.completed_count + 1
+            """, userId, request.quizId());
     }
 
     @Transactional(readOnly = true)
@@ -75,11 +62,5 @@ public class UserStatisticsService {
     public long count(Long userId, Long quizId) {
         List<Long> values = jdbc.query("SELECT completed_count FROM user_quiz_summary WHERE user_id = ? AND quiz_id = ?", (rs, n) -> rs.getLong(1), userId, quizId);
         return values.isEmpty() ? 0 : values.get(0);
-    }
-
-    @Transactional(readOnly = true)
-    public List<BestQuizScoreResponse> bestScores(Long userId) {
-        return jdbc.query("SELECT quiz_id, best_score, best_max_score FROM user_quiz_summary WHERE user_id = ? AND best_score IS NOT NULL",
-                (rs, n) -> BestQuizScoreResponse.builder().quizId(rs.getLong(1)).score(rs.getInt(2)).maxScore(rs.getInt(3)).build(), userId);
     }
 }
