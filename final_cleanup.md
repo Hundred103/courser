@@ -100,7 +100,7 @@ The rule stayed: the frontend experience for the user stays the same, the backen
   - `SPRING_JPA_HIBERNATE_DDL_AUTO`, `SERVER_PORT` and `APP_MEDIA_*` repeat values the services already default to.
   - quiz-service has `depends_on: media` but never talks to the media container.
   - The DB credentials are repeated in five places.
-- frontend Dockerfile: `package-lock.json` is in `.gitignore` and isn't copied, so `npm install` gives non-reproducible builds. Proposal: commit the lockfile and use `npm ci` **(decide)**. **(decided - do so)** (DONE)
+- frontend Dockerfile: `package-lock.json` stays gitignored; image build uses `npm install` from `package.json` only (accepted non-pin for less repo bloat). (DONE)
 
 ## frontend: API calls
 
@@ -201,5 +201,5 @@ user-service:
 - outdated `README.MD`: it describes features that don't exist (courses, an admin/moderator panel, Vitest, Postman). (DONE)
 - stale `tests.http`: it calls `localhost:8080/quizzes` without `/api` and without a token. quiz-service's only test is `contextLoads`. (DONE)
 - after the cleanup: regenerate the `docs/final-imaging` diagrams (the DB schema and class diagram still show the legacy tables) and update `docs/notatki-odpowiedzialnosci.md`. (DONE — diagrams regenerated for schema 001–018; `notatki-odpowiedzialnosci.md` is no longer in the repo)
-- frontend lockfile: commit `frontend/package-lock.json` and build with `npm ci` in the Dockerfile. (DONE — lockfile present, not gitignored, Dockerfile uses `npm ci`; stage it with the first-ship commit)
+- frontend lockfile: keep `package-lock.json` gitignored; Dockerfile `npm install` only. (DONE)
 - `docs/how-it-works.md` brought in line with the cleaned APIs (body-less fork, list `rankingPosition`, `image.util.ts`, no startup snapshot repair, one-by-one guest upload). (DONE)
