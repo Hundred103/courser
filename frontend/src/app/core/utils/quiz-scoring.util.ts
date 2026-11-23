@@ -25,10 +25,12 @@ export const DEFAULT_QUIZ_SCORING: QuizScoring = {
   penaltyMode: 'fraction',
 };
 
-/** Modes must match QuizService; fraction = share points, points/percent = per pick, custom = sum option points. */
+/** Modes must match QuizService.questionScore / maxQuestionScore; custom max = sum of correct options' points. */
 export function questionMaxScore(answers: readonly ScorableAnswer[], scoring: QuizScoring): number {
   if (scoring.mode === 'custom') {
-    return answers.reduce((total, answer) => total + Math.max(0, finiteOrZero(answer.points)), 0);
+    return answers
+      .filter((answer) => answer.correct)
+      .reduce((total, answer) => total + Math.max(0, finiteOrZero(answer.points)), 0);
   }
 
   const pointsPerCorrect = Math.max(0, scoring.pointsPerCorrect);

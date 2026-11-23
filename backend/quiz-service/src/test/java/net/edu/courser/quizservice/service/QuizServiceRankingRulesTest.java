@@ -24,10 +24,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/** Ranking finish scoring must stay aligned with frontend/src/app/core/utils/quiz-scoring.util.ts. */
 class QuizServiceRankingRulesTest {
     private static final long OWNER = 7L;
     private static final QuizScoringDTO POINTS = new QuizScoringDTO("default", false, 1d, 0d, "points");
     private static final QuizScoringDTO CUSTOM = new QuizScoringDTO("custom", false, 1d, 0d, "points");
+    private static final QuizScoringDTO FRACTION = new QuizScoringDTO("default", false, 1d, 1d, "fraction");
+    private static final QuizScoringDTO PERCENT = new QuizScoringDTO("default", false, 2d, 25d, "percent");
 
     @TempDir
     Path storage;
@@ -167,6 +170,57 @@ class QuizServiceRankingRulesTest {
 
         assertThat(result.scoreScaled()).isZero();
         assertThat(result.maxScoreScaled()).isZero();
+    }
+
+    /** Golden values shared with quiz-scoring.util.ts (fraction = share of correct − share of wrong). */
+    @Test
+    void fractionModeMatchesFrontendScoringHelpers() {
+        List<AnswerCreateDTO> answers = List.of(
+                new AnswerCreateDTO("a", true, null),
+                new AnswerCreateDTO("b", true, null),
+                new AnswerCreateDTO("c", false, null),
+                new AnswerCreateDTO("d", false, null)
+        );
+
+        RankingFinishDTO perfect = finish(FRACTION, answers, List.of(0, 1));
+        assertThat(perfect.scoreScaled()).isEqualTo(100);
+        assertThat(perfect.maxScoreScaled()).isEqualTo(100);
+
+        RankingFinishDTO halfCorrectOneWrong = finish(FRACTION, answers, List.of(0, 2));
+        // 1/2 correct − 1/2 wrong = 0
+        assertThat(halfCorrectOneWrong.scoreScaled()).isZero();
+        assertThat(halfCorrectOneWrong.maxScoreScaled()).isEqualTo(100);
+    }
+
+    /** Golden values shared with quiz-scoring.util.ts (percent = reward × (1 − wrong×penalty/100)). */
+    @Test
+    void percentModeMatchesFrontendScoringHelpers() {
+        List<AnswerCreateDTO> answers = List.of(
+                new AnswerCreateDTO("a", true, null),
+                new AnswerCreateDTO("b", true, null),
+                new AnswerCreateDTO("c", false, null)
+        );
+
+        RankingFinishDTO bothCorrect = finish(PERCENT, answers, List.of(0, 1));
+        assertThat(bothCorrect.scoreScaled()).isEqualTo(400);
+        assertThat(bothCorrect.maxScoreScaled()).isEqualTo(400);
+
+        RankingFinishDTO oneCorrectOneWrong = finish(PERCENT, answers, List.of(0, 2));
+        // 2 × 1 correct × (1 − 1×25/100) = 1.5 → 150 hundredths
+        assertThat(oneCorrectOneWrong.scoreScaled()).isEqualTo(150);
+        assertThat(oneCorrectOneWrong.maxScoreScaled()).isEqualTo(400);
+    }
+
+    @Test
+    void customModeMaximumCountsOnlyCorrectAnswerPoints() {
+        RankingFinishDTO result = finish(CUSTOM, List.of(
+                new AnswerCreateDTO("a", true, 3d),
+                new AnswerCreateDTO("b", false, -2d),
+                new AnswerCreateDTO("c", true, 1d)
+        ), List.of(0, 2));
+
+        assertThat(result.scoreScaled()).isEqualTo(400);
+        assertThat(result.maxScoreScaled()).isEqualTo(400);
     }
 
     @Test

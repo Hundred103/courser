@@ -1,7 +1,7 @@
 # Courser
 
 ## O projekcie
-EduApp to darmowa platforma e-learningowa łącząca kursy, interaktywne quizy i elementy rywalizacji (rankingi), aby zwiększać motywację do nauki.
+Courser to darmowa platforma e-learningowa łącząca kursy, interaktywne quizy i elementy rywalizacji (rankingi), aby zwiększać motywację do nauki.
 
 ### Problem
 Brak bezpłatnego, kompleksowego rozwiązania edukacyjnego z nauką, weryfikacją wiedzy i systemem motywacyjnym w jednym miejscu.
@@ -29,7 +29,7 @@ Brak bezpłatnego, kompleksowego rozwiązania edukacyjnego z nauką, weryfikacj�
 - Baza danych: PostgreSQL + Liquibase
 - Media: pliki adresowane haszem, serwowane przez nginx
 - Konteneryzacja: Docker Compose
-- Testy: JUnit, Vitest, Postman
+- Testy: JUnit (quiz-service, user-service); ręczny scratch pad HTTP w `backend/quiz-service/.../tests.http`
 - Narzędzia: VS Code / IntelliJ IDEA, GitHub Issues, draw.io
 
 ## Uruchomienie lokalne

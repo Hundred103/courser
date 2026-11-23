@@ -61,13 +61,12 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest()
                 .mutate()
                 .headers(headers -> {
+                    // Strip any client-supplied identity headers; only X-User-Id is forwarded.
                     headers.remove("X-User-Id");
                     headers.remove("X-User-Email");
                     headers.remove("X-Username");
                     if (claims != null) {
                         headers.set("X-User-Id", claims.userId().toString());
-                        headers.set("X-User-Email", claims.email());
-                        headers.set("X-Username", claims.username());
                     }
                 })
                 .build();

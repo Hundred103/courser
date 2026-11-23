@@ -72,6 +72,13 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: courserpassword
         run: mvn test
 
+      - name: Run user-service unit tests
+        working-directory: backend/user-service
+        env:
+          # Unit tests (UserAuthRulesTest) do not need a DB; secret satisfies JwtService beans if context loads.
+          APP_JWT_SECRET: ci-test-jwt-secret-at-least-32-bytes-long
+        run: mvn test
+
       - name: Wait for application readiness
         run: |
           set -euo pipefail

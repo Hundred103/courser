@@ -556,7 +556,7 @@ def system_architecture() -> str:
     pgdata -> postgres -> mediavol [style=invis];''')
 
     app = layer("app", "WARSTWA APLIKACJI", f'''
-    {arch_card("user", ic["server_user"], "user-service", "Spring Boot · Spring Security",
+    {arch_card("user", ic["server_user"], "user-service", "Spring Boot · BCrypt",
                ["rejestracja · logowanie · JWT", "refresh cookie · statystyki"],
                accent=C["blue"], tint=C["blue_bg"], badge=":8082")}
     {arch_card("quiz", ic["server_quiz"], "quiz-service", "Spring Boot · JPA",
@@ -570,7 +570,7 @@ def system_architecture() -> str:
 
     edge = layer("edge", "WARSTWA WEJŚCIA", f'''
     {arch_card("gateway", ic["shield"], "API Gateway", "Spring Cloud Gateway",
-               ["weryfikacja JWT → X-User-Id", "CORS · StripPrefix /api"],
+               ["weryfikacja JWT → X-User-Id", "StripPrefix /api"],
                accent=C["amber"], tint=C["amber_bg"], badge="8080")}
     {arch_card("frontend", ic["window"], "frontend", "nginx + Angular SPA",
                ["/api/** → gateway:8080", "/media/** → media:80", "client_max_body_size 30m"],
@@ -731,7 +731,7 @@ def database_schema(*, landscape: bool = False) -> str:
         ("", "password", "VARCHAR(255) · BCrypt", True),
         ("", "accent_color", "VARCHAR(16) = 'coral'", True),
         ("", "created_at", "TIMESTAMP", False),
-    ], notes=["UQ (lower(username))"], **T("blue", "blue", "blue_bg"))
+    ], notes=["email zapisywany w lower case", "UQ INDEX (lower(username))"], **T("blue", "blue", "blue_bg"))
 
     refresh = er_table("refresh", "refresh_sessions", [
         ("PK", "id", "UUID", True),
@@ -741,7 +741,7 @@ def database_schema(*, landscape: bool = False) -> str:
         ("", "created_at", "TIMESTAMP", True),
         ("", "last_used_at", "TIMESTAMP", True),
         ("", "expires_at", "TIMESTAMP", True),
-    ], notes=["IDX (expires_at) · IDX (family_id)"], **T("blue", "blue", "blue_bg"))
+    ], notes=["IDX (expires_at) · IDX (family_id)", "family_id łączy rotowane klucze"], **T("blue", "blue", "blue_bg"))
 
     daily = er_table("daily", "user_daily_statistics", [
         ("PK FK", "user_id", "BIGINT", True),
@@ -783,7 +783,7 @@ def database_schema(*, landscape: bool = False) -> str:
         ("FK", "quiz_id", "BIGINT", True),
         ("", "content", "TEXT", False),
         ("", "image_key", "VARCHAR(160)", False),
-    ], notes=["kolejność pytań: JPA sortuje po id"], **T("teal", "teal", "teal_bg"))
+    ], notes=["kolejność: JPA @OrderBy id", "image_key → plik w wolumenie mediów"], **T("teal", "teal", "teal_bg"))
 
     answers = er_table("answers", "answers", [
         ("PK", "id", "BIGINT IDENTITY", True),
@@ -791,7 +791,7 @@ def database_schema(*, landscape: bool = False) -> str:
         ("", "content", "TEXT", False),
         ("", "correct", "BOOLEAN", True),
         ("", "points", "DOUBLE", False),
-    ], notes=["kolejność odpowiedzi: JPA sortuje po id"], **T("teal", "teal", "teal_bg"))
+    ], notes=["kolejność: JPA @OrderBy id", "points używane w trybie CUSTOM"], **T("teal", "teal", "teal_bg"))
 
     share = er_table("share", "quiz_share_codes", [
         ("PK", "id", "BIGINT IDENTITY", True),
@@ -1358,7 +1358,10 @@ def class_diagram() -> str:
             "- maxScoreScaled: Integer [0..1]",
             "- durationMs: Long [0..1]",
             "- position: Integer [0..1]",
-        ], ["~ created(): void  «PrePersist»"], **brown),
+        ], [
+            "~ created(): void  «PrePersist»",
+            "+ isFinished(): boolean",
+        ], **brown),
         uml_classifier("QuizRankingEntry", "QuizRankingEntry", [
             "- id: Long {id}",
             "- userId: Long",
@@ -1389,7 +1392,7 @@ def class_diagram() -> str:
             "- createdAt: LocalDateTime",
             "- lastUsedAt: LocalDateTime",
             "- expiresAt: LocalDateTime",
-        ], [], **blue),
+        ], ["~ created(): void  «PrePersist»"], **blue),
         uml_classifier("UserStatisticsService", "UserStatisticsService", [
             "- jdbc: JdbcTemplate",
         ], [
@@ -1849,7 +1852,6 @@ def pad_to_aspect(path: Path, ratio: float) -> None:
 # Wyjście o stałych proporcjach (np. slajd prezentacji).
 ASPECT = {
     "02_database_schema_16x9": 16 / 9,
-    "02_database_schema_16x9_final": 16 / 9,
 }
 
 # name -> (factory, graphviz engine)
@@ -1875,7 +1877,7 @@ def main() -> None:
     parser.add_argument(
         "--suffix",
         default="",
-        help="Przyrostek nazwy pliku (np. _final → 01_system_architecture_final.png)",
+        help="Przyrostek nazwy pliku (np. _backup → 01_system_architecture_backup.png)",
     )
     parser.add_argument(
         "--keep-dot",

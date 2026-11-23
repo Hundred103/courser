@@ -19,9 +19,9 @@ Each section has the same shape:
 2. Every API call from the app goes through `frontend/core/services/auth.interceptor.ts`, which attaches the login token (the "wristband") as an `Authorization: Bearer …` header.
 3. The **gateway** checks that wristband in `backend/gateway/.../security/JwtAuthenticationFilter.java`, using `JwtService.java`.
    - A few paths are open to everyone: login, register, refresh, logout and the share-code preview.
-   - For everything else the token must be valid. The gateway first erases any `X-User-Id` / `X-User-Email` / `X-Username` headers the browser might have sent, then writes the real values read from the token.
+   - For everything else the token must be valid. The gateway first erases any `X-User-Id` / `X-User-Email` / `X-Username` headers the browser might have sent, then writes `X-User-Id` from the token (email and username stay inside the JWT; services do not receive them as headers).
 4. The gateway removes `/api` and passes the request on: `/users/**` goes to **user-service** and `/quizzes/**` to **quiz-service** (see `backend/gateway/src/main/resources/application.yml`).
-5. quiz-service simply believes `X-User-Id` (`@RequestHeader("X-User-Id")` in `QuizController.java`). user-service checks the token a second time with its own `security/JwtAuthenticationFilter.java`.
+5. Both **quiz-service** and **user-service** trust `X-User-Id` from the gateway (`@RequestHeader("X-User-Id")` on protected controllers). They are not published outside Docker; only the gateway is.
 6. Both services share one PostgreSQL database, whose tables are created by the Liquibase files in `postgre/liquibase/changelog/changes/`.
 
 ---
@@ -35,12 +35,12 @@ Each section has the same shape:
    - the username may only use letters without Polish characters and digits, with no spaces;
    - the password needs 8+ characters, a digit and a special character, and both password fields must match.
 2. `AuthService.register()` in `frontend/core/services/auth.service.ts` sends `POST /api/users/register`. The gateway lets it through without a token.
-3. `UserController.register()` (`user-service/controller/UserController.java`) builds a `User` and hands it to `UserService.createUser()` (`user-service/service/UserService.java`), which:
+3. `UserController.register()` (`user-service/controller/UserController.java`) hands the form to `UserService.register()` (`user-service/service/UserService.java`), which:
    - repeats every form rule (`validateEmail()`, `validateUsername()`, `validatePassword()`), so a request sent around the form gets the same answer. The password may also be at most 72 bytes, because BCrypt ignores anything beyond that;
    - trims the email and stores it in **lower case**;
    - checks whether the email (ignoring case) or the username (also ignoring case) is already taken, with a separate message for each case. The database enforces username uniqueness with `UNIQUE (lower(username))`. Older case-only duplicates were renamed to alphanumeric `u{id}` so settings validation still accepts them;
-   - sets the default page colour `coral` and the role `STUDENT`;
-   - scrambles the password with BCrypt (`PasswordEncoder` from `config/SecurityConfig.java`);
+   - sets the default page colour `coral` (no user roles in the schema);
+   - scrambles the password with BCrypt (`PasswordEncoder` from `config/PasswordConfig.java`);
    - saves the row in `users`.
 4. The controller then hands out two "keys":
    - a **short-lived token** (the JWT) from `security/JwtService.java`, valid for 30 minutes and holding the user id, email and username;
@@ -256,8 +256,7 @@ That's why `update()` and `importArchive()` first rebuild the quiz, which turns 
    - `quizId`;
    - `checkedQuestions`;
    - `studyMode`;
-   - `score` / `maxScore`, as hundredths;
-   - `effectivenessHundredths`: the percentage × 100;
+   - `effectivenessHundredths`: the percentage × 100 (null in study mode);
    - `timeZone`: e.g. `Europe/Warsaw`.
 2. `UserStatisticsService.complete()` (`user-service/service/UserStatisticsService.java`) uses plain SQL through `JdbcTemplate`:
    - checks the numbers and confirms that the quiz belongs to this user;

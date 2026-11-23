@@ -71,6 +71,8 @@ export class GuestQuizStorageService {
       title: dto.title,
       scoring: normalizeQuizScoring(dto.scoring),
       limits: normalizeQuizLimits(dto.limits),
+      rankingEnabled: false,
+      rankingProtected: false,
       rankingVersionId,
       questions: dto.questions.map((question) => ({
         id: nextQuestionId--,
