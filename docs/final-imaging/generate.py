@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import argparse
 import functools
+import json
+import re
 import shutil
 import subprocess
 import sys
@@ -66,6 +68,50 @@ def require_dot() -> str:
         print("Instalacja: brew install graphviz  |  sudo apt install graphviz", file=sys.stderr)
         sys.exit(1)
     return path
+
+
+_SPLIT_RE = re.compile(r"@split:(\w+)@")
+
+
+def card_bg(name: str, tint: str) -> str:
+    """Tło karty: tint nad linią nagłówka, biel pod nią.
+
+    Komórka z własnym BGCOLOR jest prostokątem malowanym na łuku ramki STYLE="rounded"
+    i ścina rogi — dlatego kolor nagłówka daje gradient ze skokiem na tle całej tabeli
+    (przycinany do zaokrąglenia). Pozycję skoku uzupełnia resolve_card_splits().
+    """
+    return f'BGCOLOR="{tint};@split:{name}@:{C["card"]}" GRADIENTANGLE="270"'
+
+
+def resolve_card_splits(dot_bin: str, source: str, engine: str) -> str:
+    """Mierzy w pierwszym przebiegu (-Tjson), gdzie leży linia nagłówka każdej karty."""
+    if not _SPLIT_RE.search(source):
+        return source
+    probe = _SPLIT_RE.sub("0.5", source)
+    result = subprocess.run([dot_bin, f"-K{engine}", "-Tjson"], input=probe.encode("utf-8"), capture_output=True)
+    if result.returncode != 0:
+        print(result.stderr.decode("utf-8", errors="replace"), file=sys.stderr)
+        raise RuntimeError("Nie udało się zmierzyć nagłówków kart")
+    fracs: dict[str, float] = {}
+    for obj in json.loads(result.stdout).get("objects", []):
+        ops = obj.get("_ldraw_", [])
+        start = next((i for i, op in enumerate(ops) if op.get("op") == "C" and "stops" in op), None)
+        if start is None:
+            continue
+        top, bottom = ops[start]["p0"][1], ops[start]["p1"][1]
+        outline = next(op for op in ops[start:] if op.get("op") in ("B", "b"))
+        xs = [p[0] for p in outline["points"]]
+        width = max(xs) - min(xs)
+        # Linia nagłówka = pierwszy wypełniony prostokąt na całą szerokość karty.
+        for op in ops[start:]:
+            if op.get("op") != "P":
+                continue
+            px = [p[0] for p in op["points"]]
+            py = [p[1] for p in op["points"]]
+            if max(px) - min(px) >= 0.9 * width:
+                fracs[obj["name"]] = (top - (max(py) + min(py)) / 2) / (top - bottom)
+                break
+    return _SPLIT_RE.sub(lambda m: f"{fracs.get(m.group(1), 0.3):.4f}", source)
 
 
 def render(dot_bin: str, source: str, output: Path, *, engine: str = "dot") -> None:
@@ -438,8 +484,8 @@ def arch_card(
     return f'''{name} [
       shape=plaintext
       label=<
-        <TABLE BORDER="1" STYLE="rounded" COLOR="{accent}" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0" BGCOLOR="{C["card"]}" WIDTH="{width}">
-          <TR><TD BGCOLOR="{tint}" CELLPADDING="9" ALIGN="LEFT">
+        <TABLE BORDER="1" STYLE="rounded" COLOR="{accent}" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0" {card_bg(name, tint)} WIDTH="{width}">
+          <TR><TD CELLPADDING="9" ALIGN="LEFT">
             <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0">
               <TR>
                 <TD WIDTH="30" HEIGHT="30" FIXEDSIZE="TRUE"><IMG SRC="{icon}" SCALE="TRUE"/></TD>
@@ -613,15 +659,16 @@ def er_table(
     """Tabela ER: (klucze, kolumna, typ, NOT NULL). Porty: <kolumna>_w (wejście FK), <kolumna>_e (wyjście PK)."""
     rows = []
     for i, (keys, col, typ, not_null) in enumerate(cols):
-        bg = C["card"] if i % 2 == 0 else "#F9FAFB"
+        # Paski liczone od dołu: ostatni wiersz nie ma własnego tła, więc nie zamalowuje dolnych rogów.
+        bg = ' BGCOLOR="#F9FAFB"' if (len(cols) - 1 - i) % 2 else ""
         weight = ("<B>", "</B>") if "PK" in keys else ("", "")
         nn = f'<FONT POINT-SIZE="7" COLOR="{C["line"]}">NN</FONT>' if not_null else ""
         rows.append(
             f'<TR>'
-            f'<TD PORT="{col}_w" BGCOLOR="{bg}" ALIGN="LEFT" WIDTH="44">{_key_badges(keys)}</TD>'
-            f'<TD BGCOLOR="{bg}" ALIGN="LEFT"><FONT POINT-SIZE="10" COLOR="{C["ink"]}">{weight[0]}{col}{weight[1]}</FONT></TD>'
-            f'<TD BGCOLOR="{bg}" ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="{C["muted"]}">{typ}</FONT></TD>'
-            f'<TD PORT="{col}_e" BGCOLOR="{bg}" ALIGN="RIGHT">{nn}</TD>'
+            f'<TD PORT="{col}_w"{bg} ALIGN="LEFT" WIDTH="44">{_key_badges(keys)}</TD>'
+            f'<TD{bg} ALIGN="LEFT"><FONT POINT-SIZE="10" COLOR="{C["ink"]}">{weight[0]}{col}{weight[1]}</FONT></TD>'
+            f'<TD{bg} ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="{C["muted"]}">{typ}</FONT></TD>'
+            f'<TD PORT="{col}_e"{bg} ALIGN="RIGHT">{nn}</TD>'
             f'</TR>'
         )
     footer = ""
@@ -636,8 +683,8 @@ def er_table(
             f'<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">{lines}</TABLE></TD></TR>'
         )
     return f'''{name} [label=<
-<TABLE BORDER="1" STYLE="rounded" COLOR="{accent}" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="{C["card"]}">
-  <TR><TD COLSPAN="4" BGCOLOR="{tint}" CELLPADDING="7" ALIGN="LEFT">
+<TABLE BORDER="1" STYLE="rounded" COLOR="{accent}" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" {card_bg(name, tint)}>
+  <TR><TD COLSPAN="4" CELLPADDING="7" ALIGN="LEFT">
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR>
       <TD WIDTH="20" HEIGHT="20" FIXEDSIZE="TRUE"><IMG SRC="{icon}" SCALE="TRUE"/></TD>
       <TD WIDTH="7"></TD>
@@ -1238,8 +1285,8 @@ def uml_classifier(
     if ops is not None:
         body += rule + compartment(ops)
     return f'''{name} [label=<
-<TABLE BORDER="1" STYLE="rounded" COLOR="{accent}" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0" BGCOLOR="{C["card"]}">
-  <TR><TD BGCOLOR="{tint}" CELLPADDING="7">
+<TABLE BORDER="1" STYLE="rounded" COLOR="{accent}" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0" {card_bg(name, tint)}>
+  <TR><TD CELLPADDING="7">
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR>
       <TD WIDTH="20" HEIGHT="20" FIXEDSIZE="TRUE" VALIGN="TOP"><IMG SRC="{icon}" SCALE="TRUE"/></TD>
       <TD WIDTH="6"></TD>
@@ -1483,6 +1530,371 @@ digraph ClassDiagram {{
 '''
 
 
+# ---------------------------------------------------------------------------
+# 6. Architektura frontendu (Angular 21, komponenty standalone)
+# ---------------------------------------------------------------------------
+
+@functools.cache
+def fe_icons() -> dict[str, str]:
+    """Ikony warstw frontendu (biały glif na kolorowym zaokrąglonym kwadracie)."""
+    import math
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    ICON_DIR.mkdir(parents=True, exist_ok=True)
+    S, W = 256, (255, 255, 255, 255)
+    font = None
+    for candidate, index in (("/System/Library/Fonts/Menlo.ttc", 1),
+                             ("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 0)):
+        try:
+            font = ImageFont.truetype(candidate, 120, index=index)
+            break
+        except OSError:
+            continue
+    if font is None:
+        font = ImageFont.load_default(size=120)
+
+    def boot(d, a):
+        d.polygon([(92, 60), (196, 128), (92, 196)], fill=W)
+
+    def layout(d, a):
+        d.rounded_rectangle((44, 56, 212, 200), radius=14, fill=W)
+        d.rectangle((44, 90, 212, 98), fill=a)
+        d.rectangle((96, 98, 104, 200), fill=a)
+
+    def page(d, a):
+        d.polygon([(70, 40), (160, 40), (188, 68), (188, 216), (70, 216)], fill=W)
+        d.polygon([(160, 40), (160, 68), (188, 68)], fill=a)
+        for y in (104, 134, 164):
+            d.line((94, y, 164, y), fill=a, width=10)
+
+    def gear(d, a):
+        pts = []
+        for i in range(16):
+            ang = math.pi * 2 * i / 16
+            r = 92 if i % 2 == 0 else 70
+            for off in (-0.12, 0.12):
+                pts.append((128 + r * math.cos(ang + off), 128 + r * math.sin(ang + off)))
+        d.polygon(pts, fill=W)
+        d.ellipse((98, 98, 158, 158), fill=a)
+
+    def funnel(d, a):
+        d.polygon([(48, 58), (208, 58), (146, 132), (146, 204), (110, 184), (110, 132)], fill=W)
+
+    def drawers(d, a):
+        for top in (48, 106, 164):
+            d.rounded_rectangle((56, top, 200, top + 46), radius=10, fill=W)
+            d.rounded_rectangle((110, top + 18, 146, top + 28), radius=4, fill=a)
+
+    def braces(d, a):
+        d.text((128, 132), "{}", fill=W, font=font, anchor="mm")
+
+    def cloud(d, a):
+        d.ellipse((48, 108, 128, 188), fill=W)
+        d.ellipse((92, 64, 188, 160), fill=W)
+        d.ellipse((140, 108, 214, 182), fill=W)
+        d.rectangle((88, 140, 176, 188), fill=W)
+
+    spec = {
+        "fe_boot": (boot, C["navy"]),
+        "fe_layout": (layout, C["slate"]),
+        "fe_page": (page, C["red"]),
+        "fe_interceptor": (funnel, C["slate"]),
+        "fe_storage": (drawers, C["brown"]),
+        "fe_util": (braces, C["navy"]),
+        "fe_api": (cloud, C["ink"]),
+        "fe_gear_blue": (gear, C["blue"]),
+        "fe_gear_teal": (gear, C["teal"]),
+        "fe_gear_violet": (gear, C["violet"]),
+        "fe_gear_amber": (gear, C["amber"]),
+        "fe_gear_red": (gear, C["red"]),
+    }
+    paths: dict[str, str] = {}
+    for name, (draw, accent) in spec.items():
+        img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        a = _hex(accent) + (255,)
+        d.rounded_rectangle((8, 8, S - 8, S - 8), radius=60, fill=a)
+        draw(d, a)
+        out = ICON_DIR / f"{name}.png"
+        img.resize((128, 128), Image.LANCZOS).save(out, dpi=(72, 72))
+        paths[name] = str(out)
+    return paths
+
+
+# Chip = to, co komponent / serwis wstrzykuje lub z czego korzysta.
+_FE_CHIPS = {
+    "auth": ("AuthService", "blue", "blue_bg"),
+    "api": ("QuizApiService", "teal", "teal_bg"),
+    "score": ("QuizScoreService", "violet", "violet_bg"),
+    "guest": ("GuestQuizStorage", "amber", "amber_bg"),
+    "theme": ("ThemeService", "red", "red_bg"),
+    "zip": ("quiz-zip", "navy", "slate_bg"),
+    "img": ("image-compression", "navy", "slate_bg"),
+    "scoring": ("quiz-scoring", "navy", "slate_bg"),
+    "local": ("localStorage", "brown", "brown_bg"),
+    "session": ("sessionStorage", "brown", "brown_bg"),
+}
+
+
+def _fe_chips(keys: list[str], per_row: int = 3) -> str:
+    if not keys:
+        return ""
+    cells = []
+    for key in keys:
+        label, fg, bg = _FE_CHIPS[key]
+        cells.append(
+            f'<TD><TABLE BORDER="1" COLOR="{C[fg]}" STYLE="rounded" CELLBORDER="0" CELLSPACING="0" '
+            f'CELLPADDING="2" BGCOLOR="{C[bg]}"><TR><TD><FONT POINT-SIZE="8" COLOR="{C[fg]}"><B> {label} </B></FONT>'
+            f'</TD></TR></TABLE></TD>'
+        )
+    rows = "".join(
+        f'<TR>{"".join(cells[i:i + per_row])}</TR>' for i in range(0, len(cells), per_row)
+    )
+    return (
+        f'<TR><TD ALIGN="LEFT" CELLPADDING="7"><TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" '
+        f'CELLPADDING="0">{rows}</TABLE></TD></TR>'
+    )
+
+
+def fe_card(
+    name: str,
+    icon: str,
+    title: str,
+    subtitle: str,
+    lines: list[str],
+    chips: list[str] | None = None,
+    *,
+    accent: str,
+    tint: str,
+    badge: str = "",
+    width: int = 230,
+) -> str:
+    """Karta frontendu: ikona, nazwa, trasa / selektor (mono), opis, chipy zależności."""
+    badge_html = (
+        f'<TD ALIGN="RIGHT" VALIGN="TOP"><TABLE BORDER="0" CELLBORDER="0" CELLPADDING="3" CELLSPACING="0" '
+        f'BGCOLOR="{accent}" STYLE="rounded"><TR><TD><FONT COLOR="white" POINT-SIZE="8"><B> {badge} </B></FONT>'
+        f'</TD></TR></TABLE></TD>'
+        if badge else "<TD></TD>"
+    )
+    body = "".join(
+        f'<TR><TD ALIGN="LEFT" CELLPADDING="1"><FONT POINT-SIZE="9" COLOR="{C["ink"]}">'
+        f'<FONT COLOR="{accent}">●</FONT>  {line}</FONT></TD></TR>'
+        for line in lines
+    )
+    body_html = (
+        f'<TR><TD ALIGN="LEFT" CELLPADDING="7"><TABLE BORDER="0" CELLBORDER="0" CELLSPACING="1" '
+        f'CELLPADDING="0">{body}</TABLE></TD></TR>'
+        if lines else ""
+    )
+    chips_html = ""
+    if chips:
+        chips_html = f'<TR><TD HEIGHT="1" BGCOLOR="{C["border"]}" CELLPADDING="0"></TD></TR>' + _fe_chips(chips)
+    return f'''{name} [label=<
+<TABLE BORDER="1" STYLE="rounded" COLOR="{accent}" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0" {card_bg(name, tint)} WIDTH="{width}">
+  <TR><TD CELLPADDING="8" ALIGN="LEFT" WIDTH="{width - 2}">
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR>
+      <TD WIDTH="24" HEIGHT="24" FIXEDSIZE="TRUE"><IMG SRC="{icon}" SCALE="TRUE"/></TD>
+      <TD WIDTH="7"></TD>
+      <TD ALIGN="LEFT" BALIGN="LEFT">
+        <FONT POINT-SIZE="12" COLOR="{C["ink"]}"><B>{title}</B></FONT><BR/>
+        <FONT POINT-SIZE="8" FACE="Menlo" COLOR="{C["muted"]}">{subtitle}</FONT>
+      </TD>
+      <TD WIDTH="8"></TD>
+      {badge_html}
+    </TR></TABLE>
+  </TD></TR>
+  <TR><TD HEIGHT="2" BGCOLOR="{accent}" CELLPADDING="0"></TD></TR>
+  {body_html}
+  {chips_html}
+</TABLE>>];'''
+
+
+def frontend_architecture() -> str:
+    ic = fe_icons()
+    page = dict(accent=C["red"], tint=C["red_bg"])
+    lay = dict(accent=C["slate"], tint=C["slate_bg"])
+
+    def layer(name: str, title: str, color: str, tint: str, body: str) -> str:
+        return f'''subgraph cluster_{name} {{
+    label=<<FONT POINT-SIZE="11" COLOR="{color}"><B>{title}</B></FONT>>;
+    labeljust=l; style="rounded,dashed"; color="{color}"; bgcolor="{tint}"; penwidth=1.2; margin=16;
+    {body}
+  }}'''
+
+    boot = layer("boot", "1 · START APLIKACJI", C["navy"], "#F8FAFC", "".join([
+        fe_card("main", ic["fe_boot"], "main.ts", "bootstrapApplication()", [
+            "provideRouter(APP_ROUTES)",
+            "provideHttpClient(withInterceptors([authInterceptor]))",
+        ], accent=C["navy"], tint=C["slate_bg"], width=290),
+        fe_card("root", ic["fe_layout"], "AppComponent", "&lt;app-root&gt;", [
+            "&lt;router-outlet&gt; — korzeń drzewa tras",
+        ], ["theme"], **lay),
+    ]))
+
+    layouts = layer("layouts", "2 · UKŁADY I NAWIGACJA (layout/)", C["slate"], "#F8FAFC", "".join([
+        fe_card("mainlayout", ic["fe_layout"], "MainLayoutComponent", "&lt;app-main-layout&gt;", [
+            "navbar + sidebar + &lt;router-outlet&gt;",
+        ], **lay),
+        fe_card("navbar", ic["fe_layout"], "NavbarComponent", "&lt;app-navbar&gt;", [
+            "logowanie / wylogowanie",
+            "ustawienia: nazwa, kolor akcentu",
+        ], ["auth"], **lay),
+        fe_card("sidebar", ic["fe_layout"], "SidebarComponent", "&lt;app-sidebar&gt;", [
+            "lista quizów (konto + gość)",
+            "kod udostępniania, eksport ZIP",
+            "kopia (fork), usuwanie, pozycja w rankingu",
+        ], ["auth", "api", "score", "guest", "zip"], width=250, **lay),
+        fe_card("authlayout", ic["fe_layout"], "AuthLayoutComponent", "&lt;app-auth-layout&gt;", [
+            "&lt;router-outlet&gt; bez paska bocznego",
+        ], **lay),
+    ]))
+
+    pages = layer("pages", "3 · STRONY (features/) — trasy APP_ROUTES", C["red"], "#FFFBFB", "".join([
+        fe_card("home", ic["fe_page"], "HomePage", "/", [
+            "powitanie, wykres aktywności dziennej",
+        ], ["auth", "score"], **page),
+        fe_card("import", ic["fe_page"], "QuizImportPage", "/quizzes/import", [
+            "import ZIP i kodem (podgląd)",
+            "pobranie szablonu ZIP",
+        ], ["api", "zip"], **page),
+        fe_card("create", ic["fe_page"], "QuizCreatePage", "/quizzes/new · /:id/edit", [
+            "edytor pytań, odpowiedzi, punktacji",
+            "obrazy pytań, kopia przy rankingu",
+        ], ["auth", "api", "img", "scoring"], badge="canDeactivate", width=250, **page),
+        fe_card("play", ic["fe_page"], "QuizPlayPage", "/quizzes/:id/play", [
+            "rozwiązywanie, tryb oceniany (ranking)",
+            "wznawianie przerwanej rozgrywki",
+        ], ["auth", "api", "score", "img", "scoring", "session"], badge="canDeactivate", width=250, **page),
+        fe_card("details", ic["fe_page"], "QuizDetailsPage", "/quizzes/:id/details", [
+            "podgląd pytań, ranking top 5",
+        ], ["api", "img"], **page),
+        fe_card("login", ic["fe_page"], "LoginPage", "/login", ["formularz logowania"], ["auth"], width=170, **page),
+        fe_card("register", ic["fe_page"], "RegisterPage", "/register", ["formularz rejestracji"], ["auth"], width=170, **page),
+    ]))
+
+    services = layer("services", "4 · SERWISY (core/services) — singletony providedIn: 'root', stan w sygnałach", C["teal"], "#F7FDFB", "".join([
+        fe_card("interceptor", ic["fe_interceptor"], "authInterceptor", "HttpInterceptorFn", [
+            "dokleja Authorization: Bearer",
+            "401 → refresh → ponowienie żądania",
+            "brak sesji → /login",
+        ], ["auth"], **lay),
+        fe_card("authsvc", ic["fe_gear_blue"], "AuthService", "user · isLoggedIn (signal)", [
+            "logowanie, rejestracja, wylogowanie",
+            "refresh przez HttpBackend (bez interceptora)",
+            "po zalogowaniu: migracja quizów gościa",
+        ], ["guest", "local", "session"], accent=C["blue"], tint=C["blue_bg"], width=260),
+        fe_card("apisvc", ic["fe_gear_teal"], "QuizApiService", "/api/quizzes/**", [
+            "CRUD quizów, import, udostępnianie",
+            "ranking: start / finish / tabela",
+            "ID &lt; 0 → quiz gościa z pamięci lokalnej",
+        ], ["auth", "guest"], accent=C["teal"], tint=C["teal_bg"], width=250),
+        fe_card("scoresvc", ic["fe_gear_violet"], "QuizScoreService", "scoresVersion (signal)", [
+            "statystyki dzienne, najlepsze wyniki",
+            "liczba podejść, zapis ukończenia",
+        ], accent=C["violet"], tint=C["violet_bg"]),
+        fe_card("guestsvc", ic["fe_gear_amber"], "GuestQuizStorageService", "klucz: guestQuizzes", [
+            "quizy gościa (ID &lt; 0) bez konta",
+        ], ["local", "scoring"], accent=C["amber"], tint=C["amber_bg"]),
+        fe_card("themesvc", ic["fe_gear_red"], "ThemeService", "effect()", [
+            "kolor akcentu z profilu",
+            "→ data-accent na &lt;html&gt;",
+        ], ["auth"], accent=C["red"], tint=C["red_bg"], width=200),
+    ]))
+
+    infra = layer("infra", "5 · NARZĘDZIA I PRZEGLĄDARKA", C["navy"], "#F8FAFC", "".join([
+        fe_card("utils", ic["fe_util"], "core/utils", "czyste funkcje", [
+            "quiz-zip.util — JSZip: build / parse ZIP",
+            "image-compression.util — walidacja, odczyt obrazów",
+            "quiz-scoring.util — punktacja pytań",
+        ], accent=C["navy"], tint=C["slate_bg"], width=280),
+        fe_card("storage", ic["fe_storage"], "Pamięć przeglądarki", "Web Storage + cookie", [
+            "localStorage: user, guestQuizzes",
+            "sessionStorage: zapis rozgrywki",
+            "cookie HttpOnly: refresh token (poza JS)",
+        ], accent=C["brown"], tint=C["brown_bg"], width=260),
+        fe_card("api", ic["fe_api"], "Backend przez nginx", "environment.apiUrl = '/api'", [
+            "/api/users/** → user-service",
+            "/api/quizzes/** → quiz-service",
+            "/media/** → obrazy pytań (&lt;img&gt;)",
+        ], accent=C["ink"], tint=C["slate_bg"], width=250),
+    ]))
+
+    legend = f'''legend [shape=plaintext, label=<
+<TABLE BORDER="1" STYLE="rounded" COLOR="{C["border"]}" CELLBORDER="0" CELLSPACING="4" CELLPADDING="2" BGCOLOR="{C["card"]}">
+  <TR><TD COLSPAN="2" ALIGN="LEFT"><FONT POINT-SIZE="11" COLOR="{C["muted"]}"><B>LEGENDA</B></FONT></TD></TR>
+  <TR><TD WIDTH="60" HEIGHT="12" FIXEDSIZE="TRUE"><IMG SRC="{legend_glyph("association")}" SCALE="TRUE"/></TD>
+      <TD ALIGN="LEFT"><FONT POINT-SIZE="10">trasa / osadzenie w szablonie</FONT></TD></TR>
+  <TR><TD WIDTH="60" HEIGHT="12" FIXEDSIZE="TRUE"><IMG SRC="{legend_glyph("dependency")}" SCALE="TRUE"/></TD>
+      <TD ALIGN="LEFT"><FONT POINT-SIZE="10">żądanie HTTP / zapis w pamięci</FONT></TD></TR>
+  <TR><TD COLSPAN="2" ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="{C["muted"]}">chipy na kartach = wstrzykiwane serwisy (inject),<BR ALIGN="LEFT"/>importowane utils i używana pamięć przeglądarki<BR ALIGN="LEFT"/></FONT></TD></TR>
+</TABLE>>];'''
+
+    http = f'style=dashed, color="{C["ink"]}", penwidth=1.4, arrowhead=vee'
+    store = f'style=dashed, color="{C["brown"]}", penwidth=1.4, arrowhead=vee'
+    route = f'color="{C["slate"]}", penwidth=1.4, arrowhead=vee'
+
+    return f'''
+digraph Frontend {{
+  graph [
+    {graph_attrs(
+        ranksep="0.55",
+        nodesep="0.3",
+        splines="spline",
+        pad="0.5",
+        compound="true",
+        newrank="true",
+        remincross="false",
+    )},
+    label=<<FONT POINT-SIZE="20" COLOR="{C["ink"]}"><B>Courser — architektura frontendu</B></FONT><BR/><FONT POINT-SIZE="11" COLOR="{C["muted"]}">Angular 21 · komponenty standalone · sygnały · RxJS · serwowane przez nginx</FONT>>
+  ];
+  node [fontname="Helvetica", shape=plaintext];
+  edge [fontname="Helvetica", fontsize=9, color="{C["line"]}", arrowsize=0.8];
+
+  {boot}
+  {layouts}
+  {pages}
+  {services}
+  {infra}
+  {legend}
+
+  main -> root [{route}, label=<<FONT POINT-SIZE="9" COLOR="{C["slate"]}"> bootstrap </FONT>>];
+  root -> mainlayout [{route}];
+  root -> authlayout [{route}];
+  {{ rank=same; mainlayout; navbar; sidebar; authlayout }}
+  mainlayout -> navbar [{route}, minlen=1];
+  navbar -> sidebar [style=invis];
+
+  mainlayout -> home [{route}];
+  mainlayout -> import [{route}];
+  mainlayout -> create [{route}];
+  mainlayout -> play [{route}];
+  mainlayout -> details [{route}];
+  authlayout -> login [{route}];
+  authlayout -> register [{route}];
+
+  play -> apisvc [ltail=cluster_pages, lhead=cluster_services, color="{C["teal"]}", penwidth=2.4, arrowsize=1.1,
+                  minlen=2, xlabel=<<FONT POINT-SIZE="10" COLOR="{C["teal"]}"><B>inject()</B></FONT>>];
+
+  authsvc -> interceptor [{http}];
+  apisvc -> interceptor [{http}];
+  scoresvc -> interceptor [{http}];
+  interceptor -> api [{http}, label=<<FONT POINT-SIZE="9"> HttpClient </FONT>>];
+  authsvc -> api [{http}, label=<<FONT POINT-SIZE="9"> /users/refresh </FONT>>];
+  authsvc -> storage [{store}];
+  guestsvc -> storage [{store}];
+  {{ rank=same; home; import; create; play; details; login; register }}
+  home -> import -> create -> play -> details -> login -> register [style=invis];
+  {{ rank=same; authsvc; apisvc; scoresvc; guestsvc; themesvc }}
+  {{ rank=same; api; utils; storage; legend }}
+  authsvc -> apisvc -> scoresvc -> guestsvc -> themesvc [style=invis];
+  api -> utils -> storage -> legend [style=invis];
+  home -> authsvc [style=invis];
+  register -> themesvc [style=invis];
+}}
+'''
+
+
 def pad_to_aspect(path: Path, ratio: float) -> None:
     """Dopełnia obraz tłem do zadanych proporcji (bez skalowania treści)."""
     from PIL import Image
@@ -1508,6 +1920,7 @@ GENERATORS = {
     "03_quiz_ranking_lifecycle": (lifecycle, "dot"),
     "04_user_usecases": (usecases, "neato"),
     "05_class_diagram": (class_diagram, "dot"),
+    "06_frontend_architecture": (frontend_architecture, "dot"),
 }
 
 
@@ -1530,7 +1943,7 @@ def main() -> None:
     print(f"Renderowanie {len(GENERATORS)} diagramów → {args.out}")
 
     for name, (factory, engine) in GENERATORS.items():
-        source = factory()
+        source = resolve_card_splits(dot_bin, factory(), engine)
         if args.keep_dot:
             dot_path = args.out / f"{name}.dot"
             dot_path.parent.mkdir(parents=True, exist_ok=True)

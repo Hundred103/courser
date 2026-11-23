@@ -36,6 +36,7 @@ Katalog wyjściowy: `out/`
 | `03_quiz_ranking_lifecycle.png` | Operacje QuizService: kiedy powstaje kopia quizu / nowa wersja rankingu |
 | `04_user_usecases.png` | Przypadki użycia UML (aktorzy, «include» / «extend») |
 | `05_class_diagram.png` | Diagram klas UML: encje JPA, enumy, model statystyk JDBC (kompozycje, krotności) |
+| `06_frontend_architecture.png` | Architektura frontendu Angular: start, layouty, trasy, serwisy, interceptor, pamięć przeglądarki |
 
 Teksty opisowe są po polsku. Identyfikatory z kodu (tabele, endpointy, flagi, nazwy klas) pozostają po angielsku.
 
