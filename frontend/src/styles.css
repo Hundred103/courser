@@ -269,3 +269,22 @@ a,
     transform: scale(1);
   }
 }
+
+@media (max-width: 768px) {
+  .squircle {
+    border-radius: 18px;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .danger-button,
+  .warning-button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 560px) {
+  .squircle {
+    border-radius: 16px;
+  }
+}

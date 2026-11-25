@@ -54,4 +54,21 @@ p { color: var(--text-soft); line-height: 1.55; }
 .welcome { padding: clamp(1.5rem,4vw,3rem); min-height: 280px; display: grid; align-content: center; justify-items: start; gap: .7rem; }
 .welcome p { max-width: 540px; }
 .login { display: inline-block; margin-top: .5rem; text-decoration: none; }
-@media (max-width: 760px) { .cards { grid-template-columns: 1fr; } .stat-card { min-height: 0; } .chart-card { padding: 1rem; } .periods button { padding: .6rem .7rem; } .chart-layout { grid-template-columns: 3.6rem minmax(0, 1fr); gap: .15rem; } .y-axis-tick { right: .3rem; } }
+@media (max-width: 760px) {
+  .cards { grid-template-columns: 1fr; }
+  .stat-card { min-height: 0; }
+  .chart-card { padding: 1rem; }
+  .periods { width: 100%; }
+  .periods button { flex: 1 1 auto; padding: .6rem .7rem; text-align: center; }
+  .metric-switch { width: 100%; }
+  .metric-switch button { flex: 1 1 auto; text-align: center; }
+  .chart-layout { grid-template-columns: 3.6rem minmax(0, 1fr); gap: .15rem; }
+  .y-axis-tick { right: .3rem; }
+  .welcome { min-height: 0; padding: 1.25rem; }
+}
+
+@media (max-width: 560px) {
+  .dashboard-header { padding-bottom: 1.2rem; }
+  .chart-header { gap: .75rem; }
+  .today-value strong { font-size: 2.4rem; }
+}

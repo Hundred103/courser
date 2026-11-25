@@ -579,10 +579,46 @@ h2 {
 @media (max-width: 900px) {
   :host {
     min-width: 0;
+    width: 100%;
   }
 
   .sidebar {
     position: static;
     min-height: auto;
+    top: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .sidebar {
+    padding: 0.85rem;
+  }
+
+  h2 {
+    font-size: 1.4rem;
+  }
+
+  .quiz-item {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .quiz-info,
+  .rename-editor {
+    flex: 1 1 100%;
+  }
+
+  .quiz-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .quiz-item .primary-button {
+    flex: 1 1 auto;
+  }
+
+  .options-menu {
+    left: auto;
+    right: 0;
   }
 }
