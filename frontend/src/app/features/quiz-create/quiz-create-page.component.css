@@ -631,6 +631,32 @@
     width: 100%;
     justify-content: center;
   }
+
+  .top-actions-left {
+    width: 100%;
+  }
+
+  .top-actions-left .primary-button,
+  .top-actions-left .secondary-button,
+  .top-actions-left .undo-button {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}
+
+@media (max-width: 560px) {
+  .create-shell {
+    padding: 0.75rem;
+  }
+
+  .quiz-create {
+    gap: 2rem;
+    padding: 0.85rem;
+  }
+
+  .options-panel {
+    padding: 0.85rem 0.85rem 0;
+  }
 }
 .ranking-warning {
   position: relative;
