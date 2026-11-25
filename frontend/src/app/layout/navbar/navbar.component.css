@@ -22,14 +22,14 @@
     linear-gradient(
       90deg,
       var(--sunset-orange),
-      #d65563,
+      var(--accent-deep),
       var(--deep-purple)
     );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   text-shadow:
-    0 0 10px rgba(255, 107, 53, 0.45),
+    0 0 10px rgba(var(--accent-rgb), 0.45),
     0 0 20px rgba(75, 29, 115, 0.55);
 }
 
@@ -37,7 +37,7 @@
   transform: translateX(-50%) translateY(-2px) scale(1.02);
   filter: brightness(1.16);
   text-shadow:
-    0 0 14px rgba(255, 107, 53, 0.62),
+    0 0 14px rgba(var(--accent-rgb), 0.62),
     0 0 28px rgba(75, 29, 115, 0.68);
 }
 
@@ -47,12 +47,66 @@
   gap: 0.75rem;
 }
 
-.user-badge {
-  padding: 0.55rem 1rem;
-  font-size: 0.9rem;
-  color: var(--text-primary, #f0f0f0);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(10, 11, 14, 0.62);
+  backdrop-filter: blur(5px);
+}
+
+.settings-modal {
+  display: grid;
+  gap: 1.25rem;
+  width: min(520px, 100%);
+  padding: 1.4rem;
+  border: 1px solid rgba(var(--accent-rgb), .5);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), .14), rgba(75, 29, 115, .18));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .36);
+}
+
+.settings-modal-header { padding-bottom: .9rem; border-bottom: 1px solid rgba(255, 255, 255, .12); }
+.settings-modal h2 { margin: 0; color: var(--text-title); font-size: 1.55rem; }
+.setting-field { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, 1.3fr); align-items: center; gap: 1rem; }
+.setting-field label, .setting-label { display: inline-flex; align-items: center; gap: .55rem; color: #f5f5f8; font-size: .95rem; font-weight: 800; }
+.setting-icon { width: 1.25rem; height: 1.25rem; fill: var(--accent-bright); }
+.setting-field input, .accent-picker { width: 100%; min-height: 46px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 13px; color: var(--text-main); background: rgba(255, 255, 255, .055); font: inherit; }
+.setting-field input, .accent-picker-area { grid-column: 2; }
+.setting-field input { padding: .7rem .8rem; }
+.setting-field input:focus { outline: none; border-color: rgba(var(--accent-rgb), .68); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .14); }
+.accent-picker-area { position: relative; }
+.accent-picker { display: flex; align-items: center; gap: .65rem; padding: .55rem .75rem; cursor: pointer; text-align: left; }
+.accent-picker:hover { border-color: rgba(var(--accent-rgb), .58); }
+.accent-swatch { width: 1.25rem; height: 1.25rem; flex: 0 0 auto; border: 1px solid rgba(255, 255, 255, .35); border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); }
+.chevron { width: 1.25rem; height: 1.25rem; margin-left: auto; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+.accent-options {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + .55rem);
+  right: 0;
+  display: grid;
+  width: min(270px, 100%);
+  gap: .3rem;
+  padding: .4rem;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 14px;
+  background: rgba(31, 32, 37, .98);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .42);
+}
+.accent-options button { display: flex; align-items: center; gap: .65rem; padding: .55rem .65rem; border: 1px solid transparent; border-radius: 10px; color: var(--text-main); background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.accent-options button:hover { border-color: rgba(var(--accent-rgb), .42); background: rgba(var(--accent-rgb), .12); }
+.accent-options button.selected { background: rgba(255, 255, 255, .055); }
+.accent-option-check { width: 1.2rem; height: 1.2rem; margin-left: auto; fill: none; stroke: var(--text-main); stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.2; }
+.settings-error { margin: -.45rem 0 0; color: var(--error-text); font-size: .85rem; }
+.settings-actions { display: flex; justify-content: center; gap: .75rem; margin-top: .2rem; }
+
+@media (max-width: 560px) {
+  .setting-field { grid-template-columns: 1fr; gap: .6rem; }
+  .setting-field input, .accent-picker-area { grid-column: 1; }
+  .accent-options { width: 100%; }
 }
 
 @media (max-width: 768px) {

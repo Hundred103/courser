@@ -1,16 +1,57 @@
+x-database-credentials: &database-credentials
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+  SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+  SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+
 services:
   postgres:
     image: postgres:16
     container_name: courser-postgres
     environment:
-      POSTGRES_DB: courserdb
-      POSTGRES_USER: courseruser
-      POSTGRES_PASSWORD: courserpassword
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - courser-postgres-data:/var/lib/postgresql/data
-      - ./postgre/dump.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  liquibase:
+    image: liquibase/liquibase:4.33.0
+    container_name: courser-liquibase
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./postgre/liquibase/changelog:/liquibase/changelog
+    environment:
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      LIQUIBASE_COMMAND_USERNAME: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      LIQUIBASE_COMMAND_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    # Exec-form keeps the context expression as one argv (spaces in AND must not split).
+    command:
+      - --changelog-file=changelog/db.changelog-master.xml
+      - --contexts=${LIQUIBASE_CONTEXTS:-!seed AND !seed-legacy}
+      - update
+
+  media:
+    image: nginx:1.27-alpine
+    container_name: courser-media
+    volumes:
+      - courser-media-data:/usr/share/nginx/html
+      - ./media/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -q ok"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   quiz-service:
     build:
@@ -18,15 +59,14 @@ services:
       dockerfile: Dockerfile
     container_name: courser-quiz
     depends_on:
-      - postgres
+      liquibase:
+        condition: service_completed_successfully
     expose:
       - "8081"
+    volumes:
+      - courser-media-data:/var/courser-media
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
-      SPRING_DATASOURCE_USERNAME: courseruser
-      SPRING_DATASOURCE_PASSWORD: courserpassword
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
-      SERVER_PORT: 8081
+      <<: *database-credentials
 
   user-service:
     build:
@@ -34,16 +74,14 @@ services:
       dockerfile: Dockerfile
     container_name: courser-user-service
     depends_on:
-      - postgres
+      liquibase:
+        condition: service_completed_successfully
     expose:
       - "8082"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/courserdb
-      SPRING_DATASOURCE_USERNAME: courseruser
-      SPRING_DATASOURCE_PASSWORD: courserpassword
-      SPRING_PROFILES_ACTIVE: docker
-      SERVER_PORT: 8082
-      APP_JWT_SECRET: courser-local-development-secret-change-me
+      <<: *database-credentials
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in .env}
+      APP_REFRESH_COOKIE_SECURE: ${APP_REFRESH_COOKIE_SECURE:-false}
 
   gateway:
     build:
@@ -54,11 +92,11 @@ services:
       - quiz-service
       - user-service
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       QUIZ_SERVICE_URL: http://quiz-service:8081
       USER_SERVICE_URL: http://user-service:8082
-      APP_JWT_SECRET: courser-local-development-secret-change-me
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in .env}
 
   frontend:
     build:
@@ -67,9 +105,12 @@ services:
     container_name: courser-frontend
     depends_on:
       - gateway
+      - media
     ports:
-      - "4200:80"
+      - "${FRONTEND_PORT:-4200}:80"
 
 volumes:
   courser-postgres-data:
     name: courser-postgres-data
+  courser-media-data:
+    name: courser-media-data

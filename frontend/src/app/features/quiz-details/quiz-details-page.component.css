@@ -29,20 +29,16 @@
   color: #86efac;
 }
 
-/* ===========================
-   PANEL
-=========================== */
 .details-panel {
-  width: min(860px, 100%);
+  width: min(1196px, 100%);
   margin: 0 auto;
   display: grid;
   gap: 1.5rem;
 }
 
-/* ===========================
-   HEADER
-=========================== */
 .details-header {
+  width: min(860px, 100%);
+  margin-inline: auto;
   display: flex;
   align-items: center;
   gap: 1.2rem;
@@ -62,13 +58,13 @@
   justify-content: center;
   min-width: 72px;
   padding: 0.5rem 1rem;
-  border: 1px solid rgba(255, 107, 53, 0.4);
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
   background: linear-gradient(
     135deg,
-    rgba(255, 107, 53, 0.18),
+    rgba(var(--accent-rgb), 0.18),
     rgba(75, 29, 115, 0.28)
   );
-  box-shadow: inset 0 0 10px rgba(255, 107, 53, 0.1);
+  box-shadow: inset 0 0 10px rgba(var(--accent-rgb), 0.1);
   flex-shrink: 0;
 }
 
@@ -77,7 +73,7 @@
   font-weight: 900;
   line-height: 1;
   color: var(--text-accent);
-  text-shadow: 0 0 12px rgba(255, 107, 53, 0.5);
+  text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.5);
 }
 
 .count-label {
@@ -89,12 +85,92 @@
   margin-top: 0.1rem;
 }
 
-/* ===========================
-   QUESTIONS LIST
-=========================== */
 .questions-list {
   display: grid;
   gap: 0.65rem;
+  width: min(860px, 100%);
+  margin-inline: auto;
+}
+
+.details-content-grid {
+  position: relative;
+}
+
+.ranking-box {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(145deg, rgba(38, 41, 48, 0.9), rgba(24, 26, 32, 0.94));
+}
+
+.ranking-heading {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  margin-bottom: .7rem;
+}
+
+.ranking-box h3 {
+  margin: 0;
+}
+
+.ranking-entry {
+  display: flex;
+  align-items: baseline;
+  gap: .45rem;
+  margin: .55rem 0;
+}
+
+.ranking-entry small {
+  margin-left: auto;
+  opacity: .8;
+  text-align: right;
+}
+
+.ranking-entry.current-user {
+  color: #8fc8ff;
+  font-weight: 700;
+}
+
+.ranking-first {
+  margin: 0;
+  color: #ffd76a;
+  font-weight: 700;
+}
+
+.details-ranking .ranking-first {
+  margin-left: auto;
+  text-align: right;
+}
+
+.details-ranking { margin-top: 1.5rem; }
+
+@media (min-width: 700px) {
+  .details-panel.has-ranking .details-header {
+    width: calc(100% - 336px);
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .details-panel.has-ranking .details-content-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    justify-content: space-between;
+    align-items: start;
+    gap: 2.25rem;
+  }
+
+  .details-panel.has-ranking .questions-list {
+    width: 100%;
+    margin-inline: 0;
+  }
+
+  .details-panel.has-ranking .details-ranking {
+    width: 300px;
+    margin-top: 0;
+    align-self: start;
+  }
 }
 
 .question-block {
@@ -115,13 +191,10 @@
 }
 
 .question-block.expanded {
-  --surface-border: rgba(255, 107, 53, 0.28);
+  --surface-border: rgba(var(--accent-rgb), 0.28);
   box-shadow: 0 0 18px rgba(75, 29, 115, 0.2);
 }
 
-/* ===========================
-   TOGGLE BUTTON
-=========================== */
 .question-toggle {
   width: 100%;
   display: flex;
@@ -148,16 +221,16 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  border: 1px solid rgba(255, 107, 53, 0.45);
+  border: 1px solid rgba(var(--accent-rgb), 0.45);
   background: linear-gradient(
     135deg,
-    rgba(255, 107, 53, 0.22),
+    rgba(var(--accent-rgb), 0.22),
     rgba(75, 29, 115, 0.3)
   );
   font-size: 0.8rem;
   font-weight: 800;
   color: var(--text-accent);
-  box-shadow: inset 0 0 6px rgba(255, 107, 53, 0.15);
+  box-shadow: inset 0 0 6px rgba(var(--accent-rgb), 0.15);
 }
 
 .question-text {
@@ -189,14 +262,12 @@
 .question-image img {
   display: block;
   width: 100%;
-  max-height: 240px;
+  height: auto;
+  max-height: min(50vh, 420px);
   object-fit: contain;
   background: rgba(255, 255, 255, 0.02);
 }
 
-/* ===========================
-   ANSWERS LIST
-=========================== */
 .answers-list {
   list-style: none;
   margin: 0;
@@ -224,7 +295,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: rgba(255, 107, 53, 0.55);
+  background: rgba(var(--accent-rgb), 0.55);
 }
 
 @keyframes slideDown {
@@ -247,4 +318,5 @@
     flex-direction: column;
     align-items: flex-start;
   }
+
 }

@@ -1,0 +1,57 @@
+package net.edu.courser.quizservice.entity;
+import jakarta.persistence.*;
+import lombok.*;
+import java.util.List;
+import java.util.ArrayList;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Entity
+@Table(name = "quizzes")
+public class Quiz {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Builder.Default
+    @OneToMany(mappedBy = "quiz", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id ASC")
+    private List<Question> questions = new ArrayList<>();
+    @Column(nullable = false)
+    private String title;
+    @Column(name = "owner_user_id", nullable = false)
+    private Long ownerUserId;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scoring_mode", nullable = false)
+    @Builder.Default
+    private ScoringMode scoringMode = ScoringMode.DEFAULT;
+    @Column(name = "allow_negative_score", nullable = false)
+    @Builder.Default
+    private boolean allowNegativeScore = false;
+    @Column(name = "points_per_correct", nullable = false)
+    @Builder.Default
+    private double pointsPerCorrect = 1;
+    @Column(name = "incorrect_penalty", nullable = false)
+    @Builder.Default
+    private double incorrectPenalty = 1;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "penalty_mode", nullable = false)
+    @Builder.Default
+    private PenaltyMode penaltyMode = PenaltyMode.FRACTION;
+    @Column(name = "random_question_order", nullable = false)
+    @Builder.Default
+    private boolean randomQuestionOrder = false;
+    @Column(name = "show_correct_answers", nullable = false)
+    @Builder.Default
+    private boolean showCorrectAnswers = true;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ranking_version_id")
+    private QuizRankingVersion rankingVersion;
+
+    public void addQuestion(Question question) {
+        questions.add(question);
+        question.setQuiz(this);
+    }
+}

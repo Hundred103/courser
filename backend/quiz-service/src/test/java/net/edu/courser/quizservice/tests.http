@@ -1,0 +1,74 @@
+### Courser HTTP scratch pad
+### Call the gateway with /api. Quiz routes need a Bearer token from login/register.
+### Gateway: http://localhost:8080
+
+@base = http://localhost:8080/api
+@token = replace-with-jwt-from-login
+
+### Register
+POST {{base}}/users/register
+Content-Type: application/json
+
+{
+  "email": "demo@example.com",
+  "username": "demo",
+  "password": "Haslo123!"
+}
+
+### Login
+POST {{base}}/users/login
+Content-Type: application/json
+
+{
+  "email": "demo@example.com",
+  "password": "Haslo123!"
+}
+
+### List quizzes
+GET {{base}}/quizzes
+Authorization: Bearer {{token}}
+
+### Get one quiz (questions + answers)
+GET {{base}}/quizzes/1
+Authorization: Bearer {{token}}
+
+### Create quiz
+POST {{base}}/quizzes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Geografia",
+  "scoring": null,
+  "limits": { "randomQuestionOrder": false, "showCorrectAnswers": true },
+  "questions": [
+    {
+      "content": "Jaka jest stolica Polski?",
+      "image": null,
+      "answers": [
+        { "content": "Warszawa", "correct": true, "points": null },
+        { "content": "Kraków", "correct": false, "points": null }
+      ]
+    }
+  ]
+}
+
+### Fork (server-side copy, no body)
+POST {{base}}/quizzes/1/fork
+Authorization: Bearer {{token}}
+
+### Ranking leaderboard
+GET {{base}}/quizzes/1/ranking
+Authorization: Bearer {{token}}
+
+### Share-code preview (public)
+POST {{base}}/quizzes/share-code-preview
+Content-Type: application/json
+
+{
+  "code": "ABCDE-FGHIJ"
+}
+
+### Daily statistics
+GET {{base}}/users/me/statistics/daily
+Authorization: Bearer {{token}}

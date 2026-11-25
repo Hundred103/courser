@@ -3,6 +3,21 @@
     <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
       Strona główna
     </button>
+    @if (quiz()?.rankingEnabled && isLoggedIn() && !isStudyMode() && !resultReady()) {
+      <p class="ranking-timer top-ranking-timer">Czas: {{ rankingTimeText() }}</p>
+    }
+    @if (quiz() && !resultReady()) {
+      <div class="top-right-info">
+        <p class="keyboard-shortcuts" aria-label="Skróty klawiaturowe">
+          <span><kbd>1–9</kbd> odpowiedzi</span>
+          <span><kbd>Spacja</kbd> sprawdź</span>
+          <span><kbd>A</kbd>/<kbd>D</kbd> strzałki</span>
+          @if (isStudyMode()) {
+            <span><kbd>Q</kbd>/<kbd>W</kbd>/<kbd>E</kbd>/<kbd>R</kbd> dodaj</span>
+          }
+        </p>
+      </div>
+    }
   </div>
 
   @if (isLoading()) {
@@ -10,14 +25,15 @@
   } @else if (errorMessage()) {
     <p class="status-text error">{{ errorMessage() }}</p>
   } @else if (quiz(); as quizData) {
-    <article class="quiz-play squircle fade-in">
-      <header class="quiz-header">
-        <p>Pytanie {{ currentQuestionNumber() }} / {{ totalQuestions() }}</p>
-        <h2 class="neon-title">{{ quizData.title }}</h2>
-      </header>
+    <div class="quiz-play-layout">
+      <article class="quiz-play squircle fade-in">
+        <header class="quiz-header">
+          <p>Pytanie {{ currentQuestionNumber() }} / {{ totalQuestions() }}</p>
+          <h2 class="neon-title">{{ quizData.title }}</h2>
+        </header>
 
-      @if (currentQuestion(); as question) {
-        <div class="question-card squircle">
+        @if (currentQuestion(); as question) {
+          <div class="question-card squircle">
           <h3>{{ question.content }}</h3>
 
           @if (questionImageSrc(question); as imageSrc) {
@@ -38,13 +54,18 @@
                 [class.submitted-answer]="isWrongSubmittedAnswer(question, answer)"
                 [disabled]="currentQuestionChecked() || resultReady()"
                 (click)="selectAnswer(question, answer)">
-                {{ answer.content }}
+                <span class="answer-copy">{{ answer.content }}</span>
+                @if (answerPointsLabel(question, answer); as pointsLabel) {
+                  <span class="answer-points" [class.negative]="(answer.points ?? 0) < 0" [class.positive]="(answer.points ?? 0) > 0">
+                    {{ pointsLabel }}
+                  </span>
+                }
               </button>
             }
           </div>
 
           <div class="question-score-slot" aria-live="polite">
-            @if (isQuestionChecked(question)) {
+            @if (isQuestionChecked(question) && showAnswerFeedback()) {
               <p>{{ questionScoreText(question) }}</p>
             }
           </div>
@@ -83,10 +104,31 @@
             </div>
           </div>
 
-        </div>
-      }
+          @if (isStudyMode() && currentQuestionChecked() && !isLastQuestion()) {
+            <div class="study-add-controls" aria-label="Dodaj pytanie ponownie do kolejki">
+              <p>Dodaj</p>
+              <div class="study-add-actions">
+                @for (placement of studyPlacementOptions; track placement) {
+                  <button
+                    class="study-add-button squircle"
+                    type="button"
+                    [class.added]="studyPlacements()[question.runId] === placement"
+                    [disabled]="resultReady() || !!studyPlacements()[question.runId]"
+                    (click)="scheduleCurrentQuestion(placement)">
+                    @if (studyPlacements()[question.runId] === placement) {
+                      <span aria-hidden="true">✓</span>
+                    }
+                    {{ studyPlacementLabel(placement) }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
 
-      @if (showIncompleteConfirm()) {
+          </div>
+        }
+
+        @if (showIncompleteConfirm()) {
         <div class="confirm-overlay">
           <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
             <p>Nie wszystkie pytania zostały rozwiązane. Czy na pewno chcesz zakończyć quiz?</p>
@@ -101,9 +143,9 @@
             </div>
           </div>
         </div>
-      }
+        }
 
-      @if (showExitConfirm()) {
+        @if (showExitConfirm()) {
         <div class="confirm-overlay">
           <div class="confirm-banner squircle" role="alertdialog" aria-modal="true">
             <p>
@@ -124,28 +166,90 @@
             </div>
           </div>
         </div>
-      }
+        }
 
-      @if (resultReady()) {
+        @if (resultReady()) {
         <div class="result-box squircle">
-          <p>Wynik: {{ formattedScore() }} / {{ totalQuestions() }}</p>
+          <p>Wynik: {{ formattedScore() }} / {{ formattedMaxScore() }}</p>
           <p>Skuteczność: {{ scorePercent() }}%</p>
+          @if (awaitingServerScore()) {
+            <p class="result-status">Trwa przeliczanie wyniku rankingu…</p>
+          }
+          @if (rankingResult(); as ranking) {
+            <p>Czas: {{ rankingDurationText(ranking.durationMs) }}</p>
+          }
 
           @if (isLoggedIn()) {
             @if (resultSaveError()) {
               <p class="result-status error">{{ resultSaveError() }}</p>
-            } @else if (resultSaved()) {
-              <p class="result-status success">Wynik został zapisany.</p>
+              <button type="button" class="secondary-button squircle" (click)="retrySave()">Spróbuj zapisać ponownie</button>
+            } @else if (resultSaveConfirmed()) {
+              <p class="result-status success">Postępy zostały zapisane.</p>
             } @else {
-              <p class="result-status">Zapisywanie wyniku...</p>
+              <p class="result-status">Zapisywanie postępów...</p>
             }
+          }
+
+          @if (rankingError() && !rankingResult()) {
+            <p class="result-status error">{{ rankingError() }}</p>
+          }
+
+          @if (rankingResult(); as ranking) {
+            <section class="ranking-box" aria-label="Ranking quizu">
+              <div class="ranking-heading">
+                <h3>Ranking</h3>
+                @if (ranking.position === 1) { <p class="ranking-first">🏆 Pierwsze miejsce!</p> }
+              </div>
+              @if (ranking.outsideTopFive) { <p>Nie znalazłeś się w Top 5.</p> }
+              @for (entry of ranking.leaderboard; track entry.position) {
+                <p class="ranking-entry" [class.current-user]="entry.position === ranking.position">
+                  <span>{{ entry.position === 1 ? '🥇' : entry.position === 2 ? '🥈' : entry.position === 3 ? '🥉' : entry.position + '.' }}</span>
+                  {{ entry.username }} <small>{{ rankingPercentText(entry.scoreScaled, entry.maxScoreScaled) }} · {{ rankingDurationText(entry.durationMs) }}</small>
+                </p>
+              }
+            </section>
           }
 
           <button class="result-back-button primary-button squircle" type="button" (click)="goBack()">
             Strona główna
           </button>
         </div>
+        }
+      </article>
+
+      @if (rankingResult()?.position === 1) {
+        <div class="confetti-overlay" aria-hidden="true">
+          <span class="firework firework-left"></span>
+          <span class="firework firework-right"></span>
+          @for (piece of confettiPieces; track piece) { <i></i> }
+        </div>
       }
-    </article>
+
+      <aside class="question-navigator" aria-label="Nawigacja po pytaniach">
+        <div class="question-navigator-content">
+          <div class="question-navigator-legend" aria-label="Legenda wyników pytań">
+            <span><i class="legend-marker incorrect" aria-hidden="true"></i>0%–49%</span>
+            <span><i class="legend-marker partial" aria-hidden="true"></i>50%–99%</span>
+            <span><i class="legend-marker correct" aria-hidden="true"></i>100%</span>
+          </div>
+          <div class="question-navigator-grid">
+            @for (question of questions(); track question.runId; let index = $index) {
+              <button
+                class="question-navigator-tile squircle"
+                type="button"
+                [class.current]="index === currentIndex()"
+                [class.correct]="isQuestionFullyCorrect(question)"
+                [class.partial]="isQuestionChecked(question) && questionScorePercentage(question) >= 50 && questionScorePercentage(question) < 100"
+                [class.incorrect]="isQuestionChecked(question) && questionScorePercentage(question) < 50"
+                [attr.aria-current]="index === currentIndex() ? 'step' : null"
+                [attr.aria-label]="'Przejdź do pytania ' + (index + 1)"
+                (click)="goToQuestion(index)">
+                {{ index + 1 }}
+              </button>
+            }
+          </div>
+        </div>
+      </aside>
+    </div>
   }
 </section>

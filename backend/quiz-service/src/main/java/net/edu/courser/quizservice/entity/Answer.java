@@ -1,0 +1,23 @@
+package net.edu.courser.quizservice.entity;
+import jakarta.persistence.*;
+import lombok.*;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Entity
+@Table(name = "answers")
+public class Answer {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "question_id", nullable = false)
+    private Question question;
+    @Column(columnDefinition = "TEXT")
+    private String content;
+    private boolean correct;
+    private Double points;
+}

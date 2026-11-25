@@ -2,29 +2,54 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
+import { DEFAULT_QUIZ_LIMITS } from '../../core/models/quiz-limits.model';
 import { QuizCreateDTO } from '../../core/models/quiz.model';
 import { QuizApiService } from '../../core/services/quiz-api.service';
-import { buildQuizZip, parseQuizZip } from '../../core/utils/quiz-zip.util';
+import { quizRequestErrorMessage } from '../../core/utils/quiz-request.util';
+import { buildQuizZip, normalizeQuiz, parseQuizZip } from '../../core/utils/quiz-zip.util';
 
 const QUIZ_TEMPLATE: QuizCreateDTO = {
   title: 'Przykładowy quiz',
+  scoring: {
+    mode: 'default',
+    allowNegativeScore: false,
+    pointsPerCorrect: 1,
+    incorrectPenalty: 1,
+    penaltyMode: 'fraction',
+  },
+  limits: { ...DEFAULT_QUIZ_LIMITS },
   questions: [
     {
       content: 'Która odpowiedź jest poprawna?',
-      image: null,
       answers: [
         {
           content: 'Pierwsza odpowiedź',
           correct: true,
+          points: null,
         },
         {
           content: 'Druga odpowiedź',
           correct: false,
+          points: null,
         },
       ],
+      image: null,
     },
   ],
 };
+
+const TEMPLATE_INSTRUCTIONS = [
+  'To pole jest tylko opisem i można je usunąć.',
+  'image zawiera wyłącznie nazwę pliku z folderu images/, np. "obraz.jpg", albo null. Archiwum powinno zawierać: quiz.json oraz images/obraz.jpg.',
+  'mode: default = wspólne zasady punktacji; custom = punkty ustawione przy każdej odpowiedzi.',
+  'Dla default penaltyMode może być: fraction, points albo percent.',
+  'fraction odpowiada opcji „Domyślne punkty”; aplikacja zawsze używa +1 oraz -1.',
+  'Dla fraction wartości pointsPerCorrect i incorrectPenalty są ignorowane.',
+  'points: każda poprawna daje pointsPerCorrect, a błędna odejmuje incorrectPenalty.',
+  'percent: incorrectPenalty to procent kary; np. pointsPerCorrect: 2 i incorrectPenalty: 25 oznacza +2 za poprawną oraz -0,5 za błędną odpowiedź.',
+  'allowNegativeScore: true pozwala, aby ujemny wynik pytania obniżył wynik quizu.',
+  'Dla custom liczy się jedno pole points przy każdej odpowiedzi; np. { "content": "Warszawa", "correct": true, "points": 2 } albo { "content": "Kraków", "correct": false, "points": -1 }. Poprawne odpowiedzi mają od 0 do 99,99 pkt, błędne od -99,99 do 0, maksymalnie z dwiema cyframi po przecinku. Pozostałe ustawienia punktacji nie wpływają na wynik.',
+] as const;
 
 @Component({
   selector: 'app-quiz-import-page',
@@ -38,8 +63,9 @@ export class QuizImportPageComponent {
   private readonly router = inject(Router);
 
   readonly selectedFileName = signal('');
-  readonly activeTab = signal<'file' | 'code'>('file');
+  readonly activeTab = signal<'file' | 'code'>('code');
   readonly importedQuiz = signal<QuizCreateDTO | null>(null);
+  readonly importedRankingVersionId = signal<string | null>(null);
   readonly validationError = signal('');
   readonly importError = signal('');
   readonly isReadingFile = signal(false);
@@ -48,18 +74,6 @@ export class QuizImportPageComponent {
   readonly shareCode = signal('');
   readonly codeImportError = signal('');
   readonly isCodeImporting = signal(false);
-  readonly templateJson = JSON.stringify(
-    {
-      title: QUIZ_TEMPLATE.title,
-      questions: QUIZ_TEMPLATE.questions.map((question) => ({
-        content: question.content,
-        image: question.image,
-        answers: question.answers,
-      })),
-    },
-    null,
-    2,
-  );
 
   readonly canImport = computed(() => this.importedQuiz() !== null && !this.validationError() && !this.isImporting());
   readonly questionCount = computed(() => this.importedQuiz()?.questions.length ?? 0);
@@ -109,7 +123,7 @@ export class QuizImportPageComponent {
   }
 
   async downloadTemplate(): Promise<void> {
-    const blob = await buildQuizZip(QUIZ_TEMPLATE);
+    const blob = await buildQuizZip(QUIZ_TEMPLATE, { instructions: TEMPLATE_INSTRUCTIONS });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
 
@@ -142,7 +156,7 @@ export class QuizImportPageComponent {
     this.importError.set('');
 
     this.quizApiService
-      .importQuiz(quiz)
+      .importArchiveQuiz(quiz, this.importedRankingVersionId())
       .pipe(finalize(() => this.isImporting.set(false)))
       .subscribe({
         next: (createdQuiz) => {
@@ -150,8 +164,8 @@ export class QuizImportPageComponent {
             queryParams: { imported: 'true' },
           });
         },
-        error: () => {
-          this.importError.set('Nie udało się zaimportować quizu. Spróbuj ponownie.');
+        error: (error) => {
+          this.importError.set(quizRequestErrorMessage(error, 'Nie udało się zaimportować quizu. Spróbuj ponownie.'));
         },
       });
   }
@@ -181,8 +195,8 @@ export class QuizImportPageComponent {
             queryParams: { imported: 'true' },
           });
         },
-        error: () => {
-          this.codeImportError.set('Nie udało się dodać quizu. Sprawdź kod i spróbuj ponownie.');
+        error: (error) => {
+          this.codeImportError.set(quizRequestErrorMessage(error, 'Nie udało się dodać quizu. Sprawdź kod i spróbuj ponownie.'));
         },
       });
   }
@@ -205,10 +219,13 @@ export class QuizImportPageComponent {
     try {
       if (lowerName.endsWith('.zip')) {
         const buffer = await file.arrayBuffer();
-        this.importedQuiz.set(await parseQuizZip(buffer));
+        const parsed = await parseQuizZip(buffer);
+        this.importedQuiz.set(parsed.quiz);
+        this.importedRankingVersionId.set(parsed.rankingVersionId);
       } else {
         const rawJson = await file.text();
         this.importedQuiz.set(this.parseJsonQuiz(rawJson));
+        this.importedRankingVersionId.set(null);
       }
     } catch (error) {
       this.importedQuiz.set(null);
@@ -219,87 +236,14 @@ export class QuizImportPageComponent {
   }
 
   private parseJsonQuiz(rawJson: string): QuizCreateDTO {
-    const parsed = JSON.parse(rawJson) as unknown;
-    return this.normalizeQuiz(parsed);
-  }
+    const quiz = normalizeQuiz(JSON.parse(rawJson) as unknown);
+    const questionWithImage = quiz.questions.findIndex((question) => question.image);
 
-  private normalizeQuiz(value: unknown): QuizCreateDTO {
-    if (!this.isRecord(value)) {
-      throw new Error('Główny obiekt musi zawierać pola title oraz questions.');
+    if (questionWithImage >= 0) {
+      throw new Error(`Pytanie ${questionWithImage + 1} ma obraz, a plik JSON nie może go zawierać. Użyj archiwum ZIP z plikiem quiz.json i folderem images/.`);
     }
 
-    if (typeof value['title'] !== 'string' || value['title'].trim().length === 0) {
-      throw new Error('Pole title musi być niepustym tekstem.');
-    }
-
-    if (!Array.isArray(value['questions']) || value['questions'].length === 0) {
-      throw new Error('Pole questions musi być niepustą tablicą.');
-    }
-
-    return {
-      title: value['title'].trim(),
-      questions: value['questions'].map((question, questionIndex) => this.normalizeQuestion(question, questionIndex)),
-    };
-  }
-
-  private normalizeQuestion(value: unknown, questionIndex: number): QuizCreateDTO['questions'][number] {
-    if (!this.isRecord(value)) {
-      throw new Error(`Pytanie ${questionIndex + 1} musi być obiektem.`);
-    }
-
-    if (typeof value['content'] !== 'string' || value['content'].trim().length === 0) {
-      throw new Error(`Pytanie ${questionIndex + 1} musi mieć niepuste pole content.`);
-    }
-
-    if (!Array.isArray(value['answers']) || value['answers'].length === 0) {
-      throw new Error(`Pytanie ${questionIndex + 1} musi mieć co najmniej jedną odpowiedź.`);
-    }
-
-    const imageValue = value['image'];
-    let image: string | null = null;
-
-    if (imageValue !== null && imageValue !== undefined && imageValue !== '') {
-      if (typeof imageValue !== 'string') {
-        throw new Error(`Pole image w pytaniu ${questionIndex + 1} musi być null albo nazwą pliku.`);
-      }
-
-      image = imageValue.trim();
-    }
-
-    return {
-      content: value['content'].trim(),
-      image,
-      answers: value['answers'].map((answer, answerIndex) =>
-        this.normalizeAnswer(answer, questionIndex, answerIndex),
-      ),
-    };
-  }
-
-  private normalizeAnswer(
-    value: unknown,
-    questionIndex: number,
-    answerIndex: number,
-  ): QuizCreateDTO['questions'][number]['answers'][number] {
-    if (!this.isRecord(value)) {
-      throw new Error(`Odpowiedź ${answerIndex + 1} w pytaniu ${questionIndex + 1} musi być obiektem.`);
-    }
-
-    if (typeof value['content'] !== 'string' || value['content'].trim().length === 0) {
-      throw new Error(`Odpowiedź ${answerIndex + 1} w pytaniu ${questionIndex + 1} musi mieć niepuste pole content.`);
-    }
-
-    if (typeof value['correct'] !== 'boolean') {
-      throw new Error(`Odpowiedź ${answerIndex + 1} w pytaniu ${questionIndex + 1} musi mieć pole correct typu boolean.`);
-    }
-
-    return {
-      content: value['content'].trim(),
-      correct: value['correct'],
-    };
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
+    return quiz;
   }
 
   private normalizeShareCode(code: string): string {

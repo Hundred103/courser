@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
+import { QuizApiService } from '../../core/services/quiz-api.service';
 
 @Component({
   selector: 'app-login-page',
@@ -13,14 +14,25 @@ import { AuthService } from '../../core/services/auth.service';
 })
 export class LoginPageComponent {
   private readonly authService = inject(AuthService);
+  private readonly quizApiService = inject(QuizApiService);
   private readonly router = inject(Router);
 
   model = { email: '', password: '' };
   readonly error = signal<string | null>(null);
   readonly loading = signal(false);
+  readonly passwordVisible = signal(false);
+
+  togglePasswordVisibility(): void {
+    this.passwordVisible.update((visible) => !visible);
+  }
+
+  onPasswordChange(password: string): void {
+    if (!password) this.passwordVisible.set(false);
+  }
 
   onSubmit(): void {
-    if (!this.model.email || !this.model.password) {
+    const email = this.model.email.trim();
+    if (!email || !this.model.password) {
       this.error.set('Wpisz email i hasło');
       return;
     }
@@ -29,12 +41,12 @@ export class LoginPageComponent {
     this.error.set(null);
 
     this.authService
-      .login(this.model.email, this.model.password)
+      .login(email, this.model.password)
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
         next: (response) => {
           this.authService.setCurrentUser(response);
-          this.authService.migrateGuestQuizzesToUser(response).subscribe({
+          this.quizApiService.migrateGuestQuizzes().subscribe({
             next: () => {
               this.router.navigate(['/']);
             },

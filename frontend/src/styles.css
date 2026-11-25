@@ -14,8 +14,13 @@ body {
   --text-main: #e6e6e8;
   --text-soft: #bebec4;
   --text-title: #f4eef8;
-  --text-accent: #ffe6de;
-  --sunset-orange: #ff6b35;
+  --text-accent: var(--accent-pale);
+  --sunset-orange: var(--accent);
+  --accent: #ff6b35;
+  --accent-deep: #d65563;
+  --accent-bright: #ff9a70;
+  --accent-pale: #ffe6de;
+  --accent-rgb: 255, 107, 53;
   --deep-purple: #4b1d73;
   --edge: rgba(255, 255, 255, 0.08);
   --edge-strong: rgba(255, 255, 255, 0.16);
@@ -24,17 +29,57 @@ body {
   --danger-text: #fee2e2;
   --selection-text: #93c5fd;
   --neon-title-shadow:
-    0 0 8px rgba(255, 107, 53, 0.45),
+    0 0 8px rgba(var(--accent-rgb), 0.45),
     0 0 16px rgba(75, 29, 115, 0.5);
   --primary-shadow:
-    inset 0 0 10px rgba(255, 107, 53, 0.2),
+    inset 0 0 10px rgba(var(--accent-rgb), 0.2),
     0 0 16px rgba(75, 29, 115, 0.25);
   --primary-hover-shadow:
-    0 0 20px rgba(255, 107, 53, 0.4),
+    0 0 20px rgba(var(--accent-rgb), 0.4),
     0 0 35px rgba(75, 29, 115, 0.35);
   --surface-angle: 160deg;
   --surface-from: rgba(32, 34, 40, 0.85);
   --surface-to: rgba(18, 20, 24, 0.85);
+}
+
+:root[data-accent='blue'] {
+  --accent: #3b82f6;
+  --accent-deep: #315fba;
+  --accent-bright: #7db4ff;
+  --accent-pale: #e5f0ff;
+  --accent-rgb: 59, 130, 246;
+}
+
+:root[data-accent='green'] {
+  --accent: #22c55e;
+  --accent-deep: #198754;
+  --accent-bright: #6ee7a0;
+  --accent-pale: #e4ffec;
+  --accent-rgb: 34, 197, 94;
+}
+
+:root[data-accent='violet'] {
+  --accent: #8b5cf6;
+  --accent-deep: #6d3bd1;
+  --accent-bright: #b79aff;
+  --accent-pale: #f0e9ff;
+  --accent-rgb: 139, 92, 246;
+}
+
+:root[data-accent='turquoise'] {
+  --accent: #14b8a6;
+  --accent-deep: #0c8b7e;
+  --accent-bright: #65ded1;
+  --accent-pale: #e0fffb;
+  --accent-rgb: 20, 184, 166;
+}
+
+:root[data-accent='pink'] {
+  --accent: #ec4899;
+  --accent-deep: #bd2e78;
+  --accent-bright: #f48ac1;
+  --accent-pale: #ffe4f2;
+  --accent-rgb: 236, 72, 153;
 }
 
 body {
@@ -46,10 +91,6 @@ body {
   box-sizing: border-box;
 }
 
-
-/* =========================
-   GLOBAL TRANSITIONS
-========================= */
 button,
 a,
 .quiz-card,
@@ -63,10 +104,6 @@ a,
     opacity 0.25s ease;
 }
 
-
-/* =========================
-   GLOBAL UTILITIES
-========================= */
 .squircle {
   border-radius: 24px;
 }
@@ -77,15 +114,11 @@ a,
 
 .glow-hover:hover {
   box-shadow: var(--glow-hover-shadow,
-    0 0 15px rgba(255, 107, 53, 0.25),
+    0 0 15px rgba(var(--accent-rgb), 0.25),
     0 0 35px rgba(75, 29, 115, 0.3)
   );
 }
 
-
-/* =========================
-   GLOBAL TEXT
-========================= */
 .neon-title {
   font-size: clamp(1.3rem, 2.5vw, 1.8rem);
   margin: 0 0 1rem;
@@ -102,10 +135,6 @@ a,
   color: var(--error-text);
 }
 
-
-/* =========================
-   GLOBAL SURFACES
-========================= */
 .view-shell,
 .quiz-play,
 .question-card,
@@ -121,10 +150,6 @@ a,
   );
 }
 
-
-/* =========================
-   GLOBAL BUTTONS
-========================= */
 .primary-button,
 .secondary-button,
 .danger-button,
@@ -138,11 +163,11 @@ a,
 }
 
 .primary-button {
-  border: 1px solid rgba(255, 107, 53, 0.45);
+  border: 1px solid rgba(var(--accent-rgb), 0.45);
   color: var(--text-accent);
   background: linear-gradient(
     90deg,
-    rgba(255, 107, 53, 0.28),
+    rgba(var(--accent-rgb), 0.28),
     rgba(75, 29, 115, 0.35)
   );
   box-shadow: var(--primary-shadow);
@@ -206,10 +231,6 @@ a,
     0 0 36px rgba(127, 29, 29, 0.35);
 }
 
-
-/* =========================
-   SCROLLBAR
-========================= */
 ::-webkit-scrollbar {
   width: 10px;
 }
@@ -221,16 +242,12 @@ a,
 ::-webkit-scrollbar-thumb {
   background: linear-gradient(
     180deg,
-    rgba(255, 107, 53, 0.7),
+    rgba(var(--accent-rgb), 0.7),
     rgba(75, 29, 115, 0.8)
   );
   border-radius: 999px;
 }
 
-
-/* =========================
-   ANIMATIONS
-========================= */
 @keyframes fadeIn {
   from {
     opacity: 0;

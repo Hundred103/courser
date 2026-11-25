@@ -1,38 +1,59 @@
 
 !!!!!!!!!!!!!!!KONTENERY MUSZA CHODZIC!!!!!!!!!!!!!!!
----------------komendy wykonywac w folderze postgre---------------
 
-Uwaga: teraz postgres jest skonfigurowany tak, by przy pierwszym uruchomieniu wykonać plik `dump.sql` umieszczony w `/docker-entrypoint-initdb.d/`.
-Jeżeli chcesz zainicjalizować bazę automatycznie, umieść `dump.sql` w tym katalogu (już zmapowane w `docker-compose.yml`).
+Wymagania: Docker z wtyczką Compose v2 (`docker compose`, nie `docker-compose`).
 
----INICJALIZACJA (pierwsze uruchomienie)---
-- Umieść `dump.sql` w tym katalogu repo: `./postgre/dump.sql` i uruchom `docker-compose up -d`.
-	Postgres wykona skrypt tylko jeśli wolumen danych jest pusty.
+---KONFIGURACJA (jednorazowo, z katalogu głównego repo)---
+cp .env.example .env
+Uzupełnij w `.env` hasło bazy (POSTGRES_PASSWORD) i sekret JWT (APP_JWT_SECRET, co najmniej 32 bajty,
+np. `openssl rand -base64 48`). Plik `.env` nie trafia do repozytorium; bez niego `docker compose` się nie uruchomi.
 
----RĘCZNY IMPORT (kontener już działa)---
+---URUCHOMIENIE / RESET BAZY (z katalogu głównego repo)---
+docker compose down
+docker volume rm courser-postgres-data
+docker compose up -d
+
+Usługi quiz-service i user-service startują dopiero po pomyślnym zakończeniu Liquibase
+(`depends_on: service_completed_successfully`). `docker compose up -d --wait` czeka wyłącznie
+na serwisy ze zdefiniowanym healthcheckiem (PostgreSQL i media) — nie polegaj na nim jako
+gwarancji zakończenia migracji Liquibase.
+
+Sprawdzenie statusu migracji:
+docker compose ps -a liquibase
+docker inspect -f '{{ .State.ExitCode }}' courser-liquibase
+
+Domyślnie Liquibase tworzy tylko schemat (kontekst `!seed AND !seed-legacy`), bez danych przykładowych ani starych seedów.
+
+---DANE PRZYKŁADOWE (tylko lokalnie, na świeżej bazie)---
+Dane przykładowe zawierają konto testowe ze znanym hasłem, więc nigdy nie włączaj ich na serwerze.
+Ustaw w `.env`: LIQUIBASE_CONTEXTS=seed, a następnie zresetuj bazę jak wyżej.
+
+Seed (019-seed-demo-data.sql):
+- konto: example@email.com / 12345678! (username: example)
+- quizy: Geografia, Informatyka, Historia
+- ranking: wpisy użytkownika example w Top 5 każdego z trzech quizów
+- statystyki dzienne za ostatnie 30 dni (od dnia migracji)
+
+Stare seedy 002/013 mają kontekst seed-legacy i nie uruchamiają się razem z seed.
+
+---RĘCZNE URUCHOMIENIE LIQUIBASE (lokalnie, bez Dockera)---
+Wymaga zainstalowanego Liquibase CLI oraz działającego PostgreSQL na porcie 5433.
+Hasło podaj przez zmienną środowiskową, nie w pliku:
+
+cd postgre/liquibase
+LIQUIBASE_COMMAND_PASSWORD=<hasło z .env> liquibase --defaults-file=liquibase.properties update
+
+Z danymi przykładowymi (świeża baza):
+LIQUIBASE_COMMAND_PASSWORD=<hasło z .env> liquibase --defaults-file=liquibase.properties --contexts=seed update
+
+---EXPORT (zrzut istniejącej bazy, kopia zapasowa)---
 (Linux/Mac):
-docker exec -i courser-postgres psql -U courseruser -d courserdb < dump.sql
+docker exec courser-postgres sh -c 'pg_dump --encoding=UTF8 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > backup.sql
 
-(Windows PowerShell):
-Get-Content .\dump.sql | docker exec -i courser-postgres psql -U courseruser -d courserdb
-
-Jeżeli chcesz wyczyścić schemat przed importem:
-docker exec -it courser-postgres psql -U courseruser -d courserdb -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-
----EXPORT (zrzut istniejącej bazy)---
-(Linux/Mac):
-docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d courserdb > dump.sql
-
-(Windows cmd):
-cmd /c "docker exec courser-postgres pg_dump --encoding=UTF8 -U courseruser -d courserdb > dump.sql"
+Zrzut zawiera hasze haseł i sesje użytkowników: nie commituj go do repozytorium.
 
 ---UWAGI DLA USŁUG (quiz-service i user-service)---
-- Obie usługi korzystają z tej samej bazy `courserdb` (użytkownik `courseruser`).
-- Jeżeli chcesz zresetować bazę i ponownie uruchomić inicjalizację z `dump.sql`: zatrzymaj kontenery, usuń wolumen danych i uruchom ponownie:
-
-docker-compose down
-docker volume rm courser-postgres-data
-docker-compose up -d
-
-To spowoduje, że postgres wykona `dump.sql` ponownie przy starcie i utworzy schemat wymagany przez obie usługi.
-
+- Schemat bazy jest zarządzany przez Liquibase (katalog `postgre/liquibase/changelog/`).
+- Obie usługi korzystają z tej samej bazy (dane dostępu z `.env`).
+- Hibernate `ddl-auto` jest ustawione na `validate` — zmiany schematu wprowadzaj wyłącznie przez Liquibase.
+- Nowe migracje dodawaj jako pliki `.sql` w `postgre/liquibase/changelog/changes/` (prefiks numeryczny dla kolejności alfabetycznej); `includeAll` w `db.changelog-master.xml` załaduje je automatycznie.
