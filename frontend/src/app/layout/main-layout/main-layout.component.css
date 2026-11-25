@@ -49,6 +49,13 @@ main {
 
 @media (max-width: 768px) {
   .app-shell {
-    padding: 0.8rem;
+    padding: max(0.7rem, env(safe-area-inset-top, 0px))
+      max(0.7rem, env(safe-area-inset-right, 0px))
+      max(0.7rem, env(safe-area-inset-bottom, 0px))
+      max(0.7rem, env(safe-area-inset-left, 0px));
+  }
+
+  .content-shell {
+    gap: 0.85rem;
   }
 }
