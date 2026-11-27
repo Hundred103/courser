@@ -10,7 +10,10 @@
   min-height: 100vh;
   place-items: center;
   overflow: hidden;
-  padding: 2rem;
+  padding: max(2rem, var(--safe-area-top))
+    max(2rem, var(--safe-area-right))
+    max(2rem, var(--safe-area-bottom))
+    max(2rem, var(--safe-area-left));
   background:
     radial-gradient(
       circle at 18% 18%,
@@ -77,8 +80,8 @@
 
 .brand-link {
   position: absolute;
-  top: 1.35rem;
-  left: 1.5rem;
+  top: max(1.35rem, var(--safe-area-top));
+  left: max(1.5rem, var(--safe-area-left));
   color: var(--text-title);
   font-size: 1.15rem;
   font-weight: 900;
@@ -94,10 +97,10 @@
   .auth-shell {
     align-items: stretch;
     padding:
-      max(4.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem))
-      max(1rem, env(safe-area-inset-right, 0px))
-      max(1rem, env(safe-area-inset-bottom, 0px))
-      max(1rem, env(safe-area-inset-left, 0px));
+      max(4.5rem, calc(var(--safe-area-top) + 3.5rem))
+      max(1rem, var(--safe-area-right))
+      max(1rem, var(--safe-area-bottom))
+      max(1rem, var(--safe-area-left));
   }
 
   .brand-backdrop {
@@ -106,8 +109,8 @@
   }
 
   .brand-link {
-    left: max(1rem, env(safe-area-inset-left, 0px));
-    top: max(1rem, env(safe-area-inset-top, 0px));
+    left: max(1rem, var(--safe-area-left));
+    top: max(1rem, var(--safe-area-top));
   }
 
   .auth-stage {

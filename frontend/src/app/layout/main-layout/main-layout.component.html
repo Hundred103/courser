@@ -1,8 +1,10 @@
 <div class="app-shell">
   <app-navbar
-    [isHome]="isHome()"
+    [isHome]="!!home()"
+    [quizDrawerOpen]="home()?.quizDrawerOpen() ?? false"
     [editor]="editor()"
     (createQuiz)="requestCreateQuiz()"
+    (openQuizDrawer)="home()?.openQuizDrawer()"
     (returnHome)="requestHome()"
   ></app-navbar>
 

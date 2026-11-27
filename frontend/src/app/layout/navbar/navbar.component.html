@@ -1,9 +1,17 @@
-<header class="topbar squircle">
+<header class="topbar squircle" [class.editing]="editor()?.isEditMode()" [class.has-editor]="!!editor()">
   <div class="topbar-start">
     <a class="brand" routerLink="/">Courser</a>
     @if (!isHome()) {
       <button class="desktop-nav primary-button squircle" type="button" (click)="returnHome.emit()">
         <span aria-hidden="true">←</span> Strona główna
+      </button>
+      <button class="compact-nav compact-back primary-button squircle" type="button" aria-label="Strona główna"
+        (click)="returnHome.emit()">←</button>
+    } @else {
+      <button class="compact-nav compact-quizzes secondary-button squircle" type="button" aria-haspopup="dialog"
+        aria-controls="quiz-drawer" [attr.aria-expanded]="quizDrawerOpen()" (click)="openQuizDrawer.emit()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        Quizy
       </button>
     }
   </div>
@@ -16,11 +24,11 @@
 
     @if (editor(); as quizEditor) {
       @if (quizEditor.isEditMode()) {
-        <button class="desktop-nav primary-button squircle" type="button" [disabled]="!quizEditor.canUndoChanges()" (click)="quizEditor.undoChanges()">
+        <button class="desktop-nav editor-action primary-button squircle" type="button" [disabled]="!quizEditor.canUndoChanges()" (click)="quizEditor.undoChanges()">
           Cofnij zmiany
         </button>
       }
-      <button class="desktop-nav primary-button squircle" type="button"
+      <button class="desktop-nav editor-action primary-button squircle" type="button"
         [disabled]="!quizEditor.canSave()" [title]="quizEditor.saveButtonTitle()" (click)="quizEditor.saveQuiz()">
         {{ quizEditor.isSaving() ? 'Zapisywanie...' : 'Zapisz quiz' }}
       </button>
@@ -34,6 +42,7 @@
       @if (user(); as currentUser) {
         <div class="desktop-nav desktop-account">
           <button #accountTrigger class="account-trigger secondary-button squircle" type="button"
+            [attr.aria-label]="'Konto: ' + currentUser.username"
             [attr.aria-expanded]="accountOpen()" aria-controls="courser-account-actions"
             (click)="accountOpen.set(!accountOpen())">
             <span class="account-initial" aria-hidden="true">{{ currentUser.username.charAt(0).toUpperCase() }}</span>
@@ -46,25 +55,8 @@
           </div>
         </div>
       }
-      <button
-        class="mobile-nav secondary-button squircle"
-        type="button"
-        (click)="onSettingsClick()">
-        Ustawienia
-      </button>
-      <button
-        class="mobile-nav secondary-button squircle"
-        type="button"
-        (click)="logout()">
-        Wyloguj
-      </button>
     } @else {
-      <a class="desktop-nav primary-button squircle" routerLink="/login">Zaloguj się</a>
-      <a
-        class="mobile-nav secondary-button squircle"
-        routerLink="/login">
-        Zaloguj się
-      </a>
+      <a class="desktop-nav account-login primary-button squircle" routerLink="/login">Zaloguj się</a>
     }
   </nav>
 </header>

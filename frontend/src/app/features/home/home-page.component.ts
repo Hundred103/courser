@@ -1,5 +1,8 @@
-import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { Component, ElementRef, computed, effect, inject, output, signal, viewChild } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
+import { fromEvent, map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { DailyStatistics, QuizScoreService } from '../../core/services/quiz-score.service';
 import { SidebarComponent } from '../../layout/sidebar/sidebar.component';
@@ -10,13 +13,21 @@ interface Bucket { label: string; quizzes: number; questions: number; sum: numbe
 interface ChartScale { min: number; max: number; ticks: readonly number[]; intervals: number; hasNegative: boolean; }
 
 @Component({
-  selector: 'app-home-page', standalone: true, imports: [RouterLink, SidebarComponent],
+  selector: 'app-home-page', standalone: true, imports: [NgTemplateOutlet, RouterLink, SidebarComponent],
   templateUrl: './home-page.component.html', styleUrl: './home-page.component.css',
 })
 export class HomePageComponent {
   readonly auth = inject(AuthService);
   private readonly scores = inject(QuizScoreService);
   private readonly quizLibrary = viewChild.required(SidebarComponent);
+  private readonly quizDrawer = viewChild<ElementRef<HTMLDialogElement>>('quizDrawer');
+  private readonly drawerMedia = window.matchMedia('(width < 901px)');
+  readonly compact = toSignal(fromEvent<MediaQueryListEvent>(this.drawerMedia, 'change').pipe(map(event => event.matches)), {
+    initialValue: this.drawerMedia.matches,
+  });
+  private readonly drawerOpen = signal(false);
+  readonly quizDrawerOpen = computed(() => this.compact() && this.drawerOpen());
+  readonly accountAction = output<'settings' | 'logout'>();
   readonly period = signal<Period>('week');
   readonly metric = signal<Metric>('questions');
   readonly daily = signal<DailyStatistics[]>([]);
@@ -42,6 +53,10 @@ export class HomePageComponent {
 
   constructor() {
     effect(() => {
+      if (!this.compact()) this.drawerOpen.set(false);
+    });
+
+    effect(() => {
       const userId = this.userId();
       this.scores.scoresVersion();
       if (userId === null) { this.daily.set([]); return; }
@@ -60,6 +75,47 @@ export class HomePageComponent {
   requestCreateQuiz(): void {
     this.quizLibrary().requestCreateQuiz();
   }
+
+  openQuizDrawer(): void {
+    const drawer = this.quizDrawer()?.nativeElement;
+    if (!drawer || drawer.open) return;
+    drawer.showModal();
+    this.drawerOpen.set(true);
+  }
+
+  closeQuizDrawer(): void {
+    this.quizDrawer()?.nativeElement.close();
+    this.drawerOpen.set(false);
+  }
+
+  onDrawerClose(): void {
+    const drawer = this.quizDrawer()?.nativeElement;
+    if (drawer?.open) return;
+    this.drawerOpen.set(false);
+    const account = drawer?.querySelector('details');
+    if (account) account.open = false;
+  }
+
+  onDrawerCancel(event: Event): void {
+    if (this.quizDrawer()?.nativeElement.querySelector('.confirm-overlay')) event.preventDefault();
+  }
+
+  onDrawerClick(event: MouseEvent): void {
+    const drawer = this.quizDrawer()?.nativeElement;
+    if (event.target === drawer) {
+      this.closeQuizDrawer();
+      return;
+    }
+
+    const account = drawer?.querySelector<HTMLDetailsElement>('.drawer-account[open]');
+    if (account && event.target instanceof Node && !account.contains(event.target)) account.open = false;
+  }
+
+  runDrawerAccountAction(action: 'settings' | 'logout'): void {
+    this.closeQuizDrawer();
+    this.accountAction.emit(action);
+  }
+
   value(bucket: Bucket): number | null {
     return this.metric() === 'questions' ? bucket.questions : this.metric() === 'quizzes' ? bucket.quizzes
       : bucket.count ? bucket.sum / bucket.count / 100 : null;

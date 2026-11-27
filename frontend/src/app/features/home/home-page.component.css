@@ -86,21 +86,156 @@ p { color: var(--text-soft); line-height: 1.55; }
 .welcome { padding: clamp(1.5rem,4vw,3rem); min-height: 280px; display: grid; align-content: center; justify-items: start; gap: .7rem; }
 .welcome p { max-width: 540px; }
 .login { display: inline-block; margin-top: .5rem; text-decoration: none; }
+@media (width < 901px) {
+  .dashboard,
+  .dashboard-body { grid-template-columns: minmax(0, 1fr); }
+  .dashboard { width: 100%; }
+  .periods { width: 100%; flex-wrap: nowrap; overflow-x: auto; }
+  .periods button { flex: 1 0 auto; white-space: nowrap; }
+  .chart-header { align-items: center; }
+}
+
 @media (max-width: 760px) {
-  .cards { grid-template-columns: 1fr; }
   .stat-card { min-height: 0; }
   .chart-card { padding: 1rem; }
-  .periods { width: 100%; }
-  .periods button { flex: 1 1 auto; padding: .6rem .7rem; text-align: center; }
-  .metric-switch { width: 100%; }
-  .metric-switch button { flex: 1 1 auto; text-align: center; }
   .chart-layout { grid-template-columns: 3.6rem minmax(0, 1fr); gap: .15rem; }
   .y-axis-tick { right: .3rem; }
   .welcome { min-height: 0; padding: 1.25rem; }
 }
 
+@media (width < 650px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .effectiveness-card { grid-column: 1 / -1; }
+  .periods button { padding: .6rem .7rem; }
+}
+
+@media (max-width: 545px) {
+  .chart-header { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .metric-switch button { flex: 1 1 auto; text-align: center; }
+}
+
 @media (max-width: 560px) {
   .dashboard-header { padding-bottom: 1.2rem; }
+  .cards { gap: .6rem; }
+  .stat-card { padding: .8rem; }
+  .periods { gap: .1rem; padding: .2rem; }
+  .periods button { padding: .55rem .2rem; font-size: .74rem; }
   .chart-header { gap: .75rem; }
   .today-value strong { font-size: 2.4rem; }
 }
+
+.quiz-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(88vw, 25rem);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid var(--edge-strong);
+  border-radius: 0 18px 18px 0;
+  background: var(--bg-1);
+  color: var(--text-main);
+  box-shadow: 12px 0 40px rgba(0, 0, 0, .45);
+  overscroll-behavior: contain;
+}
+
+.quiz-drawer::backdrop { background: rgba(10, 11, 14, .62); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .quiz-drawer[open] { animation: drawer-slide-in .18s ease-out; }
+}
+
+@keyframes drawer-slide-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.quiz-drawer-content {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: .8rem;
+  padding: max(.8rem, var(--safe-area-top)) .8rem
+    max(.8rem, var(--safe-area-bottom)) max(.8rem, var(--safe-area-left));
+}
+
+.quiz-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+
+.quiz-drawer-header h2 { margin: 0; }
+.drawer-close {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 1.45rem;
+}
+
+.quiz-drawer-footer {
+  margin-top: auto;
+  padding-top: .8rem;
+  border-top: 1px solid var(--edge);
+}
+
+.drawer-login { display: block; text-align: center; }
+.drawer-account { position: relative; }
+.drawer-account summary {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  min-height: 44px;
+  padding: .4rem .65rem;
+  list-style: none;
+}
+
+.drawer-account summary::-webkit-details-marker { display: none; }
+.drawer-account-initial {
+  display: grid;
+  place-items: center;
+  flex: 0 0 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  color: var(--accent-pale);
+  background: rgba(var(--accent-rgb), .22);
+}
+
+.drawer-account-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer-account-actions {
+  position: absolute;
+  inset: auto 0 calc(100% + .4rem);
+  z-index: 14;
+  display: grid;
+  padding: .35rem;
+  border: 1px solid var(--edge-strong);
+  border-radius: 14px;
+  background: #1f2025;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .42);
+}
+
+.drawer-account-actions button {
+  min-height: 44px;
+  padding: .45rem .65rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drawer-account-actions button:hover,
+.drawer-account-actions button:focus-visible { background: rgba(255, 255, 255, .07); }

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { HomePageComponent } from '../../features/home/home-page.component';
 import { QuizCreatePageComponent } from '../../features/quiz-create/quiz-create-page.component';
@@ -16,15 +16,31 @@ export class MainLayoutComponent {
   private readonly router = inject(Router);
 
   readonly activePage = signal<unknown>(null);
-  readonly isHome = computed(() => this.activePage() instanceof HomePageComponent);
+  readonly home = computed(() => {
+    const page = this.activePage();
+    return page instanceof HomePageComponent ? page : null;
+  });
   readonly editor = computed(() => {
     const page = this.activePage();
     return page instanceof QuizCreatePageComponent ? page : null;
   });
+  private readonly navbar = viewChild.required(NavbarComponent);
+
+  constructor() {
+    effect(onCleanup => {
+      const home = this.home();
+      if (!home) return;
+      const subscription = home.accountAction.subscribe(action => {
+        const navbar = this.navbar();
+        if (action === 'settings') navbar.onSettingsClick();
+        else navbar.logout();
+      });
+      onCleanup(() => subscription.unsubscribe());
+    });
+  }
 
   requestCreateQuiz(): void {
-    const page = this.activePage();
-    if (page instanceof HomePageComponent) page.requestCreateQuiz();
+    this.home()?.requestCreateQuiz();
   }
 
   requestHome(): void {

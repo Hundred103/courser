@@ -4,8 +4,12 @@
 }
 
 .app-shell {
+  --shell-gutter: 1.2rem;
   min-height: 100vh;
-  padding: 1.2rem;
+  padding: max(var(--shell-gutter), var(--safe-area-top))
+    max(var(--shell-gutter), var(--safe-area-right))
+    max(var(--shell-gutter), var(--safe-area-bottom))
+    max(var(--shell-gutter), var(--safe-area-left));
   background:
     radial-gradient(
       circle at 15% 10%,
@@ -30,21 +34,26 @@ main {
   min-width: 0;
 }
 
-@media (min-width: 901px) {
-  app-navbar {
-    position: sticky;
-    top: 0;
-    z-index: 12;
-    display: flow-root;
-  }
+app-navbar {
+  position: sticky;
+  top: var(--safe-area-top);
+  z-index: 12;
+  display: flow-root;
+}
+
+app-navbar::before {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--safe-area-top));
+  left: calc(-1 * max(var(--shell-gutter), var(--safe-area-left)));
+  right: calc(-1 * max(var(--shell-gutter), var(--safe-area-right)));
+  height: var(--safe-area-top);
+  background: var(--bg-0);
+  pointer-events: none;
 }
 
 @media (max-width: 768px) {
   .app-shell {
-    padding: max(0.7rem, env(safe-area-inset-top, 0px))
-      max(0.7rem, env(safe-area-inset-right, 0px))
-      max(0.7rem, env(safe-area-inset-bottom, 0px))
-      max(0.7rem, env(safe-area-inset-left, 0px));
+    --shell-gutter: 0.7rem;
   }
-
 }

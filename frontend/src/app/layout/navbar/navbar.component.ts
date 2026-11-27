@@ -19,8 +19,10 @@ export class NavbarComponent {
   readonly user = this.authService.user;
   readonly isLoggedIn = this.authService.isLoggedIn;
   readonly isHome = input(false);
+  readonly quizDrawerOpen = input(false);
   readonly editor = input<QuizCreatePageComponent | null>(null);
   readonly createQuiz = output<void>();
+  readonly openQuizDrawer = output<void>();
   readonly returnHome = output<void>();
   readonly accountOpen = signal(false);
   private readonly accountTrigger = viewChild<ElementRef<HTMLButtonElement>>('accountTrigger');

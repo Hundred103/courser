@@ -3,10 +3,8 @@
   padding: 1.2rem;
 }
 
-@media (min-width: 901px) {
-  .view-shell > .top-actions {
-    display: none;
-  }
+.view-shell > .top-actions {
+  display: none;
 }
 
 .top-actions {
