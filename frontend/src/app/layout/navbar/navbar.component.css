@@ -6,7 +6,7 @@
   justify-content: flex-end;
   align-items: center;
   padding: 1rem 1.4rem;
-  margin-bottom: 1rem;
+  margin-bottom: var(--topbar-gap, 1rem);
   backdrop-filter: blur(4px);
 }
 

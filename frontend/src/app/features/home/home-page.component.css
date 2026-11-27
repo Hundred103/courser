@@ -144,8 +144,10 @@ p { color: var(--text-soft); line-height: 1.55; }
 
 .quiz-drawer::backdrop { background: rgba(10, 11, 14, .62); }
 
-@media (prefers-reduced-motion: no-preference) {
-  .quiz-drawer[open] { animation: drawer-slide-in .18s ease-out; }
+.quiz-drawer[open] { animation: drawer-slide-in 220ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .quiz-drawer[open] { animation: none; }
 }
 
 @keyframes drawer-slide-in {

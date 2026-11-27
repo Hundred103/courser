@@ -2,9 +2,6 @@
   <div class="topbar-start">
     <a class="brand" routerLink="/">Courser</a>
     @if (!isHome()) {
-      <button class="desktop-nav primary-button squircle" type="button" (click)="returnHome.emit()">
-        <span aria-hidden="true">←</span> Strona główna
-      </button>
       <button class="compact-nav compact-back primary-button squircle" type="button" aria-label="Strona główna"
         (click)="returnHome.emit()">←</button>
     } @else {

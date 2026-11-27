@@ -5,11 +5,13 @@
 
 .app-shell {
   --shell-gutter: 1.2rem;
+  --shell-left: max(var(--shell-gutter), var(--safe-area-left));
+  --shell-right: max(var(--shell-gutter), var(--safe-area-right));
+  --shell-top: max(var(--shell-gutter), var(--safe-area-top));
   min-height: 100vh;
-  padding: max(var(--shell-gutter), var(--safe-area-top))
-    max(var(--shell-gutter), var(--safe-area-right))
+  padding: var(--shell-top) var(--shell-right)
     max(var(--shell-gutter), var(--safe-area-bottom))
-    max(var(--shell-gutter), var(--safe-area-left));
+    var(--shell-left);
   background:
     radial-gradient(
       circle at 15% 10%,
@@ -41,19 +43,27 @@ app-navbar {
   display: flow-root;
 }
 
-app-navbar::before {
-  content: "";
-  position: absolute;
-  top: calc(-1 * var(--safe-area-top));
-  left: calc(-1 * max(var(--shell-gutter), var(--safe-area-left)));
-  right: calc(-1 * max(var(--shell-gutter), var(--safe-area-right)));
-  height: var(--safe-area-top);
-  background: var(--bg-0);
-  pointer-events: none;
-}
-
 @media (max-width: 768px) {
   .app-shell {
     --shell-gutter: 0.7rem;
+  }
+}
+
+@media (width < 901px), (hover: none) and (pointer: coarse) {
+  .app-shell {
+    padding-top: 0;
+  }
+
+  app-navbar {
+    --topbar-gap: 0px;
+    top: 0;
+    margin-left: calc(0px - var(--shell-left));
+    margin-right: calc(0px - var(--shell-right));
+    padding: var(--shell-top) var(--shell-right) 0 var(--shell-left);
+    background-color: var(--bg-1);
+  }
+
+  main {
+    margin-top: 1rem;
   }
 }
