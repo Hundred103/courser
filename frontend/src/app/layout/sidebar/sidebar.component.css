@@ -36,6 +36,27 @@
   );
 }
 
+@media (min-width: 901px) {
+  :host {
+    min-width: 0;
+  }
+
+  .sidebar {
+    position: relative;
+    top: auto;
+    min-height: 0;
+  }
+
+  .sidebar:has(.options-menu) {
+    z-index: 13;
+  }
+
+  .sidebar .sidebar-actions,
+  .sidebar .sidebar-divider {
+    display: none;
+  }
+}
+
 .sidebar-heading {
   margin-bottom: 1rem;
 }
@@ -158,8 +179,6 @@ h2 {
 
 .quiz-item .primary-button {
   flex: 0 0 auto;
-  padding: 0.65rem;
-  font-size: 0.88rem;
   text-align: center;
   white-space: nowrap;
 }

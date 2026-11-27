@@ -1,7 +1,8 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { DailyStatistics, QuizScoreService } from '../../core/services/quiz-score.service';
+import { SidebarComponent } from '../../layout/sidebar/sidebar.component';
 
 type Period = 'today' | 'week' | 'month' | 'year' | 'all';
 type Metric = 'questions' | 'quizzes' | 'effectiveness';
@@ -9,12 +10,13 @@ interface Bucket { label: string; quizzes: number; questions: number; sum: numbe
 interface ChartScale { min: number; max: number; ticks: readonly number[]; intervals: number; hasNegative: boolean; }
 
 @Component({
-  selector: 'app-home-page', standalone: true, imports: [RouterLink],
+  selector: 'app-home-page', standalone: true, imports: [RouterLink, SidebarComponent],
   templateUrl: './home-page.component.html', styleUrl: './home-page.component.css',
 })
 export class HomePageComponent {
   readonly auth = inject(AuthService);
   private readonly scores = inject(QuizScoreService);
+  private readonly quizLibrary = viewChild.required(SidebarComponent);
   readonly period = signal<Period>('week');
   readonly metric = signal<Metric>('questions');
   readonly daily = signal<DailyStatistics[]>([]);
@@ -53,6 +55,10 @@ export class HomePageComponent {
       next: data => { this.daily.set(data); this.loading.set(false); },
       error: () => { this.error.set(true); this.loading.set(false); },
     });
+  }
+
+  requestCreateQuiz(): void {
+    this.quizLibrary().requestCreateQuiz();
   }
   value(bucket: Bucket): number | null {
     return this.metric() === 'questions' ? bucket.questions : this.metric() === 'quizzes' ? bucket.quizzes

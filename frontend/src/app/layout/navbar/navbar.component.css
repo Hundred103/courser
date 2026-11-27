@@ -47,6 +47,139 @@
   gap: 0.75rem;
 }
 
+.topbar .desktop-nav,
+.account-divider {
+  display: none;
+}
+
+@media (min-width: 901px) {
+  .topbar {
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: .5rem;
+  }
+
+  .topbar-start {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .brand {
+    position: static;
+    transform: none;
+    font-size: clamp(1.333rem, 2.667vw, 1.933rem);
+    line-height: 1.15;
+  }
+
+  .brand:hover {
+    transform: translateY(-2px) scale(1.02);
+  }
+
+  .topbar .desktop-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    white-space: nowrap;
+  }
+
+  .topbar .primary-button:disabled {
+    cursor: default;
+    opacity: .5;
+    transform: none;
+    box-shadow: var(--primary-shadow);
+  }
+
+  .topbar .mobile-nav {
+    display: none;
+  }
+
+  .account-divider {
+    display: block;
+    width: 1px;
+    height: 1.4rem;
+    flex-shrink: 0;
+    background: var(--edge-strong);
+  }
+
+  .desktop-account {
+    position: relative;
+  }
+
+  .account-trigger {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+  }
+
+  .topbar .desktop-nav.primary-button,
+  .topbar .account-trigger,
+  .topbar .account-actions button {
+    padding: .62rem .85rem;
+    font-size: .9rem;
+    line-height: 1.25rem;
+  }
+
+  .account-initial {
+    display: grid;
+    place-items: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    color: var(--accent-pale);
+    background: rgba(var(--accent-rgb), .22);
+  }
+
+  .account-name {
+    max-width: clamp(6rem, 12vw, 12rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .account-chevron {
+    width: .85rem;
+    height: .85rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+  }
+
+  .account-actions {
+    position: absolute;
+    top: calc(100% + .55rem);
+    right: 0;
+    display: grid;
+    min-width: 10rem;
+    gap: .25rem;
+    padding: .4rem;
+    border: 1px solid var(--edge-strong);
+    border-radius: 14px;
+    background: #1f2025;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, .42);
+  }
+
+  .account-actions[hidden] {
+    display: none;
+  }
+
+  .account-actions button {
+    border: 0;
+    border-radius: 10px;
+    color: var(--text-main);
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .account-actions button:hover,
+  .account-actions button:focus-visible {
+    background: rgba(255, 255, 255, .07);
+  }
+}
+
 .settings-overlay {
   position: fixed;
   inset: 0;

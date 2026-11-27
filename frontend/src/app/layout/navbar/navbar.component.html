@@ -1,25 +1,67 @@
 <header class="topbar squircle">
-  <a class="brand" routerLink="/">
-    Courser
-  </a>
+  <div class="topbar-start">
+    <a class="brand" routerLink="/">Courser</a>
+    @if (!isHome()) {
+      <button class="desktop-nav primary-button squircle" type="button" (click)="returnHome.emit()">
+        <span aria-hidden="true">←</span> Strona główna
+      </button>
+    }
+  </div>
 
   <nav class="topbar-actions">
+    @if (isHome()) {
+      <button class="desktop-nav primary-button squircle" type="button" (click)="createQuiz.emit()">Utwórz</button>
+      <a class="desktop-nav primary-button squircle" routerLink="/quizzes/import">Importuj</a>
+    }
+
+    @if (editor(); as quizEditor) {
+      @if (quizEditor.isEditMode()) {
+        <button class="desktop-nav primary-button squircle" type="button" [disabled]="!quizEditor.canUndoChanges()" (click)="quizEditor.undoChanges()">
+          Cofnij zmiany
+        </button>
+      }
+      <button class="desktop-nav primary-button squircle" type="button"
+        [disabled]="!quizEditor.canSave()" [title]="quizEditor.saveButtonTitle()" (click)="quizEditor.saveQuiz()">
+        {{ quizEditor.isSaving() ? 'Zapisywanie...' : 'Zapisz quiz' }}
+      </button>
+    }
+
+    @if (isHome() || editor()) {
+      <span class="account-divider" aria-hidden="true"></span>
+    }
+
     @if (isLoggedIn()) {
+      @if (user(); as currentUser) {
+        <div class="desktop-nav desktop-account">
+          <button #accountTrigger class="account-trigger secondary-button squircle" type="button"
+            [attr.aria-expanded]="accountOpen()" aria-controls="courser-account-actions"
+            (click)="accountOpen.set(!accountOpen())">
+            <span class="account-initial" aria-hidden="true">{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+            <span class="account-name">{{ currentUser.username }}</span>
+            <svg class="account-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </button>
+          <div id="courser-account-actions" class="account-actions squircle" [hidden]="!accountOpen()">
+            <button type="button" (click)="onSettingsClick()">Ustawienia</button>
+            <button type="button" (click)="logout()">Wyloguj</button>
+          </div>
+        </div>
+      }
       <button
-        class="secondary-button squircle"
+        class="mobile-nav secondary-button squircle"
         type="button"
         (click)="onSettingsClick()">
         Ustawienia
       </button>
       <button
-        class="secondary-button squircle"
+        class="mobile-nav secondary-button squircle"
         type="button"
         (click)="logout()">
         Wyloguj
       </button>
     } @else {
+      <a class="desktop-nav primary-button squircle" routerLink="/login">Zaloguj się</a>
       <a
-        class="secondary-button squircle"
+        class="mobile-nav secondary-button squircle"
         routerLink="/login">
         Zaloguj się
       </a>

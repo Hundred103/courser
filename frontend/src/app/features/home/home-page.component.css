@@ -1,5 +1,7 @@
 :host { display: block; }
+.home-layout { display: grid; gap: 1rem; align-items: start; }
 .dashboard { display: grid; gap: 1.5rem; max-width: 1440px; margin: 0 auto; }
+.dashboard-body { display: grid; gap: 1.5rem; min-width: 0; }
 .dashboard-header { padding: .6rem .15rem 2rem; }
 .eyebrow { display: block; color: var(--accent-bright); font-size: .72rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; margin-bottom: .6rem; }
 h1, h2, p { margin: 0; }
@@ -7,6 +9,36 @@ h1 { color: var(--text-title); font-size: clamp(2rem, 4vw, 3.2rem); letter-spaci
 h2 { color: var(--text-title); font-size: 1.35rem; margin-bottom: .45rem; }
 p { color: var(--text-soft); line-height: 1.55; }
 .dashboard-header p { margin-top: .7rem; }
+
+@media (min-width: 901px) {
+  .home-layout {
+    grid-template-columns: clamp(360px, 27.333vw, 430px) minmax(0, 1fr);
+  }
+
+  .with-dashboard .dashboard {
+    display: contents;
+  }
+
+  .with-dashboard .dashboard-header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    padding-bottom: .6rem;
+  }
+
+  .with-dashboard app-sidebar {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .with-dashboard .dashboard-body {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-layout { gap: .85rem; }
+}
 .periods, .metric-switch { display: flex; flex-wrap: wrap; gap: .35rem; }
 .periods button, .metric-switch button { cursor: pointer; color: var(--text-soft); border: 1px solid transparent; background: transparent; border-radius: 12px; padding: .65rem 1rem; font: inherit; font-size: .86rem; font-weight: 700; }
 .periods { width: fit-content; padding: .3rem; border: 1px solid var(--edge); border-radius: 16px; background: rgba(255,255,255,.025); }
