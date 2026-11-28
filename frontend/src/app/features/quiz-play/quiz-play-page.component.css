@@ -10,8 +10,7 @@
 }
 
 @media (width < 901px) {
-  .top-actions .back-button,
-  .view-shell > .top-actions:not(:has(.top-ranking-timer, .keyboard-shortcuts)) {
+  .top-actions .back-button {
     display: none;
   }
 
@@ -33,6 +32,18 @@
   justify-items: end;
   gap: 0.35rem;
   margin-left: auto;
+}
+
+.hide-shortcut-legend .top-right-info,
+.view-shell > .hide-shortcut-legend:not(:has(.top-ranking-timer)) {
+  display: none;
+}
+
+@media (width < 901px), (hover: none) and (pointer: coarse) {
+  .top-actions .top-right-info,
+  .view-shell > .top-actions:not(:has(.top-ranking-timer)) {
+    display: none;
+  }
 }
 
 .keyboard-shortcuts {
@@ -186,7 +197,7 @@
   color: #93c5fd;
 }
 
-@media (min-width: 1200px) {
+@media (min-width: 1470px) {
   .quiz-play-layout {
     width: 100%;
     padding-right: 0;
@@ -614,15 +625,6 @@
   .top-actions {
     flex-wrap: wrap;
     gap: 0.65rem;
-  }
-
-  .top-right-info {
-    width: 100%;
-    justify-items: start;
-  }
-
-  .keyboard-shortcuts {
-    display: none;
   }
 }
 

@@ -1,5 +1,5 @@
 <section class="view-shell squircle">
-  <div class="top-actions">
+  <div class="top-actions" [class.hide-shortcut-legend]="isMobileDevice">
     <button class="back-button primary-button squircle" type="button" (click)="requestExitQuiz()">
       Strona główna
     </button>
