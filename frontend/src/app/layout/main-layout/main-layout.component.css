@@ -59,8 +59,10 @@ app-navbar {
     top: 0;
     margin-left: calc(0px - var(--shell-left));
     margin-right: calc(0px - var(--shell-right));
-    padding: var(--shell-top) var(--shell-right) 0 var(--shell-left);
+    padding: var(--shell-top) var(--shell-right) var(--shell-top) var(--shell-left);
+    border-bottom: 1px solid var(--edge-strong);
     background-color: var(--bg-1);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
   }
 
   main {
