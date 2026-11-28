@@ -293,10 +293,8 @@
         <h3 id="quiz-settings-title">{{ quizToStart.title }}</h3>
         <div class="start-facts">
           <p>Pytania: {{ quizToStart.questionCount }}</p>
-          @if (isLoggedIn() && completedAttemptsCount(); as attempts) {
-            <p>Ukończone podejścia: {{ attempts }}</p>
-          } @else if (isLoggedIn() && completedAttemptsCount() === 0) {
-            <p>Ukończone podejścia: 0</p>
+          @if (isLoggedIn() && quizToStart.id > 0) {
+            <p>Ukończone podejścia: {{ completedAttemptsCount() ?? '—' }}</p>
           }
         </div>
       </header>

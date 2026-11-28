@@ -1,7 +1,8 @@
-import { Component, ElementRef, HostListener, ViewChild, computed, inject, output, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject, output, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
-import { catchError, finalize, of } from 'rxjs';
+import { EMPTY, Subscription, catchError, finalize } from 'rxjs';
 import { QuizRawDTO } from '../../core/models/quiz.model';
 import { AuthService } from '../../core/services/auth.service';
 import { QuizApiService } from '../../core/services/quiz-api.service';
@@ -24,6 +25,8 @@ export class SidebarComponent {
   private readonly authService = inject(AuthService);
   private readonly quizScoreService = inject(QuizScoreService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  private attemptsCountRequest?: Subscription;
 
   @ViewChild('titleInput') private titleInput?: ElementRef<HTMLInputElement>;
 
@@ -40,7 +43,6 @@ export class SidebarComponent {
   readonly busyQuizId = signal<number | null>(null);
   readonly quizPendingDelete = signal<QuizRawDTO | null>(null);
   readonly quizPendingStart = signal<QuizRawDTO | null>(null);
-  readonly startQuizLoading = signal(false);
   readonly startRandomQuestionOrder = signal(false);
   readonly startStudyMode = signal(false);
   readonly completedAttemptsCount = signal<number | null>(null);
@@ -353,28 +355,22 @@ export class SidebarComponent {
 
   requestStartQuiz(quiz: QuizRawDTO): void {
     this.openMenuQuizId.set(null);
+    this.attemptsCountRequest?.unsubscribe();
+    this.completedAttemptsCount.set(null);
+    this.startRandomQuestionOrder.set(normalizeQuizLimits(quiz.limits).randomQuestionOrder);
+    this.startStudyMode.set(false);
+    this.quizPendingStart.set(quiz);
 
-    if (this.startQuizLoading()) {
-      return;
+    if (this.isLoggedIn() && quiz.id > 0) {
+      this.attemptsCountRequest = this.quizScoreService.getCompletedAttemptsCount(quiz.id)
+        .pipe(catchError(() => EMPTY), takeUntilDestroyed(this.destroyRef))
+        .subscribe(attempts => this.completedAttemptsCount.set(attempts));
     }
-
-    this.startQuizLoading.set(true);
-
-    const completedAttemptsCount = this.isLoggedIn() && quiz.id > 0
-      ? this.quizScoreService.getCompletedAttemptsCount(quiz.id).pipe(catchError(() => of(null)))
-      : of(null);
-
-    completedAttemptsCount
-      .pipe(finalize(() => this.startQuizLoading.set(false)))
-      .subscribe((attempts) => {
-        this.quizPendingStart.set(quiz);
-        this.startRandomQuestionOrder.set(normalizeQuizLimits(quiz.limits).randomQuestionOrder);
-        this.startStudyMode.set(false);
-        this.completedAttemptsCount.set(attempts);
-      });
   }
 
   cancelStartQuiz(): void {
+    this.attemptsCountRequest?.unsubscribe();
+    this.attemptsCountRequest = undefined;
     this.quizPendingStart.set(null);
     this.completedAttemptsCount.set(null);
   }
@@ -386,8 +382,7 @@ export class SidebarComponent {
       return;
     }
 
-    this.quizPendingStart.set(null);
-    this.completedAttemptsCount.set(null);
+    this.cancelStartQuiz();
     void this.router.navigate(['/quizzes', quiz.id, 'play'], {
       queryParams: {
         randomQuestionOrder: this.startRandomQuestionOrder(),
