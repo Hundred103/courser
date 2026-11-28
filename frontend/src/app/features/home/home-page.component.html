@@ -1,3 +1,36 @@
+<div class="home-layout" [class.with-dashboard]="auth.isLoggedIn()">
+@if (compact()) {
+  <dialog #quizDrawer id="quiz-drawer" class="quiz-drawer" aria-labelledby="quiz-drawer-title"
+    (click)="onDrawerClick($event)" (cancel)="onDrawerCancel($event)" (close)="onDrawerClose()">
+    <div class="quiz-drawer-content">
+      <header class="quiz-drawer-header">
+        <h2 id="quiz-drawer-title" tabindex="-1" autofocus>Twoje quizy</h2>
+        <button class="secondary-button squircle drawer-close" type="button" aria-label="Zamknij quizy"
+          (click)="closeQuizDrawer()">×</button>
+      </header>
+      <ng-container [ngTemplateOutlet]="library" [ngTemplateOutletContext]="{ drawer: true }"></ng-container>
+
+      <footer class="quiz-drawer-footer">
+        @if (auth.user(); as user) {
+          <details class="drawer-account">
+            <summary class="secondary-button squircle">
+              <span class="drawer-account-initial" aria-hidden="true">{{ user.username.charAt(0).toUpperCase() }}</span>
+              <span class="drawer-account-name">{{ user.username }}</span>
+            </summary>
+            <div class="drawer-account-actions">
+              <button type="button" (click)="runDrawerAccountAction('settings')">Ustawienia</button>
+              <button type="button" (click)="runDrawerAccountAction('logout')">Wyloguj</button>
+            </div>
+          </details>
+        } @else {
+          <a class="primary-button squircle drawer-login" routerLink="/login">Zaloguj się</a>
+        }
+      </footer>
+    </div>
+  </dialog>
+} @else {
+  <ng-container [ngTemplateOutlet]="library"></ng-container>
+}
 @if (!auth.isLoggedIn()) {
   <section class="welcome squircle fade-in">
     <h1>Witaj w Courser</h1>
@@ -9,6 +42,7 @@
     <header class="dashboard-header">
       <div><h1>Witaj, {{ auth.user()?.username }}!</h1></div>
     </header>
+    <div class="dashboard-body">
     <nav class="periods" aria-label="Okres statystyk">
       @for (item of periods; track item.id) {
         <button type="button" [class.active]="period() === item.id" [attr.aria-pressed]="period() === item.id" (click)="period.set(item.id)">{{ item.label }}</button>
@@ -47,5 +81,11 @@
         @if (!totals().quizzes) { <p class="empty">Brak ukończonych quizów w wybranym okresie. Rozwiąż quiz, aby zobaczyć swoje postępy.</p> }
       </section>
     }
+    </div>
   </section>
 }
+</div>
+
+<ng-template #library let-drawer="drawer">
+  <app-sidebar [class.mobile-library]="drawer"></app-sidebar>
+</ng-template>

@@ -8,9 +8,15 @@ body {
 }
 
 :root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
   --bg-0: #111214;
   --bg-1: #1a1c20;
   --bg-2: #252830;
+  --auth-edge-color: #19141b;
+  --bottom-edge-color: #1d2027;
   --text-main: #e6e6e8;
   --text-soft: #bebec4;
   --text-title: #f4eef8;
@@ -85,6 +91,49 @@ body {
 body {
   color: var(--text-main);
   overflow-x: hidden;
+}
+
+:root:has(app-auth-layout) {
+  --bottom-edge-color: #1b1e27;
+}
+
+html:has(app-auth-layout),
+html:has(app-auth-layout) body {
+  background-color: var(--auth-edge-color);
+}
+
+html:has(.quiz-drawer[open]) {
+  overflow: hidden;
+}
+
+.confirm-overlay,
+.settings-overlay {
+  padding: max(1rem, var(--safe-area-top))
+    max(1rem, var(--safe-area-right))
+    max(1rem, var(--safe-area-bottom))
+    max(1rem, var(--safe-area-left));
+}
+
+@media (width < 901px) {
+  body {
+    overflow-x: clip;
+  }
+
+  .confirm-overlay,
+  .settings-overlay {
+    width: 100dvw;
+    height: 100dvh;
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  }
+
+  .confirm-banner,
+  .settings-modal {
+    max-width: 100%;
+    max-height: 100%;
+    overflow: auto;
+    overscroll-behavior: contain;
+    overflow-wrap: anywhere;
+  }
 }
 
 * {

@@ -6,7 +6,7 @@
   justify-content: flex-end;
   align-items: center;
   padding: 1rem 1.4rem;
-  margin-bottom: 1rem;
+  margin-bottom: var(--topbar-gap, 1rem);
   backdrop-filter: blur(4px);
 }
 
@@ -47,13 +47,142 @@
   gap: 0.75rem;
 }
 
+.topbar .desktop-nav,
+.compact-nav,
+.account-divider {
+  display: none;
+}
+
+@media (min-width: 901px) {
+  .topbar {
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: .5rem;
+  }
+
+  .topbar-start {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .brand {
+    position: static;
+    transform: none;
+    font-size: clamp(1.333rem, 2.667vw, 1.933rem);
+    line-height: 1.15;
+  }
+
+  .brand:hover {
+    transform: translateY(-2px) scale(1.02);
+  }
+
+  .topbar .desktop-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    white-space: nowrap;
+  }
+
+  .topbar .primary-button:disabled {
+    cursor: default;
+    opacity: .5;
+    transform: none;
+    box-shadow: var(--primary-shadow);
+  }
+
+  .account-divider {
+    display: block;
+    width: 1px;
+    height: 1.4rem;
+    flex-shrink: 0;
+    background: var(--edge-strong);
+  }
+
+  .desktop-account {
+    position: relative;
+  }
+
+  .account-trigger {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+  }
+
+  .topbar .desktop-nav.primary-button,
+  .topbar .account-trigger,
+  .topbar .account-actions button {
+    padding: .62rem .85rem;
+    font-size: .9rem;
+    line-height: 1.25rem;
+  }
+
+  .account-initial {
+    display: grid;
+    place-items: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    color: var(--accent-pale);
+    background: rgba(var(--accent-rgb), .22);
+  }
+
+  .account-name {
+    max-width: clamp(6rem, 12vw, 12rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .account-chevron {
+    width: .85rem;
+    height: .85rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+  }
+
+  .account-actions {
+    position: absolute;
+    top: calc(100% + .55rem);
+    right: 0;
+    display: grid;
+    min-width: 10rem;
+    gap: .25rem;
+    padding: .4rem;
+    border: 1px solid var(--edge-strong);
+    border-radius: 14px;
+    background: #1f2025;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, .42);
+  }
+
+  .account-actions[hidden] {
+    display: none;
+  }
+
+  .account-actions button {
+    border: 0;
+    border-radius: 10px;
+    color: var(--text-main);
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .account-actions button:hover,
+  .account-actions button:focus-visible {
+    background: rgba(255, 255, 255, .07);
+  }
+}
+
 .settings-overlay {
   position: fixed;
   inset: 0;
   z-index: 40;
   display: grid;
   place-items: center;
-  padding: 1rem;
   background: rgba(10, 11, 14, 0.62);
   backdrop-filter: blur(5px);
 }
@@ -107,38 +236,154 @@
   .setting-field { grid-template-columns: 1fr; gap: .6rem; }
   .setting-field input, .accent-picker-area { grid-column: 1; }
   .accent-options { width: 100%; }
+}
+
+@media (max-width: 350px) {
   .settings-actions { flex-direction: column; }
   .settings-actions .primary-button,
   .settings-actions .secondary-button { width: 100%; text-align: center; }
 }
 
-@media (max-width: 768px) {
+@media (width < 901px) {
+  .setting-field,
+  .setting-field input,
+  .accent-picker-area { min-width: 0; }
+
+  .accent-options {
+    position: static;
+    margin-top: .55rem;
+    width: 100%;
+  }
+
   .topbar {
-    justify-content: center;
-    padding: 0.85rem 0.95rem;
-    flex-direction: column;
-    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: .35rem;
+    padding: .45rem .55rem;
+  }
+
+  .topbar-start {
+    display: contents;
   }
 
   .brand {
+    grid-column: 2;
+    grid-row: 1;
     position: static;
     transform: none;
-    font-size: clamp(1.7rem, 8vw, 2.35rem);
+    font-size: clamp(1.15rem, 5.6vw, 1.65rem);
+    line-height: 1.2;
   }
 
   .brand:hover {
     transform: translateY(-2px) scale(1.02);
   }
 
-  .topbar-actions {
-    width: 100%;
+  .topbar .compact-nav,
+  .topbar .editor-action,
+  .topbar .account-login,
+  .topbar .desktop-account {
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
-    flex-wrap: wrap;
   }
 
-  .topbar-actions .secondary-button {
-    flex: 1 1 auto;
-    min-width: 7.5rem;
-    text-align: center;
+  .compact-nav,
+  .topbar .editor-action,
+  .topbar .account-login,
+  .account-trigger {
+    min-height: 44px;
+    padding: .35rem .5rem;
+    font-size: .8rem;
+    white-space: nowrap;
+  }
+
+  .compact-nav {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 44px;
+    justify-self: start;
+  }
+
+  .topbar .compact-back { font-size: 1.25rem; }
+  .compact-quizzes { gap: .25rem; }
+  .compact-quizzes svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 2;
+  }
+
+  .topbar-actions {
+    grid-column: 3;
+    grid-row: 1;
+    justify-content: flex-end;
+    gap: .35rem;
+  }
+
+  .topbar.editing { grid-template-columns: auto minmax(0, 1fr); }
+  .topbar.editing .brand,
+  .topbar.has-editor .desktop-account,
+  .topbar.has-editor .account-login { display: none; }
+  .topbar.editing .topbar-actions { grid-column: 2; }
+
+  .topbar .editor-action:disabled {
+    opacity: .5;
+    cursor: default;
+    transform: none;
+    box-shadow: var(--primary-shadow);
+  }
+
+  .desktop-account { position: relative; }
+  .account-trigger {
+    display: grid;
+    place-items: center;
+    min-width: 44px;
+  }
+
+  .account-initial {
+    display: grid;
+    place-items: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    color: var(--accent-pale);
+    background: rgba(var(--accent-rgb), .22);
+  }
+
+  .account-name,
+  .account-chevron { display: none; }
+
+  .account-actions {
+    position: absolute;
+    top: calc(100% + .5rem);
+    right: 0;
+    display: grid;
+    min-width: 9rem;
+    padding: .35rem;
+    border: 1px solid var(--edge-strong);
+    border-radius: 14px;
+    background: #1f2025;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, .42);
+  }
+
+  .account-actions[hidden] { display: none; }
+  .account-actions button {
+    min-height: 44px;
+    padding: .45rem .65rem;
+    border: 0;
+    border-radius: 10px;
+    color: var(--text-main);
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .account-actions button:hover,
+  .account-actions button:focus-visible {
+    background: rgba(255, 255, 255, .07);
   }
 }
