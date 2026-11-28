@@ -99,5 +99,5 @@
 </div>
 
 <ng-template #library let-drawer="drawer">
-  <app-sidebar [class.mobile-library]="drawer"></app-sidebar>
+  <app-sidebar [class.mobile-library]="drawer" (quizMenuOpened)="closeDrawerAccountMenu()"></app-sidebar>
 </ng-template>

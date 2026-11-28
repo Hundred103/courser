@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild, computed, inject, output, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, finalize, of } from 'rxjs';
@@ -33,6 +33,7 @@ export class SidebarComponent {
   readonly errorMessage = computed(() => this.quizApiService.quizList().status === 'error' ? 'Nie udało się pobrać listy quizów.' : '');
   readonly hasQuizzes = computed(() => this.quizzes().length > 0);
   readonly openMenuQuizId = signal<number | null>(null);
+  readonly quizMenuOpened = output<void>();
   readonly editingQuizId = signal<number | null>(null);
   readonly draftTitle = signal('');
   readonly renameError = signal('');
@@ -63,13 +64,21 @@ export class SidebarComponent {
     const target = event.target as HTMLElement;
 
     if (!target.closest('.quiz-options')) {
-      this.openMenuQuizId.set(null);
+      this.closeQuizMenu();
     }
+  }
+
+  closeQuizMenu(): boolean {
+    if (this.openMenuQuizId() === null) return false;
+    this.openMenuQuizId.set(null);
+    return true;
   }
 
   toggleMenu(quizId: number, event: MouseEvent): void {
     event.stopPropagation();
-    this.openMenuQuizId.update((currentQuizId) => (currentQuizId === quizId ? null : quizId));
+    const nextQuizId = this.openMenuQuizId() === quizId ? null : quizId;
+    this.openMenuQuizId.set(nextQuizId);
+    if (nextQuizId !== null) this.quizMenuOpened.emit();
   }
 
   requestCreateQuiz(): void {

@@ -144,17 +144,6 @@ p { color: var(--text-soft); line-height: 1.55; }
 
 .quiz-drawer::backdrop { background: rgba(10, 11, 14, .62); }
 
-.quiz-drawer[open] { animation: drawer-slide-in 220ms ease-out; }
-
-@media (prefers-reduced-motion: reduce) {
-  .quiz-drawer[open] { animation: none; }
-}
-
-@keyframes drawer-slide-in {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
-}
-
 .quiz-drawer-content {
   display: flex;
   min-height: 100%;

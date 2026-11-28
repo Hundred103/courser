@@ -26,6 +26,8 @@ export class HomePageComponent {
     initialValue: this.drawerMedia.matches,
   });
   private readonly drawerOpen = signal(false);
+  private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  private closingDrawer: HTMLDialogElement | null = null;
   readonly quizDrawerOpen = computed(() => this.compact() && this.drawerOpen());
   readonly accountAction = output<'settings' | 'logout'>();
   readonly period = signal<Period>('week');
@@ -81,39 +83,80 @@ export class HomePageComponent {
     if (!drawer || drawer.open) return;
     drawer.showModal();
     this.drawerOpen.set(true);
+    if (!this.reducedMotion.matches) {
+      drawer.animate(
+        [{ transform: 'translateX(-100%)' }, { transform: 'translateX(0)' }],
+        { duration: 210, easing: 'ease-out' },
+      );
+    }
   }
 
-  closeQuizDrawer(): void {
-    this.quizDrawer()?.nativeElement.close();
+  async closeQuizDrawer(): Promise<boolean> {
+    const drawer = this.quizDrawer()?.nativeElement;
+    if (!drawer?.open || this.closingDrawer === drawer) return false;
+
+    this.closingDrawer = drawer;
+    this.quizLibrary().closeQuizMenu();
+    const animation = this.animateDrawerClose(drawer);
+    if (animation) await animation.finished.catch(() => undefined);
+    if (this.closingDrawer === drawer) this.closingDrawer = null;
+
+    if (this.quizDrawer()?.nativeElement !== drawer || !drawer.open) {
+      animation?.cancel();
+      return false;
+    }
+
+    drawer.close();
+    animation?.cancel();
     this.drawerOpen.set(false);
+    return true;
+  }
+
+  private animateDrawerClose(drawer: HTMLDialogElement): Animation | undefined {
+    const transform = getComputedStyle(drawer).transform;
+    for (const animation of drawer.getAnimations()) animation.cancel();
+
+    if (this.reducedMotion.matches) return;
+    return drawer.animate(
+      [{ transform }, { transform: 'translateX(-100%)' }],
+      { duration: 160, easing: 'ease-in', fill: 'forwards' },
+    );
   }
 
   onDrawerClose(): void {
     const drawer = this.quizDrawer()?.nativeElement;
     if (drawer?.open) return;
     this.drawerOpen.set(false);
-    const account = drawer?.querySelector('details');
+    this.closeDrawerAccountMenu();
+  }
+
+  closeDrawerAccountMenu(): void {
+    const account = this.quizDrawer()?.nativeElement.querySelector<HTMLDetailsElement>('.drawer-account[open]');
     if (account) account.open = false;
   }
 
   onDrawerCancel(event: Event): void {
-    if (this.quizDrawer()?.nativeElement.querySelector('.confirm-overlay')) event.preventDefault();
+    event.preventDefault();
+    if (!this.quizDrawer()?.nativeElement.querySelector('.confirm-overlay')) {
+      void this.closeQuizDrawer();
+    }
   }
 
   onDrawerClick(event: MouseEvent): void {
     const drawer = this.quizDrawer()?.nativeElement;
+    const account = drawer?.querySelector<HTMLDetailsElement>('.drawer-account[open]');
     if (event.target === drawer) {
-      this.closeQuizDrawer();
+      const quizMenuClosed = this.quizLibrary().closeQuizMenu();
+      if (account) account.open = false;
+      if (!account && !quizMenuClosed) void this.closeQuizDrawer();
       return;
     }
 
-    const account = drawer?.querySelector<HTMLDetailsElement>('.drawer-account[open]');
     if (account && event.target instanceof Node && !account.contains(event.target)) account.open = false;
   }
 
-  runDrawerAccountAction(action: 'settings' | 'logout'): void {
-    this.closeQuizDrawer();
-    this.accountAction.emit(action);
+  async runDrawerAccountAction(action: 'settings' | 'logout'): Promise<void> {
+    if (await this.closeQuizDrawer()) this.accountAction.emit(action);
   }
 
   value(bucket: Bucket): number | null {
