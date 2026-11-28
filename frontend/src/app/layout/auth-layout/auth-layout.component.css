@@ -79,9 +79,10 @@
 }
 
 .brand-link {
-  position: absolute;
+  position: fixed;
   top: max(1.35rem, var(--safe-area-top));
   left: max(1.5rem, var(--safe-area-left));
+  z-index: 1;
   color: var(--text-title);
   font-size: 1.15rem;
   font-weight: 900;

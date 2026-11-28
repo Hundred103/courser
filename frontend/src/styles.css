@@ -16,6 +16,7 @@ body {
   --bg-1: #1a1c20;
   --bg-2: #252830;
   --auth-edge-color: #19141b;
+  --bottom-edge-color: #1d2027;
   --text-main: #e6e6e8;
   --text-soft: #bebec4;
   --text-title: #f4eef8;
@@ -90,6 +91,10 @@ body {
 body {
   color: var(--text-main);
   overflow-x: hidden;
+}
+
+:root:has(app-auth-layout) {
+  --bottom-edge-color: #1b1e27;
 }
 
 html:has(app-auth-layout),

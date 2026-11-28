@@ -172,6 +172,8 @@ p { color: var(--text-soft); line-height: 1.55; }
 }
 
 .quiz-drawer-header h2 { margin: 0; }
+.quiz-drawer-header h2:focus { outline: none; }
+
 .drawer-close {
   width: 44px;
   height: 44px;

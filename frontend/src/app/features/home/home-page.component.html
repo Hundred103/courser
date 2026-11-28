@@ -4,8 +4,8 @@
     (click)="onDrawerClick($event)" (cancel)="onDrawerCancel($event)" (close)="onDrawerClose()">
     <div class="quiz-drawer-content">
       <header class="quiz-drawer-header">
-        <h2 id="quiz-drawer-title">Twoje quizy</h2>
-        <button class="secondary-button squircle drawer-close" type="button" aria-label="Zamknij quizy" autofocus
+        <h2 id="quiz-drawer-title" tabindex="-1" autofocus>Twoje quizy</h2>
+        <button class="secondary-button squircle drawer-close" type="button" aria-label="Zamknij quizy"
           (click)="closeQuizDrawer()">×</button>
       </header>
       <ng-container [ngTemplateOutlet]="library" [ngTemplateOutletContext]="{ drawer: true }"></ng-container>

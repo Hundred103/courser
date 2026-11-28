@@ -4,3 +4,22 @@
   color: var(--text-main);
   font-family: 'Manrope', sans-serif;
 }
+
+.bottom-edge {
+  display: none;
+}
+
+@supports (-webkit-touch-callout: none) {
+  @media (hover: none) and (pointer: coarse) {
+    .bottom-edge {
+      /* Safari extends the solid color of a fixed element into its bottom toolbar. */
+      display: block;
+      position: fixed;
+      inset: auto 0 0;
+      z-index: 1;
+      height: max(11px, var(--safe-area-bottom));
+      background-color: var(--bottom-edge-color);
+      pointer-events: none;
+    }
+  }
+}
