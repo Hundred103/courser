@@ -245,15 +245,20 @@
 }
 
 @media (width < 901px) {
+  .settings-overlay {
+    grid-template-rows: minmax(min-content, 1fr);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .settings-modal {
+    max-height: none;
+    overflow: visible;
+  }
+
   .setting-field,
   .setting-field input,
   .accent-picker-area { min-width: 0; }
-
-  .accent-options {
-    position: static;
-    margin-top: .55rem;
-    width: 100%;
-  }
 
   .topbar {
     display: grid;

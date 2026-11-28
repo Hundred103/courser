@@ -70,6 +70,9 @@ export class QuizPlayPageComponent {
   private readonly quizScoreService = inject(QuizScoreService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  readonly isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
   private currentQuizId: number | null = null;
   private currentPlaySessionId: string | null = null;
   private exitDecision: ((canLeave: boolean) => void) | null = null;
