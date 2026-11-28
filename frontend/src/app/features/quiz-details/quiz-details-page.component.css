@@ -3,6 +3,10 @@
   padding: 1.2rem;
 }
 
+.view-shell > .top-actions {
+  display: none;
+}
+
 .top-actions {
   display: flex;
   justify-content: flex-start;

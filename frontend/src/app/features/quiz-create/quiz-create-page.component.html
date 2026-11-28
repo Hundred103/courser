@@ -203,22 +203,22 @@
     <div class="question-navigation" aria-label="Nawigacja między pytaniami">
       <div class="control-side left">
         @if (canGoPrevious()) {
-          <button class="question-nav-button secondary-button squircle" type="button" (click)="goPrevious()">
+          <button class="question-nav-button secondary-button squircle" type="button" aria-label="Poprzednie pytanie" (click)="goPrevious()">
             <span class="nav-arrow" aria-hidden="true">&larr;</span>
-            Poprzednie pytanie
+            <span class="nav-label">Poprzednie pytanie</span>
           </button>
         }
       </div>
 
       <div class="control-side right">
-        <button class="question-nav-button secondary-button squircle" type="button" (click)="goNext()">
+        <button class="question-nav-button secondary-button squircle" type="button" aria-label="Następne pytanie" (click)="goNext()">
           @if (rankingProtected() && currentIndex() === totalQuestions() - 1) {
             <span class="ranking-warning" role="img" tabindex="0" aria-label="Ostrzeżenie dotyczące rankingu" aria-describedby="ranking-add-question-tooltip" (click)="$event.stopPropagation()">
               <svg viewBox="2 3 20 17" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.5h.01" /></svg>
               <span id="ranking-add-question-tooltip" class="ranking-warning-tooltip" role="tooltip">Dodanie pytania utworzy prywatną kopię z własnym rankingiem.</span>
             </span>
           }
-          Następne pytanie
+          <span class="nav-label">Następne pytanie</span>
           <span class="nav-arrow" aria-hidden="true">&rarr;</span>
         </button>
       </div>

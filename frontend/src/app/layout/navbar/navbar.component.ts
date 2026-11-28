@@ -1,8 +1,9 @@
-import { Component, HostListener, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, inject, input, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { ACCENT_OPTIONS, AccentColor, DEFAULT_ACCENT_COLOR } from '../../core/models/theme.model';
+import type { QuizCreatePageComponent } from '../../features/quiz-create/quiz-create-page.component';
 
 @Component({
   selector: 'app-navbar',
@@ -17,6 +18,14 @@ export class NavbarComponent {
 
   readonly user = this.authService.user;
   readonly isLoggedIn = this.authService.isLoggedIn;
+  readonly isHome = input(false);
+  readonly quizDrawerOpen = input(false);
+  readonly editor = input<QuizCreatePageComponent | null>(null);
+  readonly createQuiz = output<void>();
+  readonly openQuizDrawer = output<void>();
+  readonly returnHome = output<void>();
+  readonly accountOpen = signal(false);
+  private readonly accountTrigger = viewChild<ElementRef<HTMLButtonElement>>('accountTrigger');
   readonly accentOptions = ACCENT_OPTIONS;
   readonly settingsOpen = signal(false);
   readonly accentListOpen = signal(false);
@@ -26,6 +35,7 @@ export class NavbarComponent {
   settingsAccent: AccentColor = DEFAULT_ACCENT_COLOR;
 
   onSettingsClick(): void {
+    this.accountOpen.set(false);
     const user = this.user();
     if (!user) return;
 
@@ -90,9 +100,21 @@ export class NavbarComponent {
     if (this.accentListOpen() && !target?.closest('.accent-picker-area')) {
       this.accentListOpen.set(false);
     }
+    if (this.accountOpen() && !target?.closest('.desktop-account')) {
+      this.accountOpen.set(false);
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  closeAccountMenu(): void {
+    if (this.accountOpen()) {
+      this.accountOpen.set(false);
+      this.accountTrigger()?.nativeElement.focus();
+    }
   }
 
   logout(): void {
+    this.accountOpen.set(false);
     // Same-URL navigation resolves false; log out immediately when already home.
     if (this.isHomeUrl(this.router.url)) {
       this.authService.logout();

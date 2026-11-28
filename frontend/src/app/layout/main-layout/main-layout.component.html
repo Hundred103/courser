@@ -1,13 +1,14 @@
 <div class="app-shell">
-  <app-navbar></app-navbar>
+  <app-navbar
+    [isHome]="!!home()"
+    [quizDrawerOpen]="home()?.quizDrawerOpen() ?? false"
+    [editor]="editor()"
+    (createQuiz)="requestCreateQuiz()"
+    (openQuizDrawer)="home()?.openQuizDrawer()"
+    (returnHome)="requestHome()"
+  ></app-navbar>
 
-  <div class="content-shell" [class.full-page]="!showSidebar()">
-    @if (showSidebar()) {
-      <app-sidebar></app-sidebar>
-    }
-
-    <main>
-      <router-outlet></router-outlet>
-    </main>
-  </div>
+  <main>
+    <router-outlet (activate)="activePage.set($event)" (deactivate)="activePage.set(null)"></router-outlet>
+  </main>
 </div>

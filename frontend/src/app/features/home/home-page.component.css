@@ -1,5 +1,7 @@
 :host { display: block; }
+.home-layout { display: grid; gap: 1rem; align-items: start; }
 .dashboard { display: grid; gap: 1.5rem; max-width: 1440px; margin: 0 auto; }
+.dashboard-body { display: grid; gap: 1.5rem; min-width: 0; }
 .dashboard-header { padding: .6rem .15rem 2rem; }
 .eyebrow { display: block; color: var(--accent-bright); font-size: .72rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; margin-bottom: .6rem; }
 h1, h2, p { margin: 0; }
@@ -7,6 +9,36 @@ h1 { color: var(--text-title); font-size: clamp(2rem, 4vw, 3.2rem); letter-spaci
 h2 { color: var(--text-title); font-size: 1.35rem; margin-bottom: .45rem; }
 p { color: var(--text-soft); line-height: 1.55; }
 .dashboard-header p { margin-top: .7rem; }
+
+@media (min-width: 901px) {
+  .home-layout {
+    grid-template-columns: clamp(360px, 27.333vw, 430px) minmax(0, 1fr);
+  }
+
+  .with-dashboard .dashboard {
+    display: contents;
+  }
+
+  .with-dashboard .dashboard-header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    padding-bottom: .6rem;
+  }
+
+  .with-dashboard app-sidebar {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .with-dashboard .dashboard-body {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-layout { gap: .85rem; }
+}
 .periods, .metric-switch { display: flex; flex-wrap: wrap; gap: .35rem; }
 .periods button, .metric-switch button { cursor: pointer; color: var(--text-soft); border: 1px solid transparent; background: transparent; border-radius: 12px; padding: .65rem 1rem; font: inherit; font-size: .86rem; font-weight: 700; }
 .periods { width: fit-content; padding: .3rem; border: 1px solid var(--edge); border-radius: 16px; background: rgba(255,255,255,.025); }
@@ -54,21 +86,160 @@ p { color: var(--text-soft); line-height: 1.55; }
 .welcome { padding: clamp(1.5rem,4vw,3rem); min-height: 280px; display: grid; align-content: center; justify-items: start; gap: .7rem; }
 .welcome p { max-width: 540px; }
 .login { display: inline-block; margin-top: .5rem; text-decoration: none; }
+@media (width < 901px) {
+  .dashboard,
+  .dashboard-body { grid-template-columns: minmax(0, 1fr); }
+  .dashboard { width: 100%; }
+  .periods { width: 100%; flex-wrap: nowrap; overflow-x: auto; }
+  .periods button { flex: 1 0 auto; white-space: nowrap; }
+  .chart-header { align-items: center; }
+}
+
 @media (max-width: 760px) {
-  .cards { grid-template-columns: 1fr; }
   .stat-card { min-height: 0; }
   .chart-card { padding: 1rem; }
-  .periods { width: 100%; }
-  .periods button { flex: 1 1 auto; padding: .6rem .7rem; text-align: center; }
-  .metric-switch { width: 100%; }
-  .metric-switch button { flex: 1 1 auto; text-align: center; }
   .chart-layout { grid-template-columns: 3.6rem minmax(0, 1fr); gap: .15rem; }
   .y-axis-tick { right: .3rem; }
   .welcome { min-height: 0; padding: 1.25rem; }
 }
 
+@media (width < 650px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .effectiveness-card { grid-column: 1 / -1; }
+  .periods button { padding: .6rem .7rem; }
+}
+
+@media (max-width: 545px) {
+  .chart-header { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .metric-switch button { flex: 1 1 auto; text-align: center; }
+}
+
 @media (max-width: 560px) {
   .dashboard-header { padding-bottom: 1.2rem; }
+  .cards { gap: .6rem; }
+  .stat-card { padding: .8rem; }
+  .periods { gap: .1rem; padding: .2rem; }
+  .periods button { padding: .55rem .2rem; font-size: .74rem; }
   .chart-header { gap: .75rem; }
   .today-value strong { font-size: 2.4rem; }
 }
+
+.quiz-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(88vw, 25rem);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid var(--edge-strong);
+  border-radius: 0 18px 18px 0;
+  background: var(--bg-1);
+  color: var(--text-main);
+  box-shadow: 12px 0 40px rgba(0, 0, 0, .45);
+  overscroll-behavior: contain;
+}
+
+.quiz-drawer::backdrop { background: rgba(10, 11, 14, .62); }
+
+.quiz-drawer[open] { animation: drawer-slide-in 220ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .quiz-drawer[open] { animation: none; }
+}
+
+@keyframes drawer-slide-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.quiz-drawer-content {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: .8rem;
+  padding: max(.8rem, var(--safe-area-top)) .8rem
+    max(.8rem, var(--safe-area-bottom)) max(.8rem, var(--safe-area-left));
+}
+
+.quiz-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+
+.quiz-drawer-header h2 { margin: 0; }
+.quiz-drawer-header h2:focus { outline: none; }
+
+.drawer-close {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 1.45rem;
+}
+
+.quiz-drawer-footer {
+  margin-top: auto;
+  padding-top: .8rem;
+  border-top: 1px solid var(--edge);
+}
+
+.drawer-login { display: block; text-align: center; }
+.drawer-account { position: relative; }
+.drawer-account summary {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  min-height: 44px;
+  padding: .4rem .65rem;
+  list-style: none;
+}
+
+.drawer-account summary::-webkit-details-marker { display: none; }
+.drawer-account-initial {
+  display: grid;
+  place-items: center;
+  flex: 0 0 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  color: var(--accent-pale);
+  background: rgba(var(--accent-rgb), .22);
+}
+
+.drawer-account-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer-account-actions {
+  position: absolute;
+  inset: auto 0 calc(100% + .4rem);
+  z-index: 14;
+  display: grid;
+  padding: .35rem;
+  border: 1px solid var(--edge-strong);
+  border-radius: 14px;
+  background: #1f2025;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .42);
+}
+
+.drawer-account-actions button {
+  min-height: 44px;
+  padding: .45rem .65rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drawer-account-actions button:hover,
+.drawer-account-actions button:focus-visible { background: rgba(255, 255, 255, .07); }

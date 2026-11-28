@@ -4,8 +4,14 @@
 }
 
 .app-shell {
+  --shell-gutter: 1.2rem;
+  --shell-left: max(var(--shell-gutter), var(--safe-area-left));
+  --shell-right: max(var(--shell-gutter), var(--safe-area-right));
+  --shell-top: max(var(--shell-gutter), var(--safe-area-top));
   min-height: 100vh;
-  padding: 1.2rem;
+  padding: var(--shell-top) var(--shell-right)
+    max(var(--shell-gutter), var(--safe-area-bottom))
+    var(--shell-left);
   background:
     radial-gradient(
       circle at 15% 10%,
@@ -25,37 +31,41 @@
     );
 }
 
-.content-shell {
-  display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
-  gap: 1rem;
-  align-items: start;
-}
-
-.content-shell.full-page {
-  grid-template-columns: 1fr;
-}
-
 main {
   width: 100%;
   min-width: 0;
 }
 
-@media (max-width: 900px) {
-  .content-shell {
-    grid-template-columns: 1fr;
-  }
+app-navbar {
+  position: sticky;
+  top: var(--safe-area-top);
+  z-index: 12;
+  display: flow-root;
 }
 
 @media (max-width: 768px) {
   .app-shell {
-    padding: max(0.7rem, env(safe-area-inset-top, 0px))
-      max(0.7rem, env(safe-area-inset-right, 0px))
-      max(0.7rem, env(safe-area-inset-bottom, 0px))
-      max(0.7rem, env(safe-area-inset-left, 0px));
+    --shell-gutter: 0.7rem;
+  }
+}
+
+@media (width < 901px), (hover: none) and (pointer: coarse) {
+  .app-shell {
+    padding-top: 0;
   }
 
-  .content-shell {
-    gap: 0.85rem;
+  app-navbar {
+    --topbar-gap: 0px;
+    top: 0;
+    margin-left: calc(0px - var(--shell-left));
+    margin-right: calc(0px - var(--shell-right));
+    padding: var(--shell-top) var(--shell-right) var(--shell-top) var(--shell-left);
+    border-bottom: 1px solid var(--edge-strong);
+    background-color: var(--bg-1);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  main {
+    margin-top: 1rem;
   }
 }
